@@ -40,10 +40,10 @@ Live Supabase and Vercel runtime verification has not been performed from this c
 Latest local commit:
 
 ```text
-af04b2e feat: phase 5 comments and activity timeline
+db35045 feat: add skip project creation button in onboarding flow
 ```
 
-Phase 5 added migration `202608260012_comments_activity.sql`, `src/lib/validation/comment.ts`, `src/components/issues/comments-section.tsx`, updates to `src/lib/issues.ts`, `src/types/database.ts`, `src/app/(dashboard)/dashboard/issues/[issueKey]/page.tsx`, `tests/comments.test.ts`, and updated documentation.
+Includes OLED pitch black UI palette, skip project creation button in onboarding, full RPC error diagnostics with `console.error`, and 13 applied migrations.
 
 Commit and push when ready (see below).
 
