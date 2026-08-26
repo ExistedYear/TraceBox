@@ -56,17 +56,17 @@ export function NewIssueForm({
     try {
       issueNumber = await createClient().rpc("create_issue", {
         p_project_id: projectId,
-        p_title: values.title,
+        p_title: values.title.trim(),
         p_type: values.type,
-        p_description: values.description || undefined,
+        p_description: values.description ? values.description.trim() : undefined,
         p_component_id: values.component_id || undefined,
         p_priority: values.priority,
         p_severity: values.severity,
         p_assignee_id: values.assignee_id || undefined,
-        p_environment: values.environment || undefined,
-        p_steps_to_reproduce: values.steps_to_reproduce || undefined,
-        p_expected_behavior: values.expected_behavior || undefined,
-        p_actual_behavior: values.actual_behavior || undefined,
+        p_environment: values.environment ? values.environment.trim() : undefined,
+        p_steps_to_reproduce: values.steps_to_reproduce ? values.steps_to_reproduce.trim() : undefined,
+        p_expected_behavior: values.expected_behavior ? values.expected_behavior.trim() : undefined,
+        p_actual_behavior: values.actual_behavior ? values.actual_behavior.trim() : undefined,
       });
     } catch {
       toast.error("Could not reach the server. Please try again.");

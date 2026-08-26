@@ -184,7 +184,18 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           p_updates: { [field]: value },
         });
         if (error) {
-          toast.error(error.message.includes("NOT_ALLOWED") ? "Developers and maintainers only." : error.message.includes("PROJECT_ARCHIVED") ? "This project is archived." : error.message.includes("INVALID_ASSIGNEE") ? "That assignee is not eligible for this project." : "Update rejected.");
+          const msg = String(error.message);
+          toast.error(
+            msg.includes("NOT_ALLOWED")
+              ? "Developers and maintainers only."
+              : msg.includes("PROJECT_ARCHIVED")
+                ? "This project is archived."
+                : msg.includes("INVALID_ASSIGNEE")
+                  ? "That assignee is not eligible for this project."
+                  : msg.includes("INVALID_COMPONENT")
+                    ? "That component is not available."
+                    : "Update rejected.",
+          );
           return;
         }
         toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);

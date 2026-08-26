@@ -117,6 +117,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
         organizationId={activeOrganizationId}
         onCreated={(projectId) => {
           selectProject(projectId);
+          router.push("/dashboard/issues");
           router.refresh();
         }}
       />
@@ -139,6 +140,7 @@ export function NewProjectButton({ organizationId }: { organizationId: string })
         organizationId={organizationId}
         onCreated={(projectId) => {
           selectProject(projectId);
+          router.push("/dashboard/issues");
           router.refresh();
         }}
       />
