@@ -63,8 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-  types/database.ts        generated DB types incl. RPC function signatures
-supabase/                  config.toml, migrations/ (12 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (13 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -142,6 +141,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260010_normalize_issue_updates.sql` | typed UUID comparisons and canonical audit values for inline issue edits |
 | `supabase/migrations/202608260011_component_mutation_rpcs.sql` | component create/update RPCs with project-first locking; direct component INSERT/UPDATE policies removed |
 | `supabase/migrations/202608260012_comments_activity.sql` | `comments` table, `can_comment_on_issue`, RPC-only `add_comment`/`edit_comment` (archived-project guard, Reporter+ add / author-or-Developer edit, 1–10k validation), `COMMENT_ADDED`/`COMMENT_EDITED` audit + `updated_at` bump, project-member RLS |
+| `supabase/migrations/202608260013_security_role_refinements.sql` | `project_role` Org Admin precedence, author self-edit REPORTER+ check, title/name trimming, background trigger context bypass |
 | `src/components/issues/comments-section.tsx` | Unified activity timeline (vertical trace line, dots) merging `issue_events` + `comments`; composer with `commentSchema` + `add_comment`; inline edit via `edit_comment`; mention/issue-ref token styling |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |

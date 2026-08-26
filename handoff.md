@@ -25,7 +25,7 @@ The final local gates passed:
 
 ```text
 TypeScript       ✓ (0 errors)
-Tests            60/60 ✓ (6 test files)
+Tests            61/61 ✓ (7 test files)
 Lint             0 errors
 Production build ✓ (Compiled successfully)
 git diff --check ✓
@@ -59,7 +59,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 12 ordered migrations, `202608260001` through `202608260012`. Inspect the installed CLI options before applying migrations:
+The repository contains 13 ordered migrations, `202608260001` through `202608260013`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help

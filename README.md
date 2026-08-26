@@ -23,7 +23,7 @@ Included today: email/password signup, login, logout, session refresh, workspace
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds twelve ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, project-first component mutation RPCs, and comments + activity (`comments` table, `can_comment_on_issue`, `add_comment`/`edit_comment`, `COMMENT_ADDED`/`COMMENT_EDITED` audit).
+`supabase/migrations/` holds thirteen ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, project-first component mutation RPCs, comments + activity (`comments` table, `can_comment_on_issue`, `add_comment`/`edit_comment`, `COMMENT_ADDED`/`COMMENT_EDITED` audit), and role/security refinements.
 
 ## Quality checks
 
