@@ -45,27 +45,29 @@ describe("eventSummary", () => {
 });
 
 describe("issueCreateSchema", () => {
-  it("accepts a minimal valid issue", () => {
-    const result = issueCreateSchema.safeParse({ title: "Crash on save", type: "BUG", priority: "P2", severity: "MAJOR" });
-    expect(result.success).toBe(true);
+  const base = { title: "Crash on save", description: "Steps included", type: "BUG", component_id: "c1c6bdf0-0000-4000-8000-000000000001" };
+
+  it("accepts a valid issue with required description and component", () => {
+    expect(issueCreateSchema.safeParse({ ...base, priority: "P2", severity: "MAJOR" }).success).toBe(true);
   });
 
-  it("requires title within bounds and a known type", () => {
-    expect(issueCreateSchema.safeParse({ title: "", type: "BUG" }).success).toBe(false);
-    expect(issueCreateSchema.safeParse({ title: "x".repeat(201), type: "BUG" }).success).toBe(false);
-    expect(issueCreateSchema.safeParse({ title: "ok", type: "NOT_A_TYPE" }).success).toBe(false);
+  it("requires title, description, component and a known type", () => {
+    expect(issueCreateSchema.safeParse({ ...base, title: "" }).success).toBe(false);
+    expect(issueCreateSchema.safeParse({ ...base, description: "" }).success).toBe(false);
+    expect(issueCreateSchema.safeParse({ ...base, component_id: "" }).success).toBe(false);
+    expect(issueCreateSchema.safeParse({ ...base, type: "NOT_A_TYPE" }).success).toBe(false);
   });
 
   it("rejects non-uuid component or assignee hints", () => {
-    expect(issueCreateSchema.safeParse({ title: "ok", type: "BUG", component_id: "nope" }).success).toBe(false);
+    expect(issueCreateSchema.safeParse({ ...base, component_id: "nope" }).success).toBe(false);
+    expect(issueCreateSchema.safeParse({ ...base, assignee_id: "nope" }).success).toBe(false);
   });
 });
 
 describe("issue filter codecs", () => {
-  it("round-trips set filters and omits empty ones", () => {
-    const filters = { priority: "P1", type: "BUG" };
-    expect(encodeIssueFilters(filters)).toEqual({ priority: "P1", type: "BUG" });
-    expect(encodeIssueFilters({})).toEqual({});
+  it("encodes set filters and drops empty values", () => {
+    expect(encodeIssueFilters({ priority: "P1", type: "BUG" })).toEqual({ priority: "P1", type: "BUG" });
+    expect(encodeIssueFilters({ priority: "", severity: undefined })).toEqual({});
   });
 
   it("decodes only whitelisted ids and enum-ish values", () => {

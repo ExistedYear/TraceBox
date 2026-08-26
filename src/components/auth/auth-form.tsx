@@ -65,7 +65,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsGithubLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback` } });
+      const requestedNext = getSafeRedirectPath(searchParams.get("next"));
+      const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(requestedNext)}` } });
       if (error) throw error;
     } catch (error) {
       toast.error(error instanceof Error ? getSafeAuthErrorMessage(error.message) : "GitHub sign-in is not available yet.");

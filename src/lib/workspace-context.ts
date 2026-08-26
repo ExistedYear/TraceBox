@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -7,6 +8,7 @@ import type { ProjectSummary, WorkspaceSummary } from "@/components/layout/works
 export type WorkspaceContext = {
   userId: string;
   email: string;
+  profile: { display_name: string | null; avatar_url: string | null } | null;
   organizations: WorkspaceSummary[];
   activeOrganization: WorkspaceSummary;
   projects: ProjectSummary[];
@@ -14,11 +16,12 @@ export type WorkspaceContext = {
 };
 
 // Shared server-side resolution of the cookie-backed workspace/project context.
-// Mirrors the dashboard layout so any page can fetch consistent context.
-export async function getWorkspaceContext(): Promise<WorkspaceContext> {
+// cache() dedupes layout + page calls within one request.
+export const getWorkspaceContext = cache(async function getWorkspaceContext(): Promise<WorkspaceContext> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const { data: profile } = await supabase.from("profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle();
 
   const { data: membershipRows } = await supabase
     .from("organization_members")
@@ -45,9 +48,10 @@ export async function getWorkspaceContext(): Promise<WorkspaceContext> {
   return {
     userId: user.id,
     email: user.email ?? "",
+    profile,
     organizations,
     activeOrganization,
     projects,
     activeProject,
   };
-}
+});

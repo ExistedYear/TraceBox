@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), currently at the **deployment-foundation stage**: working email/password + GitHub OAuth auth, `profiles` table with RLS, protected dashboard. Dashboard feature pages (issues, teams, projects, releases, settings) render **fixture data only** (`src/components/tracebox/issue-data.ts`); only auth flow and profile reads touch real Supabase. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 1 = Organizations + Projects).
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 4 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, and a dense TanStack issue table (filters/sorting/pagination/inline editing). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. Remaining fixture-free goal: the marketing landing page still shows illustrative product imagery. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 1 = Organizations + Projects).
 
 ## Architecture & Data Flow
 
@@ -43,7 +43,7 @@ src/components/
                            workspace-switcher (org/project dropdowns + new-project dialog),
                            theme-toggle, page-header
   auth/auth-form.tsx       dual-mode ('use client') login/signup form
-  tracebox/                brand marks (trace-mark) + remaining fixture demo sections
+  tracebox/                brand marks (trace-mark), dashboard overview, primitives kit
   issues/                  new-issue-form, issue-table (TanStack v8 client table)
   settings/project-settings.tsx   components manager + workflow viewer tabs
 src/lib/
@@ -105,7 +105,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Server/client split**: pages/layouts stay async server components calling Supabase directly (`await createClient(); supabase.from("profiles")…maybeSingle()`). `'use client'` only on interactive leaves. Dynamic params are awaited as `Promise<{id: string}>` (Next 16 idiom).
 - **JSX style**: most components compress elements onto single long lines; multiline JSX appears only in newer files (root layout, primitives, dashboard-overview). Match the surrounding file.
 - **Forms**: zod schema in `src/lib/validation/`, inferred type export, `useForm<T>({ resolver: zodResolver(schema) })`.
-- **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath`.
+- **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath` (control chars rejected).
 - **UI**: shadcn/ui default style + Lucide icons + Tailwind HSL CSS-variable tokens (`darkMode: ["class"]`; root html is dark by default). Add primitives with the shadcn CLI, configured by `components.json` (aliases `@/components`, `@/components/ui`, `@/lib/utils`).
 - **Repo laws** (enforced by both plans in `docs/`): every schema change ships as a versioned migration (`supabase/migrations/YYYYMMDDNNNN_name.sql`) — never dashboard-only changes; never disable RLS; never expose service-role keys to client bundles; no fake navigation/pages for unimplemented features (current fixture pages are acknowledged demo debt, not a pattern to copy).
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`) own transactional writes incl. membership rows; clients call `supabase.rpc(...)` via the browser client. Direct client inserts into membership tables are blocked by missing INSERT policies — keep it that way.
@@ -128,6 +128,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260003_create_components_workflow.sql` | components + workflow_states/workflow_transitions; `create_project` seeds the 7-state default workflow and transitions |
 | `supabase/migrations/202608260004_create_issues.sql` | issues + immutable issue_events; atomic `create_issue` (counter lock, ISSUE_CREATED event); `project_role`, `can_view_issue`; Reporter+ insert policy |
 | `supabase/migrations/202608260005_update_issue_fields.sql` | `update_issue_fields` RPC — Developer/Maintainer inline edits with per-field audit events |
+| `supabase/migrations/202608260006_security_hardening.sql` | audit hardening: issues INSERT policy dropped (RPC-only creation), owner/created-by/reporter FKs RESTRICT, column-scoped UPDATE grants on orgs/projects, org-aware `project_role`, owner-honoring `is_org_admin`, FOR UPDATE audit reads, duplicate index dropped |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |

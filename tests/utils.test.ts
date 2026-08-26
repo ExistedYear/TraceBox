@@ -26,3 +26,10 @@ describe("getSafeAuthErrorMessage", () => {
     expect(getSafeAuthErrorMessage("database connection details")).toBe("Something went wrong. Please try again.");
   });
 });
+
+describe("getSafeRedirectPath control characters", () => {
+  it("rejects control-char smuggled scheme-relative redirects", () => {
+    expect(getSafeRedirectPath("/\n//evil.com")).toBe("/dashboard");
+    expect(getSafeRedirectPath("/\t//evil.com")).toBe("/dashboard");
+  });
+});

@@ -10,9 +10,13 @@ describe("loginSchema", () => {
     });
   });
 
-  it("rejects malformed credentials", () => {
-    const result = loginSchema.safeParse({ email: "not-an-email", password: "" });
+  it("rejects a malformed email", () => {
+    const result = loginSchema.safeParse({ email: "not-an-email", password: "password" });
+    expect(result.success).toBe(false);
+  });
 
+  it("rejects an empty password", () => {
+    const result = loginSchema.safeParse({ email: "user@example.com", password: "" });
     expect(result.success).toBe(false);
   });
 });
@@ -32,9 +36,13 @@ describe("signupSchema", () => {
     });
   });
 
-  it("rejects short names and passwords", () => {
-    const result = signupSchema.safeParse({ displayName: "A", email: "ada@example.com", password: "short" });
+  it("rejects a short display name", () => {
+    const result = signupSchema.safeParse({ displayName: "A", email: "ada@example.com", password: "correct-horse-battery-staple" });
+    expect(result.success).toBe(false);
+  });
 
+  it("rejects a short password", () => {
+    const result = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "short" });
     expect(result.success).toBe(false);
   });
 });

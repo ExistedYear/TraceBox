@@ -1,28 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   useReactTable,
-  type ColumnDef,
   type SortingState,
+  type VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import { Surface } from "@/components/tracebox/primitives";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import {
   categoryClasses,
-  personLabel,
   encodeIssueFilters,
   formatIssueKey,
   ISSUE_TYPES,
+  personLabel,
   PRIORITIES,
   SEVERITIES,
   type IssueFilters,
@@ -33,14 +41,16 @@ export type TableRow = {
   id: string;
   issue_number: number;
   title: string;
+  type: string;
   priority: string;
   severity: string;
-  type: string;
   statusName: string;
   statusCategory: string;
+  componentId: string | null;
   componentName: string | null;
   assigneeId: string | null;
   assigneeLabel: string;
+  updated_at: string;
 };
 
 export type FilterOption = { value: string; label: string };
@@ -59,6 +69,18 @@ type Props = {
   initialFilters: IssueFilters;
 };
 
+function relativeTime(iso: string) {
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+const columnHelper = createColumnHelper<TableRow>();
+
 export function IssueTable({ projectKey, projectId, canEdit, currentUserId, states, components, members, initialFilters }: Props) {
   const router = useRouter();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
@@ -68,6 +90,10 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+
+  // Monotonic request id: stale responses never overwrite newer results.
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     setPage(0);
@@ -75,17 +101,17 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    const encoded = encodeIssueFilters(filters);
-    url.search = new URLSearchParams(encoded).toString();
+    url.search = new URLSearchParams(encodeIssueFilters(filters)).toString();
     window.history.replaceState(null, "", url);
   }, [filters]);
 
   const fetchData = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     const supabase = createClient();
     let query = supabase
       .from("issues")
-      .select("id, issue_number, title, priority, severity, type, assignee_id, component_id, status:workflow_states (name, category), component:components (name)", { count: "exact" })
+      .select("id, issue_number, title, type, priority, severity, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name)", { count: "exact" })
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -95,36 +121,45 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     if (filters.type) query = query.eq("type", filters.type);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
 
+    // Only real root columns may be ordered; display columns are unsortable.
+    const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
-    if (sort) query = query.order(sort.id, { ascending: !sort.desc });
+    if (sort && sortableIds.has(sort.id)) query = query.order(sort.id, { ascending: !sort.desc });
     else query = query.order("updated_at", { ascending: false });
 
     const { data, count, error } = await query;
+    if (seq !== requestSeq.current) return; // a newer request superseded this one
     if (error) {
       toast.error("Could not load issues.");
+      setRows([]);
+      setTotal(0);
       setLoading(false);
       return;
     }
 
-    const userIds = (data ?? []).map((row) => row.assignee_id);
-    const profileRows = userIds.length
-      ? (await supabase.from("profiles").select("id, display_name").in("id", [...new Set(userIds.filter((id): id is string => Boolean(id)))])).data ?? []
-      : [];
-    const nameMap = new Map(profileRows.map((row) => [row.id, row.display_name]));
+    const assigneeIds = [...new Set((data ?? []).map((row) => row.assignee_id).filter((id): id is string => Boolean(id)))];
+    const { data: profileRows } = assigneeIds.length
+      ? await supabase.from("profiles").select("id, display_name").in("id", assigneeIds)
+      : { data: [] as { id: string; display_name: string | null }[] };
 
+    if (seq !== requestSeq.current) return;
+
+    const nameMap = new Map((profileRows ?? []).map((row) => [row.id, row.display_name]));
     setRows(
       (data ?? []).map((row) => ({
         id: row.id,
         issue_number: row.issue_number,
         title: row.title,
+        type: row.type,
         priority: row.priority,
         severity: row.severity,
-        type: row.type,
         statusName: row.status?.name ?? "—",
         statusCategory: row.status?.category ?? "",
+        componentId: row.component_id,
         componentName: row.component?.name ?? null,
         assigneeId: row.assignee_id,
         assigneeLabel: personLabel(nameMap.get(row.assignee_id ?? "") ?? undefined, row.assignee_id),
+        updated_at: row.updated_at,
       })),
     );
     setTotal(count ?? 0);
@@ -135,26 +170,28 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     void fetchData();
   }, [fetchData]);
 
-  async function updateField(issue: TableRow, field: string, value: string) {
-    setEditingId(issue.id);
-    const { error } = await createClient().rpc("update_issue_fields", {
-      p_issue_id: issue.id,
-      p_updates: { [field]: value },
-    });
-    setEditingId(null);
-    if (error) {
-      toast.error(error.message.includes("NOT_ALLOWED") ? "Developers and maintainers only." : "Update rejected.");
-      return;
-    }
-    toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);
-    router.refresh();
-    void fetchData();
-  }
+  const updateField = useCallback(
+    async (issue: TableRow, field: string, value: string) => {
+      setEditingId(issue.id);
+      const { error } = await createClient().rpc("update_issue_fields", {
+        p_issue_id: issue.id,
+        p_updates: { [field]: value },
+      });
+      setEditingId(null);
+      if (error) {
+        toast.error(error.message.includes("NOT_ALLOWED") ? "Developers and maintainers only." : "Update rejected.");
+        return;
+      }
+      toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);
+      router.refresh();
+      void fetchData();
+    },
+    [projectKey, fetchData, router],
+  );
 
   const columns = useMemo(() => {
-    const helper = createColumnHelper<TableRow>();
     return [
-      helper.accessor("issue_number", {
+      columnHelper.accessor("issue_number", {
         id: "issue_number",
         header: "ID",
         cell: (info) => (
@@ -163,7 +200,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           </Link>
         ),
       }),
-      helper.accessor("title", {
+      columnHelper.accessor("title", {
         id: "title",
         header: "Title",
         cell: (info) => (
@@ -172,7 +209,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           </Link>
         ),
       }),
-      helper.display({
+      columnHelper.display({
         id: "status",
         header: "Status",
         cell: (info) => (
@@ -181,7 +218,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           </span>
         ),
       }),
-      helper.accessor("priority", {
+      columnHelper.accessor("priority", {
         id: "priority",
         header: "Priority",
         cell: (info) =>
@@ -195,7 +232,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <span className="font-mono text-xs">{info.getValue()}</span>
           ),
       }),
-      helper.accessor("severity", {
+      columnHelper.accessor("severity", {
         id: "severity",
         header: "Severity",
         cell: (info) =>
@@ -209,12 +246,38 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <span className="text-xs">{info.getValue()}</span>
           ),
       }),
-      helper.accessor("componentName", {
+      columnHelper.accessor("type", {
+        id: "type",
+        header: "Type",
+        enableSorting: false,
+        cell: (info) =>
+          canEdit ? (
+            <select aria-label="Type" className={selectClass} value={info.getValue()} onChange={(event) => void updateField(info.row.original, "type", event.target.value)} disabled={editingId === info.row.original.id}>
+              {ISSUE_TYPES.map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs">{info.getValue()}</span>
+          ),
+      }),
+      columnHelper.accessor("componentName", {
         id: "component",
         header: "Component",
-        cell: (info) => <span className="text-xs text-muted-foreground">{info.getValue() ?? "—"}</span>,
+        enableSorting: false,
+        cell: (info) =>
+          canEdit ? (
+            <select aria-label="Component" className={cn(selectClass, "max-w-32")} value={info.row.original.componentId ?? ""} onChange={(event) => void updateField(info.row.original, "component_id", event.target.value)} disabled={editingId === info.row.original.id}>
+              <option value="">None</option>
+              {components.map((component) => (
+                <option key={component.value} value={component.value}>{component.label}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-muted-foreground">{info.getValue() ?? "—"}</span>
+          ),
       }),
-      helper.display({
+      columnHelper.display({
         id: "assignee",
         header: "Assignee",
         cell: (info) =>
@@ -230,11 +293,27 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <span className="text-xs">{info.row.original.assigneeLabel}</span>
           ),
       }),
+      columnHelper.accessor("updated_at", {
+        id: "updated_at",
+        header: "Updated",
+        cell: (info) => <span className="whitespace-nowrap text-xs text-muted-foreground">{relativeTime(info.getValue())}</span>,
+      }),
     ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectKey, canEdit, editingId, currentUserId, members]);
+    // updateField/fetchData are stabilized with useCallback; including them
+    // keeps cell handlers in sync with the latest filters/sort/page.
+  }, [projectKey, canEdit, editingId, components, members, currentUserId, updateField]);
 
-  const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel(), state: { sorting }, onSortingChange: setSorting, manualSorting: true });
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    state: { sorting, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    manualSorting: true,
+  });
+
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function setFilter(key: keyof IssueFilters, value: string) {
@@ -274,10 +353,23 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <option key={component.value} value={component.value}>{component.label}</option>
           ))}
         </select>
-        {(Object.values(filters).some(Boolean)) && (
+        {Object.values(filters).some(Boolean) && (
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setFilters({})}>Clear</Button>
         )}
-        <span className="ml-auto font-mono text-[10px] text-muted-foreground">{total} issues</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="ml-auto h-7 gap-1.5 px-2 text-xs"><SlidersHorizontal className="h-3 w-3" /> Columns</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Visible columns</DropdownMenuLabel>
+            {table.getAllLeafColumns().map((column) => (
+              <DropdownMenuCheckboxItem key={column.id} checked={column.getIsVisible()} onCheckedChange={(value) => column.toggleVisibility(Boolean(value))}>
+                {typeof column.columnDef.header === "string" ? column.columnDef.header : column.id}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <span className="font-mono text-[10px] text-muted-foreground">{total} issues</span>
       </div>
 
       <Surface>
@@ -312,12 +404,12 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={table.getAllLeafColumns().length} className="px-4 py-10 text-center text-sm text-muted-foreground">No issues match these filters.</td>
+                <td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center text-sm text-muted-foreground">No issues match these filters.</td>
               </tr>
             )}
             {loading && rows.length === 0 && (
               <tr>
-                <td colSpan={table.getAllLeafColumns().length} className="px-4 py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" /></td>
+                <td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" /></td>
               </tr>
             )}
           </tbody>

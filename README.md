@@ -17,13 +17,13 @@ TraceBox is a small, deployable foundation for an engineering workspace. It prov
 4. For local Supabase, run `npm run db:start`, then `npm run db:reset` to apply migrations and seed data.
 5. Start the app with `npm run dev`, then open [http://localhost:3000](http://localhost:3000).
 
-Email/password signup, login, logout, session refresh, the protected dashboard, and the authenticated profile query are included. GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
+Included today: email/password signup, login, logout, session refresh, workspace and project onboarding, project components and default workflow management, issue creation with human-readable IDs (`KEY-1`), an issue queue with filters/sorting/pagination/inline field editing, and an audited issue detail page. GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
 
 ## Database workflow
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-The initial migration creates `public.profiles`, timestamps, the new-user profile trigger, RLS, an authenticated read policy, and an owner-only update policy.
+`supabase/migrations/` holds six ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, and a security-hardening pass (RPC-only issue creation, RESTRICT ownership FKs, column-scoped grants).
 
 ## Quality checks
 

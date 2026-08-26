@@ -101,9 +101,9 @@ export function ProjectSettings({
   async function toggleArchive(component: ComponentRow) {
     setBusyId(component.id);
     const { error } = await createClient().from("components").update({ is_archived: !component.is_archived }).eq("id", component.id);
-    setBusyId(null);
+    setBusyId((current) => (current === component.id ? null : current));
     if (error) {
-      toast.error("Only maintainers can archive components.");
+      toast.error(error.message.includes("row-level security") ? "Only maintainers can archive components." : "Could not update the component.");
       return;
     }
     setComponents((current) => current.map((row) => (row.id === component.id ? { ...row, is_archived: !row.is_archived } : row)));

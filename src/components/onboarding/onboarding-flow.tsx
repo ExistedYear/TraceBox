@@ -37,6 +37,10 @@ export function OnboardingFlow() {
   const suggestedSlug = useMemo(() => slugify(workspaceName ?? ""), [workspaceName]);
 
   async function submitWorkspace(values: WorkspaceValues) {
+    if (organizationId) {
+      setStep("project");
+      return;
+    }
     workspaceForm.clearErrors();
     const { data, error } = await createClient().rpc("create_organization", { p_name: values.name.trim(), p_slug: values.slug });
     if (error) {
@@ -44,6 +48,9 @@ export function OnboardingFlow() {
       return;
     }
     setOrganizationId(data);
+    // Scope the session to the newly created workspace immediately.
+    document.cookie = `tb_org=${data}; path=/; max-age=31536000; samesite=lax`;
+    document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
     setStep("project");
   }
 

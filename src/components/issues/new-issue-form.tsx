@@ -100,11 +100,11 @@ export function NewIssueForm({
         <div className="space-y-2">
           <Label htmlFor="issue-component">Component</Label>
           <select id="issue-component" className={selectClass} {...form.register("component_id")}>
-            <option value="">None</option>
             {components.map((component) => (
               <option key={component.id} value={component.id}>{component.name}</option>
             ))}
           </select>
+          {form.formState.errors.component_id && <p className="text-xs text-destructive">{form.formState.errors.component_id.message}</p>}
         </div>
         <div className="space-y-2">
           <Label htmlFor="issue-status-hint">Status</Label>
