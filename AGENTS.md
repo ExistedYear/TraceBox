@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 4 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, and a dense TanStack issue table (filters/sorting/pagination/inline editing). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 5 = Comments + Activity).
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 5 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), and **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 6 = Workflow Transitions is next).
 
 ## Architecture & Data Flow
 
@@ -34,6 +34,7 @@ src/app/
   (dashboard)/             protected shell: auth check, profile fetch, workspace/project
                            resolution from tb_org/tb_project cookies (redirects to
                            /onboarding when the user has no workspace)
+  dashboard/issues/[issueKey]/  issue detail with description + unified activity (events+comments)
   onboarding/              two-step create-workspace → create-first-project flow;
                            ?create=1 bypasses the has-orgs redirect for extra workspaces
   auth/callback/route.ts   OAuth/email code exchange handler
@@ -44,7 +45,8 @@ src/components/
                            theme-toggle
   auth/auth-form.tsx       dual-mode ('use client') login/signup form
   tracebox/                brand marks (trace-mark), dashboard overview, primitives kit
-  issues/                  new-issue-form, issue-table (TanStack v8 client table)
+  issues/                  new-issue-form, issue-table (TanStack v8 client table),
+                           comments-section (unified timeline + composer + inline edit)
   settings/project-settings.tsx   components manager + workflow viewer tabs
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
@@ -52,14 +54,17 @@ src/lib/
   validation/workspace.ts  workspaceSchema (name+slug) / projectSchema (name+KEY+description)
   validation/issue.ts      issueCreateSchema (title/type/component + advanced fields)
   validation/components.ts componentSchema
-  issues.ts                KEY format/parse, event timeline copy, category pills, filter codecs
+  validation/comment.ts    commentSchema (body 1–10k chars)
+  issues.ts                KEY format/parse, event timeline copy, category pills, filter codecs,
+                           plus comment timeline helpers (excerptBody, tokenizeCommentBody,
+                           buildTimeline, unified entry types)
   workspace-context.ts     server helper resolving cookie-backed org/project context
   server-people.ts         server-only profile display-name maps
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
   types/database.ts        generated DB types incl. RPC function signatures
-supabase/                  config.toml, migrations/ (11 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (12 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -109,7 +114,8 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath` (control chars rejected).
 - **UI**: shadcn/ui default style + Lucide icons + Tailwind HSL CSS-variable tokens (`darkMode: ["class"]`; root html is dark by default). Add primitives with the shadcn CLI, configured by `components.json` (aliases `@/components`, `@/components/ui`, `@/lib/utils`).
 - **Issue components**: `component_id` is optional when a project has no components yet; the RPC accepts null and the form exposes `None`. When a component is selected, its configured default assignee is preselected if the user has not chosen one.
-- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, and components are blocked by RLS/grants — keep it that way.
+- **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
+- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
 
@@ -135,6 +141,9 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260009_finalize_component_guards.sql` | RPC-only organization creation; project-row lock in component trigger |
 | `supabase/migrations/202608260010_normalize_issue_updates.sql` | typed UUID comparisons and canonical audit values for inline issue edits |
 | `supabase/migrations/202608260011_component_mutation_rpcs.sql` | component create/update RPCs with project-first locking; direct component INSERT/UPDATE policies removed |
+| `supabase/migrations/202608260012_comments_activity.sql` | `comments` table, `can_comment_on_issue`, RPC-only `add_comment`/`edit_comment` (archived-project guard, Reporter+ add / author-or-Developer edit, 1–10k validation), `COMMENT_ADDED`/`COMMENT_EDITED` audit + `updated_at` bump, project-member RLS |
+| `src/components/issues/comments-section.tsx` | Unified activity timeline (vertical trace line, dots) merging `issue_events` + `comments`; composer with `commentSchema` + `add_comment`; inline edit via `edit_comment`; mention/issue-ref token styling |
+| `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
@@ -154,6 +163,6 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 
 - **Vitest 4**, run-only: `npm test` (equivalent to `vitest run`).
 - Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
-- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`).
+- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`, `comment`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`), comment helpers (`tokenizeCommentBody`, `buildTimeline`, `excerptBody`, `COMMENT_ADDED/EDITED` summaries).
 - Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build`.
 - E2E (Playwright) and pgTAP database tests are planned but do not exist yet; don't invent harnesses without need.

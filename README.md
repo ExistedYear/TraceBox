@@ -1,6 +1,6 @@
 # TraceBox
 
-TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping the first four product phases: workspaces/projects, project workflow, issue creation, and issue list/editing.
+TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping the first five product phases: workspaces/projects, project workflow, issue creation, issue list/editing, and comments + activity timeline.
 
 ## Stack
 
@@ -17,13 +17,13 @@ TraceBox is a modern, database-backed developer workspace for structured issue t
 4. For local Supabase, run `npm run db:start`, then `npm run db:reset` to apply migrations and seed data.
 5. Start the app with `npm run dev`, then open [http://localhost:3000](http://localhost:3000).
 
-Included today: email/password signup, login, logout, session refresh, workspace and project onboarding, project components and default workflow management, issue creation with human-readable IDs (`KEY-1`), an issue queue with filters/sorting/pagination/inline field editing, and an audited issue detail page. GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
+Included today: email/password signup, login, logout, session refresh, workspace and project onboarding, project components and default workflow management, issue creation with human-readable IDs (`KEY-1`), an issue queue with filters/sorting/pagination/inline field editing, an audited issue detail page with unified activity timeline, and project-member comments (add/edit with `COMMENT_ADDED`/`COMMENT_EDITED` events, mention + issue-ref styling). GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
 
 ## Database workflow
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds eleven ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, and project-first component mutation RPCs.
+`supabase/migrations/` holds twelve ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, project-first component mutation RPCs, and comments + activity (`comments` table, `can_comment_on_issue`, `add_comment`/`edit_comment`, `COMMENT_ADDED`/`COMMENT_EDITED` audit).
 
 ## Quality checks
 

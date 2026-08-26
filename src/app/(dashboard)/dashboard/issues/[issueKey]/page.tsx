@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
+import { CommentsSection } from "@/components/issues/comments-section";
 import { createClient } from "@/lib/supabase/server";
-import { eventSummary, formatIssueKey, parseIssueKey } from "@/lib/issues";
+import { formatIssueKey, parseIssueKey } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
 import { personLabel } from "@/lib/issues";
 import { getWorkspaceContext } from "@/lib/workspace-context";
@@ -42,16 +43,23 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     .maybeSingle();
   if (!issue) notFound();
 
-  const [{ data: events }, names, { data: componentRows }] = await Promise.all([
+  const [{ data: events }, { data: comments }, names, { data: componentRows }, { data: viewerRole }] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
+    supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
     displayNameMap([issue.reporter_id, issue.assignee_id]),
     supabase.from("components").select("id, name").eq("project_id", project.id),
+    supabase.rpc("project_role", { p_project_id: project.id }),
   ]);
 
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
 
   const actorIds = (events ?? []).map((event) => event.actor_id);
-  const actorNames = await displayNameMap(actorIds);
+  const commentAuthorIds = (comments ?? []).map((comment) => comment.author_id);
+  const actorNames = await displayNameMap([...actorIds, ...commentAuthorIds]);
+
+  const mergedNames = new Map<string, string>([...names, ...actorNames]);
+  const canComment = viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
+  const canEditAnyComment = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
 
   const issueKeyLabel = formatIssueKey(parsed.projectKey, issue.issue_number);
   const facts: [string, string][] = [
@@ -100,23 +108,17 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             </Surface>
           ))}
 
-          <Surface>
-            <h2 className="border-b border-border/80 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Activity</h2>
-            <ul className="divide-y divide-border/70">
-              {(events ?? []).map((event) => {
-                const summary = eventSummary(event, (id) => names.get(id) || actorNames.get(id) || componentNames.get(id) || id);
-                return (
-                  <li key={event.id} className="px-4 py-2.5 text-sm">
-                    <span className="font-medium">{personLabel(event.actor_id ? actorNames.get(event.actor_id) : null, event.actor_id)}</span>{" "}
-                    <span className="text-muted-foreground">{summary.heading}</span>
-                    {summary.detail && <span className="ml-1 font-mono text-xs">{summary.detail}</span>}
-                    <span className="ml-2 whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">{new Date(event.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  </li>
-                );
-              })}
-              {(events ?? []).length === 0 && <li className="px-4 py-6 text-center text-sm text-muted-foreground">No activity yet.</li>}
-            </ul>
-          </Surface>
+          <CommentsSection
+            issueId={issue.id}
+            projectKey={parsed.projectKey}
+            currentUserId={context.userId}
+            canComment={canComment}
+            canEditAnyComment={canEditAnyComment}
+            comments={(comments ?? []) as unknown as import("@/lib/issues").TimelineComment[]}
+            events={(events ?? []) as unknown as import("@/lib/issues").TimelineEventRow[]}
+            displayNames={mergedNames}
+            componentNames={componentNames}
+          />
         </div>
 
         <aside className="space-y-3">

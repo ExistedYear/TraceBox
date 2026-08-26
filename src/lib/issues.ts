@@ -50,9 +50,75 @@ export function eventSummary(
       return { heading: "set resolution", detail: label(event.new_value) };
     case "TITLE_CHANGED":
       return { heading: "renamed the issue", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
+    case "COMMENT_ADDED":
+      return {
+        heading: "commented",
+        detail: typeof meta.excerpt === "string" && meta.excerpt ? meta.excerpt : undefined,
+      };
+    case "COMMENT_EDITED":
+      return { heading: "edited a comment" };
     default:
       return { heading: event.event_type.toLowerCase().replaceAll("_", " ") };
   }
+}
+
+export function excerptBody(body: string, max = 200) {
+  const trimmed = body.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max).trimEnd()}…`;
+}
+
+export type TimelineComment = {
+  id: string;
+  issue_id: string;
+  author_id: string;
+  body: string;
+  edited_at: string | null;
+  created_at: string;
+};
+
+export type TimelineEventRow = {
+  id: string;
+  issue_id: string;
+  actor_id: string | null;
+  event_type: string;
+  field_name: string | null;
+  old_value: unknown;
+  new_value: unknown;
+  metadata: unknown;
+  created_at: string;
+};
+
+export type UnifiedTimelineEntry =
+  | { kind: "comment"; at: string; comment: TimelineComment }
+  | { kind: "event"; at: string; event: TimelineEventRow };
+
+export function buildTimeline(events: TimelineEventRow[], comments: TimelineComment[]): UnifiedTimelineEntry[] {
+  const entries: UnifiedTimelineEntry[] = [
+    ...events.map((event) => ({ kind: "event" as const, at: event.created_at, event })),
+    ...comments.map((comment) => ({ kind: "comment" as const, at: comment.created_at, comment })),
+  ];
+  entries.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  return entries;
+}
+
+// Lightweight inline helpers for comment bodies: detect @mentions and KEY-N refs.
+// They are rendered as styled spans rather than raw HTML to avoid XSS.
+export function tokenizeCommentBody(body: string): { text: string; kind: "text" | "mention" | "issue-ref" }[] {
+  const tokens: { text: string; kind: "text" | "mention" | "issue-ref" }[] = [];
+  const re = /(@[a-zA-Z0-9._-]+|[A-Z][A-Z0-9]+-\d+)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(body)) !== null) {
+    if (match.index > lastIndex) tokens.push({ text: body.slice(lastIndex, match.index), kind: "text" });
+    const value = match[0];
+    if (value.startsWith("@")) tokens.push({ text: value, kind: "mention" });
+    else tokens.push({ text: value, kind: "issue-ref" });
+    lastIndex = match.index + value.length;
+  }
+  if (lastIndex < body.length) tokens.push({ text: body.slice(lastIndex), kind: "text" });
+  if (tokens.length === 0) tokens.push({ text: body, kind: "text" });
+  return tokens;
 }
 
 

@@ -11,12 +11,13 @@
 - Fixed all findings raised before the requested stop.
 - Added focused unit tests without over-expanding the suite.
 - Updated stale repository documentation.
-- Phases 1–4 are implemented:
+- Phases 1–5 are implemented:
   1. Organizations + Projects
   2. Components + Default Workflow
   3. Core Issue Creation
   4. Issue List + Editing
-- Phase 5 — Comments + Activity — is next.
+  5. Comments + Activity (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, unified vertical timeline with mention/issue-ref styling, composer + inline edit)
+- Phase 6 — Workflow Transitions — is next.
 
 ## Verification
 
@@ -24,7 +25,7 @@ The final local gates passed:
 
 ```text
 TypeScript       ✓
-Tests            39/39 ✓
+Tests            51/51 ✓
 Lint             0 errors
 Production build ✓
 git diff --check ✓
@@ -36,13 +37,15 @@ Live Supabase and Vercel runtime verification has not been performed from this c
 
 ## Commit state
 
-Latest local commit:
+Latest local commit prior to Phase 5:
 
 ```text
 7c3715a fix: harden phase four workflows
 ```
 
-Nothing has been pushed. The working tree was clean after that commit. This handoff file is the only change made after that commit until it is committed.
+Phase 5 adds migration `202608260012_comments_activity.sql`, `src/lib/validation/comment.ts`, `src/components/issues/comments-section.tsx`, updates to `src/lib/issues.ts`, `src/types/database.ts`, `src/app/(dashboard)/dashboard/issues/[issueKey]/page.tsx`, `tests/comments.test.ts`, `AGENTS.md`, and this handoff.
+
+The working tree was clean after that commit before Phase 5. Commit and push when ready (see below).
 
 ## Supabase production migration
 
@@ -56,7 +59,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 11 ordered migrations, `202608260001` through `202608260011`. Inspect the installed CLI options before applying migrations:
+The repository contains 12 ordered migrations, `202608260001` through `202608260012`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help
@@ -121,6 +124,9 @@ Never rewrite an applied migration. Future schema corrections require a new vers
    → issue filters/sorting/pagination
    → inline field edit
    → issue detail/audit timeline
+   → add comment with @mention and TRACE-123 ref
+   → edit own comment
+   → verify unified activity timeline ordering
    → logout
    → protected dashboard redirects to login
    ```

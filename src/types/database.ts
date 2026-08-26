@@ -440,6 +440,51 @@ export type Database = {
           },
         ];
       };
+      comments: {
+        Row: {
+          id: string;
+          issue_id: string;
+          author_id: string;
+          body: string;
+          edited_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          issue_id: string;
+          author_id: string;
+          body: string;
+          edited_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          issue_id?: string;
+          author_id?: string;
+          body?: string;
+          edited_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "comments_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comments_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       workflow_transitions: {
         Row: {
           id: string;
@@ -494,6 +539,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      add_comment: {
+        Args: { p_body: string; p_issue_id: string };
+        Returns: string;
+      };
+      can_comment_on_issue: {
+        Args: { p_issue_id: string };
+        Returns: boolean;
+      };
       can_manage_project: {
         Args: { p_project_id: string };
         Returns: boolean;
@@ -522,6 +575,10 @@ export type Database = {
           p_type: string;
         };
         Returns: number;
+      };
+      edit_comment: {
+        Args: { p_body: string; p_comment_id: string };
+        Returns: undefined;
       };
       update_issue_fields: {
         Args: { p_issue_id: string; p_updates: Json };
