@@ -37,15 +37,15 @@ Live Supabase and Vercel runtime verification has not been performed from this c
 
 ## Commit state
 
-Latest local commit prior to Phase 5:
+Latest local commit:
 
 ```text
-7c3715a fix: harden phase four workflows
+af04b2e feat: phase 5 comments and activity timeline
 ```
 
-Phase 5 adds migration `202608260012_comments_activity.sql`, `src/lib/validation/comment.ts`, `src/components/issues/comments-section.tsx`, updates to `src/lib/issues.ts`, `src/types/database.ts`, `src/app/(dashboard)/dashboard/issues/[issueKey]/page.tsx`, `tests/comments.test.ts`, `AGENTS.md`, and this handoff.
+Phase 5 added migration `202608260012_comments_activity.sql`, `src/lib/validation/comment.ts`, `src/components/issues/comments-section.tsx`, updates to `src/lib/issues.ts`, `src/types/database.ts`, `src/app/(dashboard)/dashboard/issues/[issueKey]/page.tsx`, `tests/comments.test.ts`, and updated documentation.
 
-The working tree was clean after that commit before Phase 5. Commit and push when ready (see below).
+Commit and push when ready (see below).
 
 ## Supabase production migration
 

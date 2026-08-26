@@ -10,6 +10,8 @@ Current deployment:
 https://trace-box.vercel.app/
 ```
 
+
+Implementation status: Phases 1–5 are complete in the repository. Phase 6 — Assignment + Workflow — is next.
 This plan assumes the following are already working:
 
 - Next.js + TypeScript
