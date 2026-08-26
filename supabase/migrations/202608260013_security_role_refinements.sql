@@ -72,7 +72,8 @@ begin
     v_name,
     upper(v_key),
     lower(v_key),
-    nullif(trim(coalesce(p_description, '')), '')
+    nullif(trim(coalesce(p_description, '')), ''),
+    v_user
   )
   returning id into v_project_id;
 

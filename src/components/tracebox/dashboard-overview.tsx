@@ -1,35 +1,259 @@
-import { CheckCircle2 } from "lucide-react";
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import {
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  CircleDot,
+  FolderKanban,
+  Plus,
+  Ticket,
+} from "lucide-react";
 
-const stackChecks = ["Next.js", "Vercel", "Supabase", "Authentication", "Database connection"];
+import { Surface } from "@/components/tracebox/primitives";
+import { Button } from "@/components/ui/button";
+import { categoryClasses } from "@/lib/issues";
+import { cn } from "@/lib/utils";
+import { NewProjectButton, type ProjectSummary } from "@/components/layout/workspace-switcher";
 
-type DashboardOverviewProps = { displayName: string; email: string };
+export type OverviewIssue = {
+  id: string;
+  issueNumber: number;
+  keyLabel: string;
+  title: string;
+  type: string;
+  priority: string;
+  severity: string;
+  statusName: string;
+  statusCategory: string;
+  assigneeLabel: string;
+  updatedAt: string;
+};
 
-export function DashboardOverview({ displayName, email }: DashboardOverviewProps) {
+export type OverviewMetrics = {
+  openCount: number;
+  inProgressCount: number;
+  criticalCount: number;
+  totalCount: number;
+};
+
+type DashboardOverviewProps = {
+  workspaceName: string;
+  organizationId: string;
+  activeProject: ProjectSummary | null;
+  projects: ProjectSummary[];
+  metrics: OverviewMetrics;
+  recentIssues: OverviewIssue[];
+};
+
+function relativeTime(iso: string) {
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+export function DashboardOverview({
+  workspaceName,
+  organizationId,
+  activeProject,
+  projects,
+  metrics,
+  recentIssues,
+}: DashboardOverviewProps) {
   return (
-    <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Welcome, {displayName}.</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Authenticated as{" "}
-        <span className="font-medium text-foreground">{email}</span>
-      </p>
-      <Card className="mt-8">
-        <CardHeader className="space-y-1.5">
-          <CardTitle className="text-lg">Deployment status</CardTitle>
-          <CardDescription>This deployment proves the foundation end to end.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="grid gap-2.5 sm:grid-cols-2">
-            {stackChecks.map((label) => (
-              <li key={label} className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
-                {label}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+    <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+      {/* Header / Command Center banner */}
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-border/80 pb-6">
+        <div>
+          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+            Command Center · {workspaceName}
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            Engineering Status
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {activeProject
+              ? `Active issue queue and metrics for ${activeProject.name} (${activeProject.key}).`
+              : `Overview of all projects in ${workspaceName}.`}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          {activeProject ? (
+            <>
+              <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+                <Link href="/dashboard/issues">
+                  <CircleDot className="h-3.5 w-3.5" /> View issue queue
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
+                <Link href="/dashboard/issues/new">
+                  <Plus className="h-3.5 w-3.5" /> New issue
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <NewProjectButton organizationId={organizationId} />
+          )}
+        </div>
+      </div>
+
+      {projects.length === 0 ? (
+        <Surface className="p-12 text-center">
+          <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border bg-muted text-muted-foreground">
+            <FolderKanban className="h-6 w-6" />
+          </span>
+          <h2 className="text-base font-semibold">No projects yet</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Create your first project in {workspaceName} to start tracking issues, components, and workflows.
+          </p>
+          <div className="mt-5 flex justify-center">
+            <NewProjectButton organizationId={organizationId} />
+          </div>
+        </Surface>
+      ) : (
+        <div className="space-y-8">
+          {/* Metrics Grid */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Open & Triage</p>
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+              </div>
+              <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.openCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Awaiting resolution or triage</p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-muted-foreground">In Progress & Review</p>
+                <Activity className="h-4 w-4 text-blue-500" />
+              </div>
+              <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.inProgressCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Under active engineering</p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Critical & Blockers</p>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </div>
+              <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.criticalCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Highest severity issues</p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between">
+                <p className="text-xs font-medium text-muted-foreground">Total Issues</p>
+                <Ticket className="h-4 w-4 text-purple-500" />
+              </div>
+              <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.totalCount}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Tracked in active project</p>
+            </div>
+          </div>
+
+          {/* Recent Issues Section */}
+          <Surface>
+            <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
+              <div>
+                <h2 className="text-sm font-semibold">Recent Issues</h2>
+                <p className="text-xs text-muted-foreground">Latest filed or updated items in the queue</p>
+              </div>
+              {activeProject && (
+                <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground">
+                  <Link href="/dashboard/issues">
+                    View all <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </Button>
+              )}
+            </div>
+
+            {recentIssues.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No issues filed yet in this project.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border/70">
+                {recentIssues.map((issue) => (
+                  <li key={issue.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+                    <Link
+                      href={`/dashboard/issues/${issue.keyLabel}`}
+                      className="font-mono text-xs font-medium text-primary hover:underline"
+                    >
+                      {issue.keyLabel}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/dashboard/issues/${issue.keyLabel}`}
+                        className="block truncate text-sm font-medium hover:text-primary"
+                      >
+                        {issue.title}
+                      </Link>
+                    </div>
+                    <span
+                      className={cn(
+                        "whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                        categoryClasses(issue.statusCategory),
+                      )}
+                    >
+                      {issue.statusName}
+                    </span>
+                    <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
+                      {issue.priority}
+                    </span>
+                    <span className="hidden text-xs text-muted-foreground md:inline">
+                      {issue.assigneeLabel}
+                    </span>
+                    <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">
+                      {relativeTime(issue.updatedAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Surface>
+
+          {/* Projects Summary Section */}
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Projects in {workspaceName} ({projects.length})
+              </h2>
+              <Button asChild variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">
+                <Link href="/dashboard/projects">Manage projects</Link>
+              </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <Link
+                  key={project.id}
+                  href="/dashboard/issues"
+                  className={cn(
+                    "block rounded-xl border p-4 transition-colors hover:border-primary/40",
+                    activeProject?.id === project.id ? "border-primary/50 bg-primary/5" : "border-border bg-card",
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-semibold text-primary">{project.key}</span>
+                    {activeProject?.id === project.id && (
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-primary">
+                        active
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 truncate text-sm font-semibold">{project.name}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
