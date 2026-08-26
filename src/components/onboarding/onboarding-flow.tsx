@@ -19,14 +19,22 @@ import { projectSchema, workspaceSchema, type ProjectValues, type WorkspaceValue
 
 type Step = "workspace" | "project";
 
+function setWorkspaceCookie(id: string) {
+  document.cookie = `tb_org=${id}; path=/; max-age=31536000; samesite=lax`;
+  document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
+}
+
+function setProjectCookie(id: string) {
+  document.cookie = `tb_project=${id}; path=/; max-age=31536000; samesite=lax`;
+}
+
 export function OnboardingFlow() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("workspace");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   useEffect(() => {
     if (!organizationId) return;
-    document.cookie = `tb_org=${organizationId}; path=/; max-age=31536000; samesite=lax`;
-    document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
+    setWorkspaceCookie(organizationId);
   }, [organizationId]);
   const workspaceForm = useForm<WorkspaceValues>({
     resolver: zodResolver(workspaceSchema),
@@ -61,26 +69,34 @@ export function OnboardingFlow() {
 
   }
   async function submitProject(values: ProjectValues) {
-    if (!organizationId) return;
+    if (!organizationId) {
+      toast.error("No active workspace found. Please complete step 1.");
+      setStep("workspace");
+      return;
+    }
     projectForm.clearErrors();
     try {
-      const { error } = await createClient().rpc("create_project", {
+      const { data: projectId, error } = await createClient().rpc("create_project", {
         p_organization_id: organizationId,
         p_name: values.name.trim(),
         p_key: values.key.trim().toUpperCase(),
         p_description: values.description ? values.description.trim() : undefined,
       });
       if (error) {
+        console.error("Project creation failed:", error);
         toast.error(getSafeWorkspaceErrorMessage(error));
         return;
       }
+      if (projectId) {
+        setProjectCookie(projectId);
+      }
       toast.success("Workspace ready.");
-      router.push("/dashboard");
+      router.push("/dashboard/issues");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("Unexpected project creation error:", err);
       toast.error("Could not reach the server. Please try again.");
     }
-
   }
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">

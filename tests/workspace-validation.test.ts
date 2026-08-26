@@ -95,6 +95,23 @@ describe("getSafeWorkspaceErrorMessage", () => {
       "Project key must be 2–10 uppercase letters or numbers (e.g. AUTH, CORE).",
     );
   });
+  it("maps missing migration or function errors clearly", () => {
+    expect(getSafeWorkspaceErrorMessage({ code: "PGRST202", message: "Could not find the function public.create_project in the schema cache" })).toBe(
+      "Database function not found. Please apply the latest migrations to Supabase (`npx supabase db push`).",
+    );
+    expect(getSafeWorkspaceErrorMessage({ code: "42P01", message: 'relation "projects" does not exist' })).toBe(
+      "Database table not found. Please apply the latest migrations to Supabase (`npx supabase db push`).",
+    );
+  });
+
+  it("maps foreign key and invalid uuid errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ code: "23503", message: 'violates foreign key constraint "projects_organization_id_fkey"' })).toBe(
+      "Referenced workspace or profile not found.",
+    );
+    expect(getSafeWorkspaceErrorMessage({ code: "22P02", message: 'invalid input syntax for type uuid: ""' })).toBe(
+      "Invalid workspace identifier.",
+    );
+  });
 
   it("falls back safely for unknown errors", () => {
     expect(getSafeWorkspaceErrorMessage({ message: "internal network timeout" })).toBe(

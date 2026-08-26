@@ -20,10 +20,11 @@ export function getSafeAuthErrorMessage(message: string) {
   return "Something went wrong. Please try again.";
 }
 
-export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: string }) {
-  const msg = error.message ?? "";
+export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: string; details?: string; hint?: string }) {
+  const msg = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`;
+  const code = error.code ?? "";
 
-  if (error.code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
+  if (code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
     if (/organizations_slug/i.test(msg)) {
       return "That workspace URL is already taken. Try another slug.";
     }
@@ -41,7 +42,23 @@ export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: s
     return "You must be signed in to perform this action.";
   }
 
-  if (error.code === "22023" || /VALIDATION/i.test(msg) || /check constraint/i.test(msg)) {
+  if (code === "23503" || /foreign key/i.test(msg)) {
+    return "Referenced workspace or profile not found.";
+  }
+
+  if (code === "22P02" || /invalid input syntax for type uuid/i.test(msg)) {
+    return "Invalid workspace identifier.";
+  }
+
+  if (code === "PGRST202" || /function.*does not exist|could not find the function/i.test(msg)) {
+    return "Database function not found. Please apply the latest migrations to Supabase (`npx supabase db push`).";
+  }
+
+  if (code === "42P01" || /relation.*does not exist/i.test(msg)) {
+    return "Database table not found. Please apply the latest migrations to Supabase (`npx supabase db push`).";
+  }
+
+  if (code === "22023" || /VALIDATION/i.test(msg) || /check constraint/i.test(msg)) {
     if (/key/i.test(msg)) {
       return "Project key must be 2–10 uppercase letters or numbers (e.g. AUTH, CORE).";
     }
@@ -49,6 +66,10 @@ export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: s
       return "Project name must be 2–80 characters.";
     }
     return "Please check the entered values and try again.";
+  }
+
+  if (code === "42501" || /permission denied|row-level security/i.test(msg)) {
+    return "Permission denied. Workspace owners and admins only.";
   }
 
   return "Something went wrong. Please try again.";
