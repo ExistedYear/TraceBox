@@ -100,6 +100,12 @@ export function OnboardingFlow() {
       toast.error("Could not reach the server. Please try again.");
     }
   }
+  function skipProject() {
+    toast.success("Workspace ready.");
+    router.push("/dashboard");
+    router.refresh();
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[420px]">
@@ -162,13 +168,18 @@ export function OnboardingFlow() {
                   {projectForm.formState.errors.description && <p className="text-xs text-destructive">{projectForm.formState.errors.description.message}</p>}
                 </div>
                 <Separator />
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setStep("workspace")} disabled={projectForm.formState.isSubmitting}>
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={projectForm.formState.isSubmitting}>
-                    {projectForm.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Finish setup
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => setStep("workspace")} disabled={projectForm.formState.isSubmitting}>
+                      <ArrowLeft className="h-3.5 w-3.5" /> Back
+                    </Button>
+                    <Button type="submit" className="flex-1" disabled={projectForm.formState.isSubmitting}>
+                      {projectForm.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Finish setup
+                    </Button>
+                  </div>
+                  <Button type="button" variant="ghost" className="w-full text-xs text-muted-foreground hover:text-foreground" onClick={skipProject} disabled={projectForm.formState.isSubmitting}>
+                    Skip for now
                   </Button>
                 </div>
               </form>
