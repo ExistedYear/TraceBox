@@ -1,6 +1,6 @@
 # TraceBox
 
-TraceBox is a small, deployable foundation for an engineering workspace. It proves the Vercel + Supabase path before product features are added.
+TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping the first four product phases: workspaces/projects, project workflow, issue creation, and issue list/editing.
 
 ## Stack
 
@@ -23,7 +23,7 @@ Included today: email/password signup, login, logout, session refresh, workspace
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds six ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, and a security-hardening pass (RPC-only issue creation, RESTRICT ownership FKs, column-scoped grants).
+`supabase/migrations/` holds eleven ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, and project-first component mutation RPCs.
 
 ## Quality checks
 

@@ -89,58 +89,81 @@ export function ProjectSettings({
 
   async function saveComponent(values: ComponentValues) {
     if (editing) {
-      const { error } = await createClient()
-        .from("components")
-        .update({
-          name: values.name,
-          description: values.description || null,
-          default_assignee_id: values.default_assignee_id || null,
-        })
-        .eq("id", editing.id);
-      if (error) {
-        toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not update the component.");
+      try {
+        const { error } = await createClient().rpc("update_component", {
+          p_component_id: editing.id,
+          p_name: values.name,
+          p_description: values.description || undefined,
+          p_default_assignee_id: values.default_assignee_id || undefined,
+          p_is_archived: editing.is_archived,
+        });
+        if (error) {
+          toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not update the component.");
+          return;
+        }
+        setComponents((current) => current.map((row) => (row.id === editing.id ? { ...row, name: values.name, description: values.description || null, default_assignee_id: values.default_assignee_id || null } : row)).sort((a, b) => a.name.localeCompare(b.name)));
+        toast.success("Component updated.");
+      } catch {
+        toast.error("Could not reach the server. Please try again.");
         return;
       }
-      setComponents((current) => current.map((row) => (row.id === editing.id ? { ...row, name: values.name, description: values.description || null, default_assignee_id: values.default_assignee_id || null } : row)).sort((a, b) => a.name.localeCompare(b.name)));
-      toast.success("Component updated.");
     } else {
       await addComponent(values);
       return;
     }
     form.reset();
     setEditing(null);
+    setAddOpen(false);
   }
 
   async function addComponent(values: ComponentValues) {
-    const { data, error } = await createClient()
-      .from("components")
-      .insert({
-        project_id: projectId,
+    try {
+      const { data: componentId, error } = await createClient().rpc("create_component", {
+        p_project_id: projectId,
+        p_name: values.name,
+        p_description: values.description || undefined,
+        p_default_assignee_id: values.default_assignee_id || undefined,
+      });
+      if (error) {
+        toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not create the component.");
+        return;
+      }
+      const data = {
+        id: componentId,
         name: values.name,
         description: values.description || null,
         default_assignee_id: values.default_assignee_id || null,
-      })
-      .select("*")
-      .single();
-    if (error) {
-      toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not create the component.");
-      return;
+        is_archived: false,
+      };
+      setComponents((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
+      toast.success(`Component ${data.name} created.`);
+      form.reset();
+      setAddOpen(false);
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
     }
-    setComponents((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
-    toast.success(`Component ${data.name} created.`);
-    form.reset();
-    setAddOpen(false);
   }
 
   async function toggleArchive(component: ComponentRow) {
     setBusyId(component.id);
-    const { error } = await createClient().from("components").update({ is_archived: !component.is_archived }).eq("id", component.id);
-    setBusyId((current) => (current === component.id ? null : current));
-    if (error) {
-      toast.error(error.message.includes("row-level security") ? "Only maintainers can archive components." : "Could not update the component.");
-      return;
+    try {
+      const { error } = await createClient().rpc("update_component", {
+        p_component_id: component.id,
+        p_name: component.name,
+        p_description: component.description || undefined,
+        p_default_assignee_id: component.default_assignee_id || undefined,
+        p_is_archived: !component.is_archived,
+      });
+      if (error) {
+        toast.error(error.message.includes("PROJECT_ARCHIVED") ? "This project is archived." : error.message.includes("NOT_ALLOWED") ? "Only maintainers can archive components." : "Could not update the component.");
+        return;
+      }
+      setComponents((current) => current.map((row) => (row.id === component.id ? { ...row, is_archived: !row.is_archived } : row)));
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
+    } finally {
+      setBusyId((current) => (current === component.id ? null : current));
     }
-    setComponents((current) => current.map((row) => (row.id === component.id ? { ...row, is_archived: !row.is_archived } : row)));
   }
 
   const stateName = (id: string) => states.find((state) => state.id === id)?.name ?? "?";
@@ -153,9 +176,9 @@ export function ProjectSettings({
         <p className="mt-2 max-w-2xl text-muted-foreground">{project.description ?? "Components and workflow for this project."}</p>
       </div>
 
-      <div className="flex gap-1 border-b border-border/80">
+      <div role="tablist" aria-label="Settings sections" className="flex gap-1 border-b border-border/80">
         {(["components", "workflow"] as const).map((value) => (
-          <button key={value} onClick={() => setTab(value)} aria-current={tab === value ? "page" : undefined} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+          <button key={value} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
             {value}
           </button>
         ))}

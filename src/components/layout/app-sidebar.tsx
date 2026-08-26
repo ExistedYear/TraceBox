@@ -21,7 +21,7 @@ export type ShellNavProps = { organizations: WorkspaceSummary[]; projects: Proje
 function SidebarLink({ href, label, icon: Icon, collapsed, onNavigate }: { href: string; label: string; icon: typeof LayoutDashboard; collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const current = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
-  return <Link href={href} onClick={onNavigate} aria-current={current ? "page" : undefined} title={collapsed ? label : undefined} className={cn("group flex items-center gap-3 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors", current ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground", collapsed && "justify-center px-2")}><Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}</Link>;
+  return <Link href={href} prefetch={href === "/dashboard/issues" ? false : undefined} onClick={onNavigate} aria-current={current ? "page" : undefined} title={collapsed ? label : undefined} className={cn("group flex items-center gap-3 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors", current ? "bg-primary/12 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground", collapsed && "justify-center px-2")}><Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}</Link>;
 }
 
 function SidebarContent({ mobile = false, collapsed = false, onCollapse, onNavigate, switcher }: { mobile?: boolean; collapsed?: boolean; onCollapse?: () => void; onNavigate?: () => void; switcher?: React.ReactNode }) {
@@ -47,6 +47,6 @@ export function AppSidebar({ organizations, projects, activeOrganizationId, acti
 export function MobileSidebar({ organizations, projects, activeOrganizationId, activeProjectId }: ShellNavProps) {
   const [open, setOpen] = React.useState(false);
   const close = () => setOpen(false);
-  const switcher = <WorkspaceSwitcher organizations={organizations} projects={projects} activeOrganizationId={activeOrganizationId} activeProjectId={activeProjectId} />;
+  const switcher = <WorkspaceSwitcher organizations={organizations} projects={projects} activeOrganizationId={activeOrganizationId} activeProjectId={activeProjectId} onContextChange={close} />;
   return <Sheet open={open} onOpenChange={setOpen}><SheetTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 md:hidden" aria-label="Open navigation"><Menu className="h-4 w-4" /></Button></SheetTrigger><SheetContent side="left" className="w-72 p-0"><SheetTitle className="sr-only">Workspace navigation</SheetTitle><SidebarContent mobile switcher={switcher} onNavigate={close} /></SheetContent></Sheet>;
 }

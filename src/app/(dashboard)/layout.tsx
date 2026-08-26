@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { getWorkspaceContext } from "@/lib/workspace-context";

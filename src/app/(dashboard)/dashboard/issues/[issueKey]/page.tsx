@@ -30,6 +30,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     .select("id")
     .eq("organization_id", context.activeOrganization.id)
     .eq("key", parsed.projectKey)
+    .eq("is_archived", false)
     .maybeSingle();
   if (!project) notFound();
 
@@ -41,10 +42,13 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     .maybeSingle();
   if (!issue) notFound();
 
-  const [{ data: events }, names] = await Promise.all([
+  const [{ data: events }, names, { data: componentRows }] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
     displayNameMap([issue.reporter_id, issue.assignee_id]),
+    supabase.from("components").select("id, name").eq("project_id", project.id),
   ]);
+
+  const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
 
   const actorIds = (events ?? []).map((event) => event.actor_id);
   const actorNames = await displayNameMap(actorIds);
@@ -100,7 +104,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             <h2 className="border-b border-border/80 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Activity</h2>
             <ul className="divide-y divide-border/70">
               {(events ?? []).map((event) => {
-                const summary = eventSummary(event);
+                const summary = eventSummary(event, (id) => names.get(id) || actorNames.get(id) || componentNames.get(id) || id);
                 return (
                   <li key={event.id} className="px-4 py-2.5 text-sm">
                     <span className="font-medium">{personLabel(event.actor_id ? actorNames.get(event.actor_id) : null, event.actor_id)}</span>{" "}

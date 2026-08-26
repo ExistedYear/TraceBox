@@ -40,6 +40,7 @@ type WorkspaceSwitcherProps = {
   projects: ProjectSummary[];
   activeOrganizationId: string;
   activeProjectId: string | null;
+  onContextChange?: () => void;
 };
 
 function selectOrganization(id: string) {
@@ -52,7 +53,7 @@ function selectProject(id: string) {
   document.cookie = `tb_project=${id}; path=/; max-age=31536000; samesite=lax`;
 }
 
-export function WorkspaceSwitcher({ organizations, projects, activeOrganizationId, activeProjectId }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ organizations, projects, activeOrganizationId, activeProjectId, onContextChange }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const activeOrganization = organizations.find((organization) => organization.id === activeOrganizationId);
   const activeProject = projects.find((project) => project.id === activeProjectId);
@@ -73,7 +74,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Workspaces</DropdownMenuLabel>
           {organizations.map((organization) => (
-            <DropdownMenuItem key={organization.id} onSelect={() => { selectOrganization(organization.id); router.refresh(); }}>
+            <DropdownMenuItem key={organization.id} onSelect={() => { selectOrganization(organization.id); router.push("/dashboard"); router.refresh(); onContextChange?.(); }}>
               <span className="min-w-0 flex-1 truncate">{organization.name}</span>
               {organization.id === activeOrganizationId && <Check className="h-3.5 w-3.5 text-primary" />}
             </DropdownMenuItem>
@@ -99,7 +100,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
           <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Projects</DropdownMenuLabel>
           {projects.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No projects yet.</p>}
           {projects.map((project) => (
-            <DropdownMenuItem key={project.id} onSelect={() => { selectProject(project.id); router.refresh(); }}>
+            <DropdownMenuItem key={project.id} onSelect={() => { selectProject(project.id); router.push("/dashboard/issues"); router.refresh(); onContextChange?.(); }}>
               <span className="font-mono text-xs">{project.key}</span>
               <span className="min-w-0 flex-1 truncate">{project.name}</span>
               {project.id === activeProjectId && <Check className="h-3.5 w-3.5 text-primary" />}
@@ -123,24 +124,63 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
   );
 }
 
+export function NewProjectButton({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button size="sm" className="gap-2" onClick={() => setOpen(true)}>
+        <Plus className="h-3.5 w-3.5" /> New project
+      </Button>
+      <NewProjectDialog
+        open={open}
+        onOpenChange={setOpen}
+        organizationId={organizationId}
+        onCreated={(projectId) => {
+          selectProject(projectId);
+          router.refresh();
+        }}
+      />
+    </>
+  );
+}
+export function ProjectCardLink({ project }: { project: ProjectSummary }) {
+  return (
+    <Link
+      href="/dashboard/issues"
+      prefetch={false}
+      onClick={() => selectProject(project.id)}
+      className="block rounded-[10px] border border-border/80 bg-card p-4 transition-colors hover:border-primary/40"
+    >
+      <p className="font-mono text-xs text-primary">{project.key}</p>
+      <p className="mt-1 truncate text-sm font-semibold">{project.name}</p>
+    </Link>
+  );
+}
+
 function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; organizationId: string; onCreated: (projectId: string) => void }) {
   const form = useForm<ProjectValues>({ resolver: zodResolver(projectSchema), defaultValues: { name: "", key: "", description: "" } });
 
   async function onSubmit(values: ProjectValues) {
-    const { data, error } = await createClient().rpc("create_project", {
-      p_organization_id: organizationId,
-      p_name: values.name,
-      p_key: values.key,
-      p_description: values.description ? values.description : undefined,
-    });
-    if (error) {
-      toast.error(getSafeWorkspaceErrorMessage(error));
-      return;
+    try {
+      const { data, error } = await createClient().rpc("create_project", {
+        p_organization_id: organizationId,
+        p_name: values.name,
+        p_key: values.key,
+        p_description: values.description ? values.description : undefined,
+      });
+      if (error) {
+        toast.error(getSafeWorkspaceErrorMessage(error));
+        return;
+      }
+      toast.success(`Project ${values.key} created.`);
+      form.reset();
+      onOpenChange(false);
+      onCreated(data);
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
     }
-    toast.success(`Project ${values.key} created.`);
-    form.reset();
-    onOpenChange(false);
-    onCreated(data);
   }
 
   return (
@@ -159,7 +199,7 @@ function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { o
             </div>
             <div className="space-y-2">
               <Label htmlFor="dialog-project-key">Key</Label>
-              <Input id="dialog-project-key" className="font-mono uppercase" placeholder="AUTH" {...form.register("key")} onChange={(event) => { form.setValue("key", event.target.value.toUpperCase()); }} />
+              <Input id="dialog-project-key" className="font-mono uppercase" placeholder="AUTH" {...form.register("key")} onChange={(event) => { form.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
               {form.formState.errors.key && <p className="text-xs text-destructive">{form.formState.errors.key.message}</p>}
             </div>
           </div>

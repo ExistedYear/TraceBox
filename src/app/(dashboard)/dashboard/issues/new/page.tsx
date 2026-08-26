@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 
 import { NewIssueForm } from "@/components/issues/new-issue-form";
 import { createClient } from "@/lib/supabase/server";
-import { displayNameMap } from "@/lib/server-people";
 import { personLabel } from "@/lib/issues";
+import { displayNameMap } from "@/lib/server-people";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 export const metadata: Metadata = { title: "New issue" };
@@ -15,17 +15,19 @@ export default async function NewIssuePage() {
   const projectId = context.activeProject.id;
 
   const supabase = await createClient();
-  const [{ data: components }, { data: memberRows }, { data: states }, { data: role }] = await Promise.all([
-    supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
+  const [{ data: components }, { data: memberRows }, { data: adminRows }, { data: states }, { data: role }] = await Promise.all([
+    supabase.from("components").select("id, name, default_assignee_id").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
+    supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.from("workflow_states").select("name").eq("project_id", projectId).order("is_initial", { ascending: false }).order("position").limit(1),
     supabase.rpc("project_role", { p_project_id: projectId }),
   ]);
 
   if (role !== "REPORTER" && role !== "DEVELOPER" && role !== "MAINTAINER") redirect("/dashboard");
 
-  const names = await displayNameMap((memberRows ?? []).map((row) => row.user_id));
-  const members = (memberRows ?? []).map((row) => ({ userId: row.user_id, displayName: personLabel(names.get(row.user_id), row.user_id) }));
+  const candidates = [...(memberRows ?? []), ...(adminRows ?? [])];
+  const names = await displayNameMap(candidates.map((row) => row.user_id));
+  const members = [...new Map(candidates.map((row) => [row.user_id, { userId: row.user_id, displayName: personLabel(names.get(row.user_id), row.user_id) }])).values()];
 
   return (
     <main className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
@@ -35,9 +37,10 @@ export default async function NewIssuePage() {
         <p className="mt-2 text-muted-foreground">Defaults: status {states?.[0]?.name ?? "Triage"}, P2, Major severity.</p>
       </div>
       <NewIssueForm
+        key={projectId}
         projectId={projectId}
         projectKey={context.activeProject.key}
-        components={components ?? []}
+        components={(components ?? []).map((component) => ({ id: component.id, name: component.name, defaultAssigneeId: component.default_assignee_id }))}
         members={members}
         initialStateName={states?.[0]?.name ?? "Triage"}
       />

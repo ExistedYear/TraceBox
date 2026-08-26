@@ -27,14 +27,16 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
   const projectId = context.activeProject.id;
 
   const supabase = await createClient();
-  const [{ data: states }, { data: components }, { data: memberRows }, { data: role }] = await Promise.all([
+  const [{ data: states }, { data: components }, { data: memberRows }, { data: adminRows }, { data: role }] = await Promise.all([
     supabase.from("workflow_states").select("id, name").eq("project_id", projectId).order("position"),
     supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
+    supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.rpc("project_role", { p_project_id: projectId }),
   ]);
 
-  const names = await displayNameMap((memberRows ?? []).map((row) => row.user_id));
+  const candidates = [...(memberRows ?? []), ...(adminRows ?? [])];
+  const names = await displayNameMap(candidates.map((row) => row.user_id));
   const filters = decodeIssueSearchParams(rawParams, {
     stateIds: new Set((states ?? []).map((state) => state.id)),
     componentIds: new Set((components ?? []).map((component) => component.id)),
@@ -63,7 +65,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           currentUserId={context.userId}
           states={(states ?? []).map((state) => ({ value: state.id, label: state.name }))}
           components={(components ?? []).map((component) => ({ value: component.id, label: component.name }))}
-          members={(memberRows ?? []).map((row) => ({ value: row.user_id, label: personLabel(names.get(row.user_id), row.user_id) }))}
+          members={[...new Map(candidates.map((row) => [row.user_id, { value: row.user_id, label: personLabel(names.get(row.user_id), row.user_id) }])).values()]}
           initialFilters={filters}
         />
       )}

@@ -8,7 +8,7 @@ import { MobileSidebar } from "@/components/layout/app-sidebar";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { ProjectSummary, WorkspaceSummary } from "@/components/layout/workspace-switcher";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 type AppHeaderProps = {
@@ -74,9 +74,15 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="max-w-xl gap-0 overflow-hidden rounded-xl p-0">
         <DialogTitle className="sr-only">Command palette</DialogTitle>
+        <DialogDescription className="sr-only">Type to search workspace commands. Use arrow keys to navigate.</DialogDescription>
         <div className="flex items-center gap-3 border-b px-4 py-3">
           <Search className="h-4 w-4 text-muted-foreground" />
           <Input
+            aria-label="Search workspace commands"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="command-palette-results"
+            aria-activedescendant={commands[highlighted] ? `command-${highlighted}` : undefined}
             autoFocus
             value={query}
             onChange={(event) => {
@@ -88,11 +94,14 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
           />
         </div>
-        <div className="max-h-80 overflow-y-auto p-2">
+        <div id="command-palette-results" role="listbox" className="max-h-80 overflow-y-auto p-2">
           {commands.length ? (
             commands.map((item, index) => (
               <button
+                id={`command-${index}`}
                 key={item.href}
+                role="option"
+                aria-selected={index === highlighted}
                 className={cnFlex(index === highlighted)}
                 onMouseEnter={() => setHighlighted(index)}
                 onClick={() => go(item.href)}

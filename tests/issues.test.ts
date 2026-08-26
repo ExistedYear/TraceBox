@@ -34,13 +34,16 @@ describe("eventSummary", () => {
     const summary = eventSummary({ event_type: "PRIORITY_CHANGED", old_value: "P2", new_value: "P1" });
     expect(summary).toEqual({ heading: "changed priority", detail: "P2 → P1" });
   });
-
-  it("falls back to a readable heading and em-dashes for empty values", () => {
-    const summary = eventSummary({ event_type: "ASSIGNEE_CHANGED", old_value: null, new_value: "Ada" });
-    expect(summary.detail).toBe("— → Ada");
-
-    const unknown = eventSummary({ event_type: "SOMETHING_ELSE" });
-    expect(unknown.heading).toBe("something else");
+  it("resolves user ids in assignee and component events", () => {
+    const resolveId = (id: string) => `Ada (${id.slice(0, 4)})`;
+    expect(eventSummary({ event_type: "ASSIGNEE_CHANGED", old_value: "11111111-1111-4111-8111-111111111111", new_value: "22222222-2222-4222-8222-222222222222" }, resolveId)).toEqual({
+      heading: "changed assignee",
+      detail: "Ada (1111) → Ada (2222)",
+    });
+    expect(eventSummary({ event_type: "COMPONENT_CHANGED", old_value: "Auth", new_value: "Billing" })).toEqual({
+      heading: "changed component",
+      detail: "Auth → Billing",
+    });
   });
 });
 
@@ -51,11 +54,16 @@ describe("issueCreateSchema", () => {
     expect(issueCreateSchema.safeParse({ ...base, priority: "P2", severity: "MAJOR" }).success).toBe(true);
   });
 
-  it("requires title, description, component and a known type", () => {
+  it("requires title, non-empty description and a known type", () => {
     expect(issueCreateSchema.safeParse({ ...base, title: "" }).success).toBe(false);
     expect(issueCreateSchema.safeParse({ ...base, description: "" }).success).toBe(false);
-    expect(issueCreateSchema.safeParse({ ...base, component_id: "" }).success).toBe(false);
     expect(issueCreateSchema.safeParse({ ...base, type: "NOT_A_TYPE" }).success).toBe(false);
+  });
+
+  it("allows filing without a component for fresh projects", () => {
+    const { component_id: _omitted, ...withoutComponent } = base;
+    expect(issueCreateSchema.safeParse({ ...withoutComponent, priority: "P2", severity: "MAJOR" }).success).toBe(true);
+    expect(issueCreateSchema.safeParse({ ...base, component_id: "", priority: "P2", severity: "MAJOR" }).success).toBe(true);
   });
 
   it("rejects non-uuid component or assignee hints", () => {

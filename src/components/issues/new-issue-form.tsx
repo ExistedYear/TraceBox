@@ -27,7 +27,7 @@ export function NewIssueForm({
 }: {
   projectId: string;
   projectKey: string;
-  components: { id: string; name: string }[];
+  components: { id: string; name: string; defaultAssigneeId: string | null }[];
   members: { userId: string; displayName: string | null }[];
   initialStateName: string;
 }) {
@@ -49,6 +49,7 @@ export function NewIssueForm({
       actual_behavior: "",
     },
   });
+  const componentField = form.register("component_id");
 
   async function onSubmit(values: IssueCreateValues) {
     let issueNumber: { data: number | null; error: { message: string } | null };
@@ -80,7 +81,9 @@ export function NewIssueForm({
             ? "This project is archived."
             : message.includes("INVALID_COMPONENT")
               ? "That component is not available."
-              : "Could not create the issue.",
+              : message.includes("INVALID_ASSIGNEE")
+                ? "That assignee is not eligible for this project."
+                : "Could not create the issue.",
       );
       return;
     }
@@ -107,7 +110,7 @@ export function NewIssueForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="issue-component">Component</Label>
-          <select id="issue-component" className={selectClass} {...form.register("component_id")}>
+          <select id="issue-component" className={selectClass} {...componentField} onChange={(event) => { componentField.onChange(event); const selected = components.find((component) => component.id === event.target.value); if (selected?.defaultAssigneeId && !form.getValues("assignee_id")) form.setValue("assignee_id", selected.defaultAssigneeId); }}>
             <option value="">None</option>
             {components.map((component) => (
               <option key={component.id} value={component.id}>{component.name}</option>

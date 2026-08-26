@@ -502,6 +502,10 @@ export type Database = {
         Args: { p_issue_id: string };
         Returns: boolean;
       };
+      create_component: {
+        Args: { p_default_assignee_id?: string; p_description?: string; p_name: string; p_project_id: string };
+        Returns: string;
+      };
       create_issue: {
         Args: {
           p_actual_behavior?: string;
@@ -526,6 +530,10 @@ export type Database = {
       create_organization: {
         Args: { p_name: string; p_slug: string };
         Returns: string;
+      };
+      update_component: {
+        Args: { p_component_id: string; p_default_assignee_id?: string; p_description?: string; p_is_archived?: boolean; p_name: string };
+        Returns: undefined;
       };
       create_project: {
         Args: { p_description?: string; p_key: string; p_name: string; p_organization_id: string };

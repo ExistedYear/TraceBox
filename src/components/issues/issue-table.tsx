@@ -86,6 +86,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [sorting, setSorting] = useState<SortingState>([{ id: "updated_at", desc: true }]);
   const [page, setPage] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [rows, setRows] = useState<TableRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -124,8 +125,12 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     // Only real root columns may be ordered; display columns are unsortable.
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
-    if (sort && sortableIds.has(sort.id)) query = query.order(sort.id, { ascending: !sort.desc });
-    else query = query.order("updated_at", { ascending: false });
+    if (sort && sortableIds.has(sort.id)) {
+      query = query.order(sort.id, { ascending: !sort.desc });
+      if (sort.id !== "id") query = query.order("id", { ascending: true });
+    } else {
+      query = query.order("updated_at", { ascending: false }).order("id", { ascending: true });
+    }
 
     const { data, count, error } = await query;
     if (seq !== requestSeq.current) return; // a newer request superseded this one
@@ -168,25 +173,30 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
   useEffect(() => {
     void fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshNonce]);
 
   const updateField = useCallback(
     async (issue: TableRow, field: string, value: string) => {
       setEditingId(issue.id);
-      const { error } = await createClient().rpc("update_issue_fields", {
-        p_issue_id: issue.id,
-        p_updates: { [field]: value },
-      });
-      setEditingId(null);
-      if (error) {
-        toast.error(error.message.includes("NOT_ALLOWED") ? "Developers and maintainers only." : "Update rejected.");
-        return;
+      try {
+        const { error } = await createClient().rpc("update_issue_fields", {
+          p_issue_id: issue.id,
+          p_updates: { [field]: value },
+        });
+        if (error) {
+          toast.error(error.message.includes("NOT_ALLOWED") ? "Developers and maintainers only." : error.message.includes("PROJECT_ARCHIVED") ? "This project is archived." : error.message.includes("INVALID_ASSIGNEE") ? "That assignee is not eligible for this project." : "Update rejected.");
+          return;
+        }
+        toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);
+        router.refresh();
+        setRefreshNonce((value) => value + 1);
+      } catch {
+        toast.error("Could not reach the server. Please try again.");
+      } finally {
+        setEditingId(null);
       }
-      toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);
-      router.refresh();
-      void fetchData();
     },
-    [projectKey, fetchData, router],
+    [projectKey, router],
   );
 
   const columns = useMemo(() => {
@@ -194,6 +204,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       columnHelper.accessor("issue_number", {
         id: "issue_number",
         header: "ID",
+        enableHiding: false,
         cell: (info) => (
           <Link href={`/dashboard/issues/${formatIssueKey(projectKey, info.getValue())}`} className="font-mono text-xs text-muted-foreground hover:text-primary">
             {formatIssueKey(projectKey, info.getValue())}
@@ -203,6 +214,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       columnHelper.accessor("title", {
         id: "title",
         header: "Title",
+        enableHiding: false,
         cell: (info) => (
           <Link href={`/dashboard/issues/${formatIssueKey(projectKey, info.row.original.issue_number)}`} className="block max-w-md truncate font-medium hover:text-primary">
             {info.getValue()}
@@ -269,6 +281,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           canEdit ? (
             <select aria-label="Component" className={cn(selectClass, "max-w-32")} value={info.row.original.componentId ?? ""} onChange={(event) => void updateField(info.row.original, "component_id", event.target.value)} disabled={editingId === info.row.original.id}>
               <option value="">None</option>
+              {info.row.original.componentId && !components.some((component) => component.value === info.row.original.componentId) && <option value={info.row.original.componentId} disabled>{info.row.original.componentName ?? "Archived component"} (archived)</option>}
               {components.map((component) => (
                 <option key={component.value} value={component.value}>{component.label}</option>
               ))}
@@ -284,8 +297,9 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           canEdit ? (
             <select aria-label="Assignee" className={cn(selectClass, "max-w-36")} value={info.row.original.assigneeId ?? ""} onChange={(event) => void updateField(info.row.original, "assignee_id", event.target.value)} disabled={editingId === info.row.original.id}>
               <option value="">Unassigned</option>
+              {info.row.original.assigneeId && !members.some((member) => member.value === info.row.original.assigneeId) && <option value={info.row.original.assigneeId}>{info.row.original.assigneeLabel}</option>}
               <option value={currentUserId}>Me</option>
-              {members.filter((member) => member.value !== currentUserId).map((member) => (
+              {members.filter((member) => member.value !== currentUserId && member.value !== info.row.original.assigneeId).map((member) => (
                 <option key={member.value} value={member.value}>{member.label}</option>
               ))}
             </select>
@@ -306,6 +320,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const table = useReactTable({
     data: rows,
     columns,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     state: { sorting, columnVisibility },

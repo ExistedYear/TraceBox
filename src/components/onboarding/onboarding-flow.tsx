@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -23,7 +23,11 @@ export function OnboardingFlow() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("workspace");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
-
+  useEffect(() => {
+    if (!organizationId) return;
+    document.cookie = `tb_org=${organizationId}; path=/; max-age=31536000; samesite=lax`;
+    document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
+  }, [organizationId]);
   const workspaceForm = useForm<WorkspaceValues>({
     resolver: zodResolver(workspaceSchema),
     defaultValues: { name: "", slug: "" },
@@ -32,9 +36,10 @@ export function OnboardingFlow() {
     resolver: zodResolver(projectSchema),
     defaultValues: { name: "", key: "", description: "" },
   });
+  const workspaceNameField = workspaceForm.register("name");
 
-  const workspaceName = workspaceForm.watch("name");
-  const suggestedSlug = useMemo(() => slugify(workspaceName ?? ""), [workspaceName]);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const suggestedSlug = slugify(workspaceName);
 
   async function submitWorkspace(values: WorkspaceValues) {
     if (organizationId) {
@@ -42,36 +47,41 @@ export function OnboardingFlow() {
       return;
     }
     workspaceForm.clearErrors();
-    const { data, error } = await createClient().rpc("create_organization", { p_name: values.name.trim(), p_slug: values.slug });
-    if (error) {
-      toast.error(getSafeWorkspaceErrorMessage(error));
-      return;
+    try {
+      const { data, error } = await createClient().rpc("create_organization", { p_name: values.name.trim(), p_slug: values.slug });
+      if (error) {
+        toast.error(getSafeWorkspaceErrorMessage(error));
+        return;
+      }
+      setOrganizationId(data);
+      setStep("project");
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
     }
-    setOrganizationId(data);
-    // Scope the session to the newly created workspace immediately.
-    document.cookie = `tb_org=${data}; path=/; max-age=31536000; samesite=lax`;
-    document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
-    setStep("project");
-  }
 
+  }
   async function submitProject(values: ProjectValues) {
     if (!organizationId) return;
     projectForm.clearErrors();
-    const { error } = await createClient().rpc("create_project", {
-      p_organization_id: organizationId,
-      p_name: values.name,
-      p_key: values.key,
-      p_description: values.description ? values.description : undefined,
-    });
-    if (error) {
-      toast.error(getSafeWorkspaceErrorMessage(error));
-      return;
+    try {
+      const { error } = await createClient().rpc("create_project", {
+        p_organization_id: organizationId,
+        p_name: values.name,
+        p_key: values.key,
+        p_description: values.description ? values.description : undefined,
+      });
+      if (error) {
+        toast.error(getSafeWorkspaceErrorMessage(error));
+        return;
+      }
+      toast.success("Workspace ready.");
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
     }
-    toast.success("Workspace ready.");
-    router.push("/dashboard");
-    router.refresh();
-  }
 
+  }
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-[420px]">
@@ -89,14 +99,14 @@ export function OnboardingFlow() {
               <form onSubmit={workspaceForm.handleSubmit(submitWorkspace)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="workspace-name">Workspace name</Label>
-                  <Input id="workspace-name" autoComplete="organization" placeholder="Acme Engineering" {...workspaceForm.register("name")} />
+                  <Input id="workspace-name" autoComplete="organization" placeholder="Acme Engineering" {...workspaceNameField} onChange={(event) => { workspaceNameField.onChange(event); setWorkspaceName(event.target.value); }} />
                   {workspaceForm.formState.errors.name && <p className="text-xs text-destructive">{workspaceForm.formState.errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="workspace-slug">Workspace URL</Label>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground">/</span>
-                    <Input id="workspace-slug" className="font-mono" placeholder="acme-engineering" {...workspaceForm.register("slug")} onChange={(event) => { workspaceForm.setValue("slug", event.target.value.toLowerCase()); }} onBlur={() => { if (!workspaceForm.getValues("slug") && suggestedSlug) workspaceForm.setValue("slug", suggestedSlug); }} />
+                    <Input id="workspace-slug" className="font-mono" placeholder="acme-engineering" {...workspaceForm.register("slug")} onChange={(event) => { workspaceForm.setValue("slug", event.target.value.toLowerCase(), { shouldValidate: true, shouldDirty: true }); }} onBlur={() => { if (!workspaceForm.getValues("slug") && suggestedSlug) workspaceForm.setValue("slug", suggestedSlug, { shouldValidate: true, shouldDirty: true }); }} />
                   </div>
                   {!workspaceForm.formState.errors.slug && suggestedSlug && <p className="text-xs text-muted-foreground">Suggested: <span className="font-mono">{suggestedSlug}</span></p>}
                   {workspaceForm.formState.errors.slug && <p className="text-xs text-destructive">{workspaceForm.formState.errors.slug.message}</p>}
@@ -124,7 +134,7 @@ export function OnboardingFlow() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="project-key">Key</Label>
-                    <Input id="project-key" className="font-mono uppercase" placeholder="AUTH" {...projectForm.register("key")} onChange={(event) => { projectForm.setValue("key", event.target.value.toUpperCase()); }} />
+                    <Input id="project-key" className="font-mono uppercase" placeholder="AUTH" {...projectForm.register("key")} onChange={(event) => { projectForm.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
                     {projectForm.formState.errors.key && <p className="text-xs text-destructive">{projectForm.formState.errors.key.message}</p>}
                   </div>
                 </div>

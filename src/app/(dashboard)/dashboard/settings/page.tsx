@@ -27,28 +27,31 @@ export default async function SettingsPage() {
   const supabase = await createClient();
   const projectId = context.activeProject.id;
 
-  const [{ data: project }, { data: components }, { data: states }, { data: transitions }, { data: memberRows }, { data: canManage }] =
+  const [{ data: project }, { data: components }, { data: states }, { data: transitions }, { data: memberRows }, { data: adminRows }, { data: canManage }] =
     await Promise.all([
       supabase.from("projects").select("name, key, description").eq("id", projectId).maybeSingle(),
       supabase.from("components").select("*").eq("project_id", projectId).order("name"),
       supabase.from("workflow_states").select("*").eq("project_id", projectId).order("position"),
       supabase.from("workflow_transitions").select("from_state_id, to_state_id").eq("project_id", projectId),
       supabase.from("project_members").select("user_id, role").eq("project_id", projectId),
+      supabase.from("organization_members").select("user_id, role").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
       supabase.rpc("can_manage_project", { p_project_id: projectId }),
     ]);
 
   if (!project) redirect("/dashboard");
 
-  const names = await displayNameMap((memberRows ?? []).map((row) => row.user_id));
-  const members = (memberRows ?? []).map((row) => ({
+  const candidates = [...(memberRows ?? []), ...(adminRows ?? [])];
+  const names = await displayNameMap(candidates.map((row) => row.user_id));
+  const members = [...new Map(candidates.map((row) => [row.user_id, {
     userId: row.user_id,
     role: row.role,
     displayName: names.get(row.user_id) ?? null,
-  }));
+  }])).values()];
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
       <ProjectSettings
+        key={projectId}
         projectId={projectId}
         project={{ key: project.key, name: project.name, description: project.description }}
         canManage={Boolean(canManage)}

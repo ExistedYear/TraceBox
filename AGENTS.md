@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 4 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, and a dense TanStack issue table (filters/sorting/pagination/inline editing). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. Remaining fixture-free goal: the marketing landing page still shows illustrative product imagery. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 1 = Organizations + Projects).
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 4 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, and a dense TanStack issue table (filters/sorting/pagination/inline editing). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 5 = Comments + Activity).
 
 ## Architecture & Data Flow
 
@@ -59,7 +59,7 @@ src/lib/
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
   types/database.ts        generated DB types incl. RPC function signatures
-supabase/                  config.toml, migrations/ (7 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (11 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -91,7 +91,7 @@ All new UI follows `info/trace-box-geist-command-center/` **wherever possible**;
 
 - Transfer directly: dense information layout, compact controls (`h-8` buttons, small inputs), `rounded-[10px]` bordered surfaces (`Surface` primitive), font-mono uppercase eyebrows with wide tracking, status-dot + tinted pill system (blue/violet/red/emerald/zinc/amber), vertical trace-line timelines, bordered cards with `/70–80` border opacity, minimal color noise on neutral backgrounds.
 - Translate, don't paste: the reference runs Tailwind v4 with OKLCH tokens; this repo is Tailwind v3 with HSL CSS variables (`src/app/globals.css`). Map intent (e.g. `--amber`, `--console`) onto existing Tailwind palette utilities (`amber-500/25` borders, `bg-card`, etc.).
-- Reuse before creating: `src/components/tracebox/primitives.tsx` (`SectionHeading`, `StatusPill`, `MetricCard`, `Surface`, `TraceLine`, `Avatar`, `EmptyState`) already mirrors the reference — extend it instead of adding parallel kits.
+- Reuse before creating: `src/components/tracebox/primitives.tsx` currently provides `Surface` and `EmptyState`; extend it instead of adding parallel kits.
 
 ## AGENTS.md Maintenance
 
@@ -107,8 +107,8 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Forms**: zod schema in `src/lib/validation/`, inferred type export, `useForm<T>({ resolver: zodResolver(schema) })`.
 - **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath` (control chars rejected).
 - **UI**: shadcn/ui default style + Lucide icons + Tailwind HSL CSS-variable tokens (`darkMode: ["class"]`; root html is dark by default). Add primitives with the shadcn CLI, configured by `components.json` (aliases `@/components`, `@/components/ui`, `@/lib/utils`).
-- **Repo laws** (enforced by both plans in `docs/`): every schema change ships as a versioned migration (`supabase/migrations/YYYYMMDDNNNN_name.sql`) — never dashboard-only changes; never disable RLS; never expose service-role keys to client bundles; no fake navigation/pages for unimplemented features.
-- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`) own transactional writes incl. membership rows; clients call `supabase.rpc(...)` via the browser client. Direct client inserts into membership tables are blocked by missing INSERT policies — keep it that way.
+- **Issue components**: `component_id` is optional when a project has no components yet; the RPC accepts null and the form exposes `None`. When a component is selected, its configured default assignee is preselected if the user has not chosen one.
+- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, and components are blocked by RLS/grants — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
 
@@ -130,6 +130,10 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260005_update_issue_fields.sql` | `update_issue_fields` RPC — Developer/Maintainer inline edits with per-field audit events |
 | `supabase/migrations/202608260006_security_hardening.sql` | audit hardening: issues INSERT policy dropped (RPC-only creation), owner/created-by/reporter FKs RESTRICT, column-scoped UPDATE grants on orgs/projects, org-aware `project_role`, owner-honoring `is_org_admin`, FOR UPDATE audit reads, duplicate index dropped |
 | `supabase/migrations/202608260007_archived_guards_audit.sql` | archived projects reject create/edit RPCs; archived components rejected on edit; assignee eligibility honors org admins; `handle_new_user` clamps display names; component client-DELETE policy retired (archive-only) |
+| `supabase/migrations/202608260008_write_guard_refinements.sql` | race-free project archive checks, candidate-scoped assignees, component column grants, component-assignment trigger, no-op-safe archived component handling |
+| `supabase/migrations/202608260009_finalize_component_guards.sql` | RPC-only organization creation; project-row lock in component trigger |
+| `supabase/migrations/202608260010_normalize_issue_updates.sql` | typed UUID comparisons and canonical audit values for inline issue edits |
+| `supabase/migrations/202608260011_component_mutation_rpcs.sql` | component create/update RPCs with project-first locking; direct component INSERT/UPDATE policies removed |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
@@ -141,7 +145,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - **Node ≥ 20.9** (`engines`); **npm** with committed `package-lock.json`; CI runs `npm ci` on Node 20.
 - TypeScript `strict`, target ES2017, moduleResolution `bundler`, isolatedModules.
 - ESLint 9 flat config re-exporting `eslint-config-next/core-web-vitals` — no custom rules; keep it that way unless required.
-- Tailwind v3 (not v4): content globs cover `src/{app,components,pages}`.
+- Tailwind v3 (not v4): content globs cover `src/{app,components}`.
 - **TanStack Table is pinned to v8** (`^8.21.3`); v9 renamed the API (`ReactTable`, `createCoreRowModel`) and will not typecheck against `useReactTable`. Column defs must be *inferred* from `createColumnHelper` — explicit `ColumnDef<T>[]` annotations break variance.
 - Deploy: Vercel (`vercel.json` pins framework + `npm run build`); GitHub Actions runs the same four gates on PRs and pushes to `main` — keep them green before yielding.
 
