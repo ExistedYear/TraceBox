@@ -52,6 +52,168 @@ export type Database = {
           },
         ];
       };
+      issue_events: {
+        Row: {
+          id: string;
+          issue_id: string;
+          actor_id: string | null;
+          event_type: string;
+          field_name: string | null;
+          old_value: Json | null;
+          new_value: Json | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          issue_id: string;
+          actor_id?: string | null;
+          event_type: string;
+          field_name?: string | null;
+          old_value?: Json | null;
+          new_value?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          issue_id?: string;
+          actor_id?: string | null;
+          event_type?: string;
+          field_name?: string | null;
+          old_value?: Json | null;
+          new_value?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issue_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issue_events_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issues: {
+        Row: {
+          id: string;
+          project_id: string;
+          issue_number: number;
+          title: string;
+          description: string | null;
+          type: string;
+          status_id: string;
+          resolution: string | null;
+          priority: string;
+          severity: string;
+          reporter_id: string;
+          assignee_id: string | null;
+          component_id: string | null;
+          environment: string | null;
+          steps_to_reproduce: string | null;
+          expected_behavior: string | null;
+          actual_behavior: string | null;
+          visibility: string;
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+          closed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          issue_number: number;
+          title: string;
+          description?: string | null;
+          type: string;
+          status_id: string;
+          resolution?: string | null;
+          priority?: string;
+          severity?: string;
+          reporter_id: string;
+          assignee_id?: string | null;
+          component_id?: string | null;
+          environment?: string | null;
+          steps_to_reproduce?: string | null;
+          expected_behavior?: string | null;
+          actual_behavior?: string | null;
+          visibility?: string;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          closed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          issue_number?: number;
+          title?: string;
+          description?: string | null;
+          type?: string;
+          status_id?: string;
+          resolution?: string | null;
+          priority?: string;
+          severity?: string;
+          reporter_id?: string;
+          assignee_id?: string | null;
+          component_id?: string | null;
+          environment?: string | null;
+          steps_to_reproduce?: string | null;
+          expected_behavior?: string | null;
+          actual_behavior?: string | null;
+          visibility?: string;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          closed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issues_assignee_id_fkey";
+            columns: ["assignee_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_component_id_fkey";
+            columns: ["component_id"];
+            isOneToOne: false;
+            referencedRelation: "components";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_reporter_id_fkey";
+            columns: ["reporter_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_status_id_fkey";
+            columns: ["status_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_states";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       organization_members: {
         Row: {
           organization_id: string;
@@ -336,6 +498,27 @@ export type Database = {
         Args: { p_project_id: string };
         Returns: boolean;
       };
+      can_view_issue: {
+        Args: { p_issue_id: string };
+        Returns: boolean;
+      };
+      create_issue: {
+        Args: {
+          p_actual_behavior?: string;
+          p_assignee_id?: string;
+          p_component_id?: string;
+          p_description?: string;
+          p_environment?: string;
+          p_expected_behavior?: string;
+          p_priority?: string;
+          p_project_id: string;
+          p_severity?: string;
+          p_steps_to_reproduce?: string;
+          p_title: string;
+          p_type: string;
+        };
+        Returns: number;
+      };
       create_organization: {
         Args: { p_name: string; p_slug: string };
         Returns: string;
@@ -355,6 +538,10 @@ export type Database = {
       is_project_member: {
         Args: { p_project_id: string };
         Returns: boolean;
+      };
+      project_role: {
+        Args: { p_project_id: string };
+        Returns: string;
       };
     };
     Enums: {
