@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Github, Loader2 } from "lucide-react";
@@ -29,6 +29,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   const form = useForm<LoginValues | SignupValues>({ resolver: zodResolver(isSignup ? signupSchema : loginSchema), defaultValues: isSignup ? { displayName: "", email: "", password: "" } : { email: "", password: "" } });
   const displayNameError = (form.formState.errors as { displayName?: { message?: string } }).displayName;
 
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam === "auth_callback") {
+      toast.error("Could not authenticate with GitHub. Ensure GitHub OAuth is enabled in Supabase.");
+    }
+  }, [searchParams]);
   async function onSubmit(values: LoginValues | SignupValues) {
     setIsSubmitting(true);
     try {
