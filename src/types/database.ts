@@ -4,6 +4,54 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      components: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          default_assignee_id: string | null;
+          is_archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          default_assignee_id?: string | null;
+          is_archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          description?: string | null;
+          default_assignee_id?: string | null;
+          is_archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "components_default_assignee_id_fkey";
+            columns: ["default_assignee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "components_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       organization_members: {
         Row: {
           organization_id: string;
@@ -182,6 +230,99 @@ export type Database = {
             columns: ["organization_id"];
             isOneToOne: false;
             referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_states: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          category: string;
+          position: number;
+          color: string | null;
+          is_initial: boolean;
+          is_terminal: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          category: string;
+          position: number;
+          color?: string | null;
+          is_initial?: boolean;
+          is_terminal?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          category?: string;
+          position?: number;
+          color?: string | null;
+          is_initial?: boolean;
+          is_terminal?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_states_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workflow_transitions: {
+        Row: {
+          id: string;
+          project_id: string;
+          from_state_id: string;
+          to_state_id: string;
+          required_role: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          from_state_id: string;
+          to_state_id: string;
+          required_role?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          from_state_id?: string;
+          to_state_id?: string;
+          required_role?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "workflow_transitions_from_state_id_fkey";
+            columns: ["from_state_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_states";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_transitions_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workflow_transitions_to_state_id_fkey";
+            columns: ["to_state_id"];
+            isOneToOne: false;
+            referencedRelation: "workflow_states";
             referencedColumns: ["id"];
           },
         ];
