@@ -184,6 +184,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           p_updates: { [field]: value },
         });
         if (error) {
+          console.error("Issue update failed:", error);
           const msg = String(error.message);
           toast.error(
             msg.includes("NOT_ALLOWED")
@@ -201,7 +202,8 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         toast.success(`${formatIssueKey(projectKey, issue.issue_number)} updated.`);
         router.refresh();
         setRefreshNonce((value) => value + 1);
-      } catch {
+      } catch (err) {
+        console.error("Unexpected issue update error:", err);
         toast.error("Could not reach the server. Please try again.");
       } finally {
         setEditingId(null);

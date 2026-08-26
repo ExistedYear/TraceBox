@@ -58,12 +58,14 @@ export function OnboardingFlow() {
     try {
       const { data, error } = await createClient().rpc("create_organization", { p_name: values.name.trim(), p_slug: values.slug });
       if (error) {
+        console.error("Workspace creation failed:", error);
         toast.error(getSafeWorkspaceErrorMessage(error));
         return;
       }
       setOrganizationId(data);
       setStep("project");
-    } catch {
+    } catch (err) {
+      console.error("Unexpected workspace creation error:", err);
       toast.error("Could not reach the server. Please try again.");
     }
 

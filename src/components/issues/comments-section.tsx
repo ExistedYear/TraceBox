@@ -55,6 +55,7 @@ function Composer({ issueId, currentUserId, onAdded }: { issueId: string; curren
     try {
       const { data, error } = await createClient().rpc("add_comment", { p_issue_id: issueId, p_body: values.body });
       if (error) {
+        console.error("Comment creation failed:", error);
         const msg = String(error.message);
         toast.error(
           msg.includes("NOT_ALLOWED")
@@ -81,9 +82,9 @@ function Composer({ issueId, currentUserId, onAdded }: { issueId: string; curren
       form.reset();
       toast.success("Comment added.");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("Unexpected comment creation error:", err);
       toast.error("Could not reach the server. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   }
@@ -144,6 +145,7 @@ function EditableComment({
     try {
       const { error } = await createClient().rpc("edit_comment", { p_comment_id: comment.id, p_body: trimmed });
       if (error) {
+        console.error("Comment edit failed:", error);
         const msg = String(error.message);
         toast.error(
           msg.includes("NOT_ALLOWED")
@@ -159,9 +161,9 @@ function EditableComment({
       onUpdated(comment.id, trimmed);
       setEditing(false);
       toast.success("Comment updated.");
-    } catch {
+    } catch (err) {
+      console.error("Unexpected comment edit error:", err);
       toast.error("Could not reach the server. Please try again.");
-    } finally {
       setSaving(false);
     }
   }

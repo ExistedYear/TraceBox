@@ -68,11 +68,13 @@ export function NewIssueForm({
         p_expected_behavior: values.expected_behavior ? values.expected_behavior.trim() : undefined,
         p_actual_behavior: values.actual_behavior ? values.actual_behavior.trim() : undefined,
       });
-    } catch {
+    } catch (err) {
+      console.error("Unexpected issue creation error:", err);
       toast.error("Could not reach the server. Please try again.");
       return;
     }
     if (issueNumber.error) {
+      console.error("Issue creation failed:", issueNumber.error);
       const message = String(issueNumber.error.message);
       toast.error(
         message.includes("NOT_ALLOWED")

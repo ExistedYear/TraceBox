@@ -177,6 +177,7 @@ function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { o
         p_description: values.description ? values.description.trim() : undefined,
       });
       if (error) {
+        console.error("Project creation failed:", error);
         toast.error(getSafeWorkspaceErrorMessage(error));
         return;
       }
@@ -184,7 +185,8 @@ function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { o
       form.reset();
       onOpenChange(false);
       onCreated(data);
-    } catch {
+    } catch (err) {
+      console.error("Unexpected project creation error:", err);
       toast.error("Could not reach the server. Please try again.");
     }
   }

@@ -104,12 +104,14 @@ export function ProjectSettings({
           p_is_archived: editing.is_archived,
         });
         if (error) {
+          console.error("Component update failed:", error);
           toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not update the component.");
           return;
         }
         setComponents((current) => current.map((row) => (row.id === editing.id ? { ...row, name: values.name, description: values.description || null, default_assignee_id: values.default_assignee_id || null } : row)).sort((a, b) => a.name.localeCompare(b.name)));
         toast.success("Component updated.");
-      } catch {
+      } catch (err) {
+        console.error("Unexpected component update error:", err);
         toast.error("Could not reach the server. Please try again.");
         return;
       }
@@ -131,6 +133,7 @@ export function ProjectSettings({
         p_default_assignee_id: values.default_assignee_id || undefined,
       });
       if (error) {
+        console.error("Component creation failed:", error);
         toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not create the component.");
         return;
       }
@@ -145,7 +148,8 @@ export function ProjectSettings({
       toast.success(`Component ${data.name} created.`);
       form.reset({ name: "", description: "", default_assignee_id: "" });
       setAddOpen(false);
-    } catch {
+    } catch (err) {
+      console.error("Unexpected component creation error:", err);
       toast.error("Could not reach the server. Please try again.");
     }
   }
@@ -161,11 +165,13 @@ export function ProjectSettings({
         p_is_archived: !component.is_archived,
       });
       if (error) {
+        console.error("Component archive toggle failed:", error);
         toast.error(error.message.includes("PROJECT_ARCHIVED") ? "This project is archived." : error.message.includes("NOT_ALLOWED") ? "Only maintainers can archive components." : "Could not update the component.");
         return;
       }
       setComponents((current) => current.map((row) => (row.id === component.id ? { ...row, is_archived: !row.is_archived } : row)));
-    } catch {
+    } catch (err) {
+      console.error("Unexpected component archive error:", err);
       toast.error("Could not reach the server. Please try again.");
     } finally {
       setBusyId((current) => (current === component.id ? null : current));
