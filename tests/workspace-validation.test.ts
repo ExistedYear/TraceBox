@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { getSafeWorkspaceErrorMessage } from "../src/lib/errors";
 import { slugify } from "../src/lib/utils";
 import { projectSchema, workspaceSchema } from "../src/lib/validation/workspace";
-
 describe("slugify", () => {
   it("derives lowercase dashed slugs from names", () => {
     expect(slugify("Acme Engineering")).toBe("acme-engineering");
@@ -59,5 +59,46 @@ describe("projectSchema", () => {
   it("allows an optional description within bounds", () => {
     expect(projectSchema.safeParse({ name: "Service", key: "AUTH", description: "" }).success).toBe(true);
     expect(projectSchema.safeParse({ name: "Service", key: "AUTH", description: "x".repeat(281) }).success).toBe(false);
+  });
+});
+
+describe("getSafeWorkspaceErrorMessage", () => {
+  it("maps duplicate workspace slug errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ code: "23505", message: 'duplicate key value violates unique constraint "organizations_slug_key"' })).toBe(
+      "That workspace URL is already taken. Try another slug.",
+    );
+  });
+
+  it("maps duplicate project key errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ code: "23505", message: 'duplicate key value violates unique constraint "projects_organization_id_key_key"' })).toBe(
+      "A project with that key already exists in this workspace.",
+    );
+  });
+
+  it("maps NOT_ORG_ADMIN errors clearly", () => {
+    expect(getSafeWorkspaceErrorMessage({ message: "NOT_ORG_ADMIN" })).toBe(
+      "Only workspace owners and admins can create projects.",
+    );
+    expect(getSafeWorkspaceErrorMessage({ message: "P0001: NOT_ORG_ADMIN" })).toBe(
+      "Only workspace owners and admins can create projects.",
+    );
+  });
+
+  it("maps AUTH_REQUIRED errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ message: "AUTH_REQUIRED" })).toBe(
+      "You must be signed in to perform this action.",
+    );
+  });
+
+  it("maps check constraint validation errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ code: "22023", message: "VALIDATION: invalid key" })).toBe(
+      "Project key must be 2–10 uppercase letters or numbers (e.g. AUTH, CORE).",
+    );
+  });
+
+  it("falls back safely for unknown errors", () => {
+    expect(getSafeWorkspaceErrorMessage({ message: "internal network timeout" })).toBe(
+      "Something went wrong. Please try again.",
+    );
   });
 });

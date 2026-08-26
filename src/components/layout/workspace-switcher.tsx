@@ -163,18 +163,22 @@ function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { o
   const form = useForm<ProjectValues>({ resolver: zodResolver(projectSchema), defaultValues: { name: "", key: "", description: "" } });
 
   async function onSubmit(values: ProjectValues) {
+    if (!organizationId) {
+      toast.error("No active workspace selected.");
+      return;
+    }
     try {
       const { data, error } = await createClient().rpc("create_project", {
         p_organization_id: organizationId,
-        p_name: values.name,
-        p_key: values.key,
-        p_description: values.description ? values.description : undefined,
+        p_name: values.name.trim(),
+        p_key: values.key.trim().toUpperCase(),
+        p_description: values.description ? values.description.trim() : undefined,
       });
       if (error) {
         toast.error(getSafeWorkspaceErrorMessage(error));
         return;
       }
-      toast.success(`Project ${values.key} created.`);
+      toast.success(`Project ${values.key.trim().toUpperCase()} created.`);
       form.reset();
       onOpenChange(false);
       onCreated(data);

@@ -21,18 +21,34 @@ export function getSafeAuthErrorMessage(message: string) {
 }
 
 export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: string }) {
-  if (error.code === "23505" || /duplicate key|unique constraint/i.test(error.message ?? "")) {
-    if (/organizations_slug_key/i.test(error.message ?? "")) {
+  const msg = error.message ?? "";
+
+  if (error.code === "23505" || /duplicate key|unique constraint/i.test(msg)) {
+    if (/organizations_slug/i.test(msg)) {
       return "That workspace URL is already taken. Try another slug.";
     }
-    if (/(projects_organization_id_key_key|projects_organization_id_slug_key)/i.test(error.message ?? "")) {
+    if (/projects_organization_id_(key|slug)/i.test(msg) || /Key \(organization_id, (key|slug)\)/i.test(msg)) {
       return "A project with that key already exists in this workspace.";
     }
-    return "That name is already taken.";
+    return "That name or key is already taken.";
   }
 
-  if (error.message === "NOT_ORG_ADMIN") {
+  if (/NOT_ORG_ADMIN/i.test(msg)) {
     return "Only workspace owners and admins can create projects.";
+  }
+
+  if (/AUTH_REQUIRED/i.test(msg)) {
+    return "You must be signed in to perform this action.";
+  }
+
+  if (error.code === "22023" || /VALIDATION/i.test(msg) || /check constraint/i.test(msg)) {
+    if (/key/i.test(msg)) {
+      return "Project key must be 2–10 uppercase letters or numbers (e.g. AUTH, CORE).";
+    }
+    if (/name/i.test(msg)) {
+      return "Project name must be 2–80 characters.";
+    }
+    return "Please check the entered values and try again.";
   }
 
   return "Something went wrong. Please try again.";
