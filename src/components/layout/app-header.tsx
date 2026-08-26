@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
 import { MobileSidebar } from "@/components/layout/app-sidebar";
+import { NotificationCenter } from "@/components/layout/notification-center";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { ProjectSummary, WorkspaceSummary } from "@/components/layout/workspace-switcher";
@@ -170,7 +171,8 @@ export function AppHeader({ email, displayName, avatarUrl, workspaceName, projec
             <Search className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
+          <NotificationCenter />
           <ThemeToggle />
           <UserMenu email={email} displayName={displayName} avatarUrl={avatarUrl} />
         </div>

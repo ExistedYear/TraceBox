@@ -5,10 +5,13 @@ import { notFound } from "next/navigation";
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
+import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
+import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
+import { IssueWatchButton } from "@/components/issues/issue-watch-button";
 import { createClient } from "@/lib/supabase/server";
-import { formatIssueKey, parseIssueKey } from "@/lib/issues";
+import { formatIssueKey, parseIssueKey, personLabel } from "@/lib/issues";
+import type { TimelineComment, TimelineEventRow } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
-import { personLabel } from "@/lib/issues";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 type Params = Promise<{ issueKey: string }>;
@@ -43,11 +46,30 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     .maybeSingle();
   if (!issue) notFound();
 
-  const [{ data: events }, { data: comments }, { data: componentRows }, { data: viewerRole }] = await Promise.all([
+  const [
+    { data: events },
+    { data: comments },
+    { data: componentRows },
+    { data: viewerRole },
+    { data: workflowStateRows },
+    { data: transitionRows },
+    { data: labelRows },
+    { data: assignedLabelRows },
+    { data: versionRows },
+    { data: milestoneRows },
+    { data: watcherRows },
+  ] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("components").select("id, name").eq("project_id", project.id),
     supabase.rpc("project_role", { p_project_id: project.id }),
+    supabase.from("workflow_states").select("id, name, category").eq("project_id", project.id).order("position"),
+    supabase.from("workflow_transitions").select("to_state_id").eq("project_id", project.id).eq("from_state_id", issue.status_id),
+    supabase.from("labels").select("id, name, color").eq("project_id", project.id).order("name"),
+    supabase.from("issue_labels").select("label_id").eq("issue_id", issue.id),
+    supabase.from("versions").select("id, name, is_released").eq("project_id", project.id).eq("is_archived", false).order("name"),
+    supabase.from("milestones").select("id, name, status").eq("project_id", project.id).order("name"),
+    supabase.from("issue_watchers").select("user_id").eq("issue_id", issue.id),
   ]);
 
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
@@ -84,10 +106,34 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
         <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <Link href="/dashboard/issues" className="hover:text-foreground">{parsed.projectKey} · issues</Link>
         </p>
-        <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-          <span className="font-mono text-primary">{issueKeyLabel}</span> · {issue.title}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">{issue.type} · {issue.severity} · {issue.priority}</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+              <span className="font-mono text-primary">{issueKeyLabel}</span> · {issue.title}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">{issue.type} · {issue.severity} · {issue.priority}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <IssueWatchButton
+              issueId={issue.id}
+              initialWatching={(watcherRows ?? []).some((w) => w.user_id === context.userId)}
+              initialWatcherCount={watcherRows?.length ?? 0}
+            />
+            <IssueStatusTransition
+              issueId={issue.id}
+              projectKey={parsed.projectKey}
+              issueNumber={issue.issue_number}
+              currentStatusId={issue.status_id}
+              currentStatusName={issue.status?.name ?? "—"}
+              currentStatusCategory={issue.status?.category ?? "OPEN"}
+              currentResolution={issue.resolution}
+              states={(workflowStateRows ?? []).map((s) => ({ id: s.id, name: s.name, category: s.category }))}
+              allowedTransitions={(transitionRows ?? []).map((t) => ({ toStateId: t.to_state_id }))}
+              canTransition={viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
+              isMaintainer={viewerRole === "MAINTAINER"}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
@@ -110,14 +156,28 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             currentUserId={context.userId}
             canComment={canComment}
             canEditAnyComment={canEditAnyComment}
-            comments={(comments ?? []) as unknown as import("@/lib/issues").TimelineComment[]}
-            events={(events ?? []) as unknown as import("@/lib/issues").TimelineEventRow[]}
+            comments={(comments ?? []) as unknown as TimelineComment[]}
+            events={(events ?? []) as unknown as TimelineEventRow[]}
             displayNames={mergedNames}
             componentNames={componentNames}
           />
         </div>
 
         <aside className="space-y-3">
+          <Surface className="p-4">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planning & Labels</h2>
+            <IssuePlanningSection
+              issueId={issue.id}
+              canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
+              assignedLabelIds={(assignedLabelRows ?? []).map((r) => r.label_id)}
+              allLabels={(labelRows ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color }))}
+              affectedVersionId={issue.affected_version_id}
+              allVersions={(versionRows ?? []).map((v) => ({ id: v.id, name: v.name, is_released: v.is_released }))}
+              targetMilestoneId={issue.target_milestone_id}
+              allMilestones={(milestoneRows ?? []).map((m) => ({ id: m.id, name: m.name, status: m.status }))}
+            />
+          </Surface>
+
           <Surface className="p-4">
             <dl className="space-y-2.5 text-sm">
               {facts.map(([label, value]) => (

@@ -1,7 +1,8 @@
 export const ISSUE_TYPES = ["BUG", "ENHANCEMENT", "TASK", "SECURITY", "PERFORMANCE", "REGRESSION"] as const;
 export const PRIORITIES = ["P0", "P1", "P2", "P3", "P4"] as const;
 export const SEVERITIES = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "TRIVIAL"] as const;
-
+export const RESOLUTIONS = ["FIXED", "DUPLICATE", "WONT_FIX", "INVALID", "CANNOT_REPRODUCE", "WORKS_AS_EXPECTED"] as const;
+export type Resolution = (typeof RESOLUTIONS)[number];
 
 export function formatIssueKey(projectKey: string, issueNumber: number) {
   return `${projectKey.toUpperCase()}-${issueNumber}`;

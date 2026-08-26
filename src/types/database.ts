@@ -118,6 +118,8 @@ export type Database = {
           reporter_id: string;
           assignee_id: string | null;
           component_id: string | null;
+          affected_version_id: string | null;
+          target_milestone_id: string | null;
           environment: string | null;
           steps_to_reproduce: string | null;
           expected_behavior: string | null;
@@ -142,6 +144,8 @@ export type Database = {
           reporter_id: string;
           assignee_id?: string | null;
           component_id?: string | null;
+          affected_version_id?: string | null;
+          target_milestone_id?: string | null;
           environment?: string | null;
           steps_to_reproduce?: string | null;
           expected_behavior?: string | null;
@@ -166,6 +170,8 @@ export type Database = {
           reporter_id?: string;
           assignee_id?: string | null;
           component_id?: string | null;
+          affected_version_id?: string | null;
+          target_milestone_id?: string | null;
           environment?: string | null;
           steps_to_reproduce?: string | null;
           expected_behavior?: string | null;
@@ -534,6 +540,253 @@ export type Database = {
           },
         ];
       };
+      labels: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          color: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          color?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          description?: string | null;
+          color?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "labels_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issue_labels: {
+        Row: {
+          issue_id: string;
+          label_id: string;
+        };
+        Insert: {
+          issue_id: string;
+          label_id: string;
+        };
+        Update: {
+          issue_id?: string;
+          label_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issue_labels_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issue_labels_label_id_fkey";
+            columns: ["label_id"];
+            isOneToOne: false;
+            referencedRelation: "labels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      versions: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          released_at: string | null;
+          is_released: boolean;
+          is_archived: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          released_at?: string | null;
+          is_released?: boolean;
+          is_archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          description?: string | null;
+          released_at?: string | null;
+          is_released?: boolean;
+          is_archived?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "versions_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      milestones: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          due_at: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          due_at?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          description?: string | null;
+          due_at?: string | null;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "milestones_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issue_watchers: {
+        Row: {
+          issue_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          issue_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          issue_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issue_watchers_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          actor_id: string | null;
+          issue_id: string | null;
+          type: string;
+          data: Json | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          actor_id?: string | null;
+          issue_id?: string | null;
+          type: string;
+          data?: Json | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          actor_id?: string | null;
+          issue_id?: string | null;
+          type?: string;
+          data?: Json | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          mentions: boolean;
+          assignments: boolean;
+          comments: boolean;
+          status_changes: boolean;
+          watch_updates: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          mentions?: boolean;
+          assignments?: boolean;
+          comments?: boolean;
+          status_changes?: boolean;
+          watch_updates?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          mentions?: boolean;
+          assignments?: boolean;
+          comments?: boolean;
+          status_changes?: boolean;
+          watch_updates?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -543,8 +796,16 @@ export type Database = {
         Args: { p_body: string; p_issue_id: string };
         Returns: string;
       };
+      assign_issue: {
+        Args: { p_assignee_id?: string | null; p_issue_id: string };
+        Returns: undefined;
+      };
       can_comment_on_issue: {
         Args: { p_issue_id: string };
+        Returns: boolean;
+      };
+      can_transition_issue: {
+        Args: { p_issue_id: string; p_to_state_id: string };
         Returns: boolean;
       };
       can_manage_project: {
@@ -575,6 +836,66 @@ export type Database = {
           p_type: string;
         };
         Returns: number;
+      };
+      create_label: {
+        Args: { p_color?: string; p_description?: string; p_name: string; p_project_id: string };
+        Returns: string;
+      };
+      create_milestone: {
+        Args: { p_description?: string; p_due_at?: string; p_name: string; p_project_id: string; p_status?: string };
+        Returns: string;
+      };
+      create_version: {
+        Args: { p_description?: string; p_is_released?: boolean; p_name: string; p_project_id: string; p_released_at?: string };
+        Returns: string;
+      };
+      delete_label: {
+        Args: { p_label_id: string };
+        Returns: undefined;
+      };
+      set_issue_labels: {
+        Args: { p_issue_id: string; p_label_ids: string[] };
+        Returns: undefined;
+      };
+      get_unread_notifications_count: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      mark_all_notifications_read: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      mark_notification_read: {
+        Args: { p_notification_id: string };
+        Returns: undefined;
+      };
+      toggle_watch_issue: {
+        Args: { p_issue_id: string };
+        Returns: boolean;
+      };
+      unwatch_issue: {
+        Args: { p_issue_id: string };
+        Returns: undefined;
+      };
+      watch_issue: {
+        Args: { p_issue_id: string };
+        Returns: undefined;
+      };
+      update_issue_planning: {
+        Args: { p_affected_version_id?: string | null; p_issue_id: string; p_target_milestone_id?: string | null };
+        Returns: undefined;
+      };
+      update_label: {
+        Args: { p_color?: string; p_description?: string; p_label_id: string; p_name: string };
+        Returns: undefined;
+      };
+      update_milestone: {
+        Args: { p_description?: string; p_due_at?: string; p_milestone_id: string; p_name: string; p_status?: string };
+        Returns: undefined;
+      };
+      update_version: {
+        Args: { p_description?: string; p_is_archived?: boolean; p_is_released?: boolean; p_name: string; p_released_at?: string; p_version_id: string };
+        Returns: undefined;
       };
       edit_comment: {
         Args: { p_body: string; p_comment_id: string };
@@ -611,6 +932,14 @@ export type Database = {
       project_role: {
         Args: { p_project_id: string };
         Returns: string;
+      };
+      reopen_issue: {
+        Args: { p_comment?: string; p_issue_id: string };
+        Returns: undefined;
+      };
+      transition_issue: {
+        Args: { p_issue_id: string; p_resolution?: string; p_to_state_id: string };
+        Returns: undefined;
       };
     };
     Enums: {
