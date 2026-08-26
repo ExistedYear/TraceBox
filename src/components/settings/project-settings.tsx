@@ -77,6 +77,11 @@ export function ProjectSettings({
     resolver: zodResolver(componentSchema),
     defaultValues: { name: "", description: "", default_assignee_id: "" },
   });
+  function openAdd() {
+    setEditing(null);
+    form.reset({ name: "", description: "", default_assignee_id: "" });
+    setAddOpen(true);
+  }
 
   function openEdit(component: ComponentRow) {
     setEditing(component);
@@ -85,6 +90,7 @@ export function ProjectSettings({
       description: component.description ?? "",
       default_assignee_id: component.default_assignee_id ?? "",
     });
+    setAddOpen(true);
   }
 
   async function saveComponent(values: ComponentValues) {
@@ -111,7 +117,7 @@ export function ProjectSettings({
       await addComponent(values);
       return;
     }
-    form.reset();
+    form.reset({ name: "", description: "", default_assignee_id: "" });
     setEditing(null);
     setAddOpen(false);
   }
@@ -137,7 +143,7 @@ export function ProjectSettings({
       };
       setComponents((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
       toast.success(`Component ${data.name} created.`);
-      form.reset();
+      form.reset({ name: "", description: "", default_assignee_id: "" });
       setAddOpen(false);
     } catch {
       toast.error("Could not reach the server. Please try again.");
@@ -192,9 +198,9 @@ export function ProjectSettings({
               <p className="mt-0.5 text-xs text-muted-foreground">Group issues by area; a default assignee can be preselected at creation.</p>
             </div>
             {canManage && (
-              <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setEditing(null); }}>
+              <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) { setEditing(null); form.reset({ name: "", description: "", default_assignee_id: "" }); } }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setEditing(null); form.reset(); }}><Plus className="h-3.5 w-3.5" /> Add component</Button>
+                  <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAdd}><Plus className="h-3.5 w-3.5" /> Add component</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md rounded-[10px]">
                   <DialogHeader>
@@ -243,7 +249,7 @@ export function ProjectSettings({
                   </div>
                   {canManage && (
                     <>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => { openEdit(component); setAddOpen(true); }}>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => openEdit(component)}>
                         <Pencil className="h-3 w-3" /> Edit
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground" onClick={() => toggleArchive(component)} disabled={busyId === component.id}>

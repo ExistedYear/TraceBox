@@ -75,7 +75,16 @@ describe("issueCreateSchema", () => {
 describe("issue filter codecs", () => {
   it("encodes set filters and drops empty values", () => {
     expect(encodeIssueFilters({ priority: "P1", type: "BUG" })).toEqual({ priority: "P1", type: "BUG" });
+    expect(encodeIssueFilters({ statusId: "s1", componentId: "c1" })).toEqual({ status: "s1", component: "c1" });
     expect(encodeIssueFilters({ priority: "", severity: undefined })).toEqual({});
+  });
+
+  it("round-trips encoded filters through decodeIssueSearchParams", () => {
+    const valid = { stateIds: new Set(["s1"]), componentIds: new Set(["c1"]) };
+    const original = { statusId: "s1", componentId: "c1", priority: "P1", severity: "MAJOR", type: "BUG" };
+    const encoded = encodeIssueFilters(original);
+    const decoded = decodeIssueSearchParams(encoded, valid);
+    expect(decoded).toEqual(original);
   });
 
   it("decodes only whitelisted ids and enum-ish values", () => {
@@ -84,6 +93,13 @@ describe("issue filter codecs", () => {
       statusId: "s1",
       componentId: "c1",
       priority: "P0",
+      severity: undefined,
+      type: undefined,
+    });
+    expect(decodeIssueSearchParams({ statusId: "s1", componentId: "c1" }, valid)).toEqual({
+      statusId: "s1",
+      componentId: "c1",
+      priority: undefined,
       severity: undefined,
       type: undefined,
     });

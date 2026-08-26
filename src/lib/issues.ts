@@ -152,19 +152,28 @@ export type IssueFilters = {
 
 
 export function encodeIssueFilters(filters: IssueFilters): Record<string, string> {
-  return Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value))) as Record<string, string>;
+  const result: Record<string, string> = {};
+  if (filters.statusId) result.status = filters.statusId;
+  if (filters.componentId) result.component = filters.componentId;
+  if (filters.priority) result.priority = filters.priority;
+  if (filters.severity) result.severity = filters.severity;
+  if (filters.type) result.type = filters.type;
+  return result;
 }
 
 export function decodeIssueSearchParams(
   params: Record<string, string | string[] | undefined>,
   valid: { stateIds: Set<string>; componentIds: Set<string> },
 ): IssueFilters {
-  const pick = (name: string) => {
-    const value = params[name];
-    return typeof value === "string" && value !== "" ? value : undefined;
+  const pick = (...names: string[]) => {
+    for (const name of names) {
+      const value = params[name];
+      if (typeof value === "string" && value !== "") return value;
+    }
+    return undefined;
   };
-  const statusId = pick("status");
-  const componentId = pick("component");
+  const statusId = pick("status", "statusId");
+  const componentId = pick("component", "componentId");
   const priority = PRIORITIES.find((value) => value === pick("priority"));
   const severity = SEVERITIES.find((value) => value === pick("severity"));
   const type = ISSUE_TYPES.find((value) => value === pick("type"));
