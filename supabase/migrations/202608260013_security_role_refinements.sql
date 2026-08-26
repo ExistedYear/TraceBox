@@ -83,25 +83,24 @@ begin
   insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
   values (v_project_id, 'Triage', 'TRIAGE', 0, true, false)
   returning id into v_state_triage;
-  insert into public.workflow_states (project_id, name, category, position)
-  values (v_project_id, 'Open', 'OPEN', 10)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
+  values (v_project_id, 'Open', 'OPEN', 10, false, false)
   returning id into v_state_open;
-  insert into public.workflow_states (project_id, name, category, position)
-  values (v_project_id, 'In Progress', 'IN_PROGRESS', 20)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
+  values (v_project_id, 'In Progress', 'IN_PROGRESS', 20, false, false)
   returning id into v_state_in_progress;
-  insert into public.workflow_states (project_id, name, category, position)
-  values (v_project_id, 'In Review', 'REVIEW', 30)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
+  values (v_project_id, 'In Review', 'REVIEW', 30, false, false)
   returning id into v_state_review;
-  insert into public.workflow_states (project_id, name, category, position)
-  values (v_project_id, 'Resolved', 'RESOLVED', 40)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
+  values (v_project_id, 'Resolved', 'RESOLVED', 40, false, false)
   returning id into v_state_resolved;
-  insert into public.workflow_states (project_id, name, category, position, is_terminal)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
   values (v_project_id, 'Closed', 'CLOSED', 50, false, true)
   returning id into v_state_closed;
-  insert into public.workflow_states (project_id, name, category, position)
-  values (v_project_id, 'Reopened', 'OPEN', 60)
+  insert into public.workflow_states (project_id, name, category, position, is_initial, is_terminal)
+  values (v_project_id, 'Reopened', 'OPEN', 60, false, false)
   returning id into v_state_reopened;
-
   insert into public.workflow_transitions (project_id, from_state_id, to_state_id) values
     (v_project_id, v_state_triage, v_state_open),
     (v_project_id, v_state_triage, v_state_in_progress),
