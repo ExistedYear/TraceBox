@@ -1,0 +1,2 @@
+-- TraceBox intentionally starts with no application seed data.
+-- Auth users and their profiles are created through Supabase Auth.

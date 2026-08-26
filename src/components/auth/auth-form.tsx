@@ -1,0 +1,92 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Github, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+
+import { getSafeAuthErrorMessage } from "@/lib/errors";
+import { createClient } from "@/lib/supabase/client";
+import { getSafeRedirectPath } from "@/lib/utils";
+import { loginSchema, signupSchema, type LoginValues, type SignupValues } from "@/lib/validation/auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+
+type AuthFormProps = { mode: "login" | "signup" };
+
+export function AuthForm({ mode }: AuthFormProps) {
+  const isSignup = mode === "signup";
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGithubLoading, setIsGithubLoading] = useState(false);
+  const form = useForm<LoginValues | SignupValues>({ resolver: zodResolver(isSignup ? signupSchema : loginSchema), defaultValues: isSignup ? { displayName: "", email: "", password: "" } : { email: "", password: "" } });
+  const displayNameError = (form.formState.errors as { displayName?: { message?: string } }).displayName;
+
+  async function onSubmit(values: LoginValues | SignupValues) {
+    setIsSubmitting(true);
+    try {
+      const supabase = createClient();
+      if (isSignup) {
+        const signupValues = values as SignupValues;
+        const { data, error } = await supabase.auth.signUp({ email: signupValues.email, password: signupValues.password, options: { data: { display_name: signupValues.displayName }, emailRedirectTo: `${window.location.origin}/auth/callback` } });
+        if (error) throw error;
+        if (data.session) {
+          toast.success("Your account is ready.");
+          router.push("/dashboard");
+          router.refresh();
+        } else {
+          toast.success("Account created. Check your email to confirm it, then log in.");
+          router.push("/login");
+        }
+      } else {
+        const loginValues = values as LoginValues;
+        const { error } = await supabase.auth.signInWithPassword(loginValues);
+        if (error) throw error;
+        toast.success("Welcome back.");
+        router.push(getSafeRedirectPath(searchParams.get("next")));
+        router.refresh();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? getSafeAuthErrorMessage(error.message) : "Something went wrong. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function continueWithGithub() {
+    setIsGithubLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback` } });
+      if (error) throw error;
+    } catch (error) {
+      toast.error(error instanceof Error ? getSafeAuthErrorMessage(error.message) : "GitHub sign-in is not available yet.");
+      setIsGithubLoading(false);
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-md border-border/80 bg-card/70 shadow-xl shadow-black/10">
+      <CardHeader className="space-y-2"><CardTitle className="text-2xl">{isSignup ? "Create your account" : "Welcome back"}</CardTitle><CardDescription>{isSignup ? "Set up your TraceBox workspace in a few seconds." : "Log in to continue to your workspace."}</CardDescription></CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {isSignup && <div className="space-y-2"><Label htmlFor="displayName">Display name</Label><Input id="displayName" autoComplete="name" placeholder="Ada Lovelace" {...form.register("displayName" as const)} />{displayNameError && <p className="text-xs text-destructive">{displayNameError.message}</p>}</div>}
+          <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" autoComplete="email" placeholder="you@example.com" {...form.register("email")} />{form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}</div>
+          <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Password</Label>{!isSignup && <span className="text-xs text-muted-foreground">Minimum 8 characters</span>}</div><Input id="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder="••••••••" {...form.register("password")} />{form.formState.errors.password && <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>}</div>
+          <Button type="submit" className="w-full" disabled={isSubmitting || isGithubLoading}>{isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}{isSignup ? "Create account" : "Log in"}</Button>
+        </form>
+        <div className="relative my-6"><Separator /><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">or</span></div>
+        <Button type="button" variant="outline" className="w-full" onClick={continueWithGithub} disabled={isSubmitting || isGithubLoading}><Github className="h-4 w-4" />{isGithubLoading && <Loader2 className="h-4 w-4 animate-spin" />}Continue with GitHub</Button>
+        <p className="mt-6 text-center text-sm text-muted-foreground">{isSignup ? "Already have an account?" : "Need an account?"}{" "}<Link href={isSignup ? "/login" : "/signup"} className="font-medium text-primary hover:underline">{isSignup ? "Log in" : "Sign up"}</Link></p>
+      </CardContent>
+    </Card>
+  );
+}
