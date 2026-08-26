@@ -63,6 +63,7 @@ supabase/                  config.toml, migrations/ (11 applied), seed.sql (inte
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
+handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 ```
 
 ## Development Commands
