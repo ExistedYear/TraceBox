@@ -30,9 +30,30 @@ begin
     raise exception 'AUTH_REQUIRED' using errcode = '42501';
   end if;
 
-  if p_organization_id is null or not public.is_org_admin(p_organization_id) then
+  if p_organization_id is null then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if not (
+    public.is_org_admin(p_organization_id)
+    or exists (
+      select 1 from public.organizations o
+      where o.id = p_organization_id and o.owner_id = v_user
+    )
+    or exists (
+      select 1 from public.organization_members om
+      where om.organization_id = p_organization_id
+        and om.user_id = v_user
+        and om.role in ('OWNER', 'ADMIN')
+    )
+  ) then
     raise exception 'NOT_ORG_ADMIN' using errcode = '42501';
   end if;
+
+  -- Ensure caller profile exists to guarantee foreign key integrity
+  insert into public.profiles (id, display_name)
+  values (v_user, coalesce(auth.jwt()->>'display_name', split_part(coalesce(auth.jwt()->>'email', 'user'), '@', 1)))
+  on conflict (id) do nothing;
 
   v_name := nullif(trim(coalesce(p_name, '')), '');
   v_key := nullif(trim(coalesce(p_key, '')), '');
