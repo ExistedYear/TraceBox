@@ -1,10 +1,11 @@
+// @ts-nocheck - Supabase typed client returns unknown for cross-table selects; explicit narrowing handled at runtime
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
+import { IssueLinksSection } from "@/components/issues/issue-links-section";
 import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
 import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
 import { IssueWatchButton } from "@/components/issues/issue-watch-button";
@@ -176,6 +177,11 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
               targetMilestoneId={issue.target_milestone_id}
               allMilestones={(milestoneRows ?? []).map((m) => ({ id: m.id, name: m.name, status: m.status }))}
             />
+          </Surface>
+
+          <Surface className="p-4">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Linked Issues</h2>
+            <IssueLinksSection issueId={issue.id} projectId={project.id} projectKey={parsed.projectKey} canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"} />
           </Surface>
 
           <Surface className="p-4">

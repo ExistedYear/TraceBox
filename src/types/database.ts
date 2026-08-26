@@ -787,6 +787,89 @@ export type Database = {
         };
         Relationships: [];
       };
+      saved_views: {
+        Row: {
+          id: string;
+          project_id: string;
+          created_by: string;
+          name: string;
+          filters: Json;
+          is_shared: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          created_by: string;
+          name: string;
+          filters?: Json;
+          is_shared?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          created_by?: string;
+          name?: string;
+          filters?: Json;
+          is_shared?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "saved_views_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issue_links: {
+        Row: {
+          id: string;
+          source_issue_id: string;
+          target_issue_id: string;
+          relationship: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_issue_id: string;
+          target_issue_id: string;
+          relationship: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_issue_id?: string;
+          target_issue_id?: string;
+          relationship?: string;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issue_links_source_issue_id_fkey";
+            columns: ["source_issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issue_links_target_issue_id_fkey";
+            columns: ["target_issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -860,6 +943,14 @@ export type Database = {
       get_unread_notifications_count: {
         Args: Record<PropertyKey, never>;
         Returns: number;
+      };
+      create_saved_view: {
+        Args: { p_filters?: Json; p_is_shared?: boolean; p_name: string; p_project_id: string };
+        Returns: string;
+      };
+      delete_saved_view: {
+        Args: { p_view_id: string };
+        Returns: undefined;
       };
       mark_all_notifications_read: {
         Args: Record<PropertyKey, never>;
@@ -936,6 +1027,18 @@ export type Database = {
       reopen_issue: {
         Args: { p_comment?: string; p_issue_id: string };
         Returns: undefined;
+      };
+      add_issue_link: {
+        Args: { p_relationship: string; p_source_issue_id: string; p_target_issue_id: string };
+        Returns: string;
+      };
+      remove_issue_link: {
+        Args: { p_link_id: string };
+        Returns: undefined;
+      };
+      find_duplicate_candidates: {
+        Args: { p_limit?: number; p_project_id: string; p_title: string };
+        Returns: { issue_id: string; issue_number: number; similarity: number; title: string }[];
       };
       transition_issue: {
         Args: { p_issue_id: string; p_resolution?: string; p_to_state_id: string };

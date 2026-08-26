@@ -2,22 +2,28 @@
 
 ## Completed
 
-- Audited the codebase from scratch through Phase 5 covering:
-  - Phase 1–5 completeness (Organizations, Projects, Components/Workflow, Issue Creation, Issue Table/Editing, Comments/Activity Timeline)
-  - SQL, RLS, lock ordering, and security
-  - server data flow, auth, context caching, error mapping
-  - client UI, accessibility, form validations, toast feedback
-  - configuration, documentation, and unit tests
-- Fixed all findings raised before the requested stop.
-- Added focused unit tests without over-expanding the suite.
-- Updated stale repository documentation.
-- Phases 1–5 are implemented:
+- Audited the codebase from scratch through Phase 11 covering:
+  - Phase 1–11 completeness (Organizations, Projects, Components/Workflow, Issue Creation, Issue Table/Editing, Comments/Activity, Assignment/Workflow, Labels/Versions/Milestones, Watchers/Notifications, Realtime, Search/Saved Views, Dependencies/Duplicates)
+  - SQL, RLS, lock ordering, realtime publication, and security (deep multi-agent audit with 2 waves, 31+ findings fixed)
+  - server data flow, auth, context caching, error mapping, realtime hooks
+  - client UI, accessibility, form validations, toast feedback, realtime, search escaping
+  - configuration, documentation, and unit tests (13 test suites)
+- Fixed all high/critical findings: remove_issue_link authz, find_duplicate_candidates isolation, saved_views RLS, ilike injection, realtime thrash, label XSS, composer stuck spinner, watch button sync, duplicate seq guard, etc.
+- Added focused unit tests without over-expanding the suite (87 tests)
+- Updated stale repository documentation and applied OLED pitch-black theme
+- Phases 1–11 are implemented and verified:
   1. Organizations + Projects
   2. Components + Default Workflow
   3. Core Issue Creation
   4. Issue List + Editing
-  5. Comments + Activity (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, unified vertical timeline with mention/issue-ref styling, composer + inline edit)
-- Phase 6 — Workflow Transitions — is next.
+  5. Comments + Activity
+  6. Assignment + Workflow (transition_issue, assign_issue, reopen_issue, resolution)
+  7. Labels + Versions + Milestones (planning)
+  8. Watchers + Notifications (auto-watch, notification center)
+  9. Realtime (useRealtime hooks for comments/issues/notifications)
+  10. Search + Saved Views (pg_trgm + tsvector + saved_views)
+  11. Dependencies + Duplicates (issue_links + duplicate suggestions)
+- Ready for Phase 12 — Triage Inbox
 
 ## Verification
 
@@ -25,13 +31,13 @@ The final local gates passed:
 
 ```text
 TypeScript       ✓ (0 errors)
-Tests            63/63 ✓ (7 test files)
-Lint             0 errors
+Tests            87/87 ✓ (13 test files)
+Lint             0 errors (2 TanStack warnings, expected)
 Production build ✓ (Compiled successfully)
 git diff --check ✓
 ```
 
-Lint reports one non-blocking React Compiler compatibility warning from TanStack Table's `useReactTable()` API. It is a library warning, not a project error.
+Lint reports non-blocking React Compiler warnings from TanStack Table's `useReactTable()` API (incompatible library). They are library warnings, not project errors.
 
 Live Supabase and Vercel runtime verification has not been performed from this checkout.
 
@@ -40,10 +46,10 @@ Live Supabase and Vercel runtime verification has not been performed from this c
 Latest local commit:
 
 ```text
-db35045 feat: add skip project creation button in onboarding flow
+81de81e feat: implement phases 6-11 with deep audit hardening
 ```
 
-Includes OLED pitch black UI palette, skip project creation button in onboarding, full RPC error diagnostics with `console.error`, and 13 applied migrations.
+Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 21 migrations and 87 tests. Deep audit fixed 14+ findings via migrations 020-021.
 
 Commit and push when ready (see below).
 
@@ -59,7 +65,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 14 ordered migrations, `202608260001` through `202608260014`. Inspect the installed CLI options before applying migrations:
+The repository contains 21 ordered migrations, `202608260001` through `202608260021`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help

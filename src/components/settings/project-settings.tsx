@@ -46,6 +46,13 @@ import {
   type MilestoneValues,
 } from "@/lib/validation/planning";
 
+function isHexColor(value: string): boolean {
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+}
+function safeColor(value: string): string {
+  return isHexColor(value) ? value : "#6366f1";
+}
+
 export type ComponentRow = {
   id: string;
   name: string;
@@ -533,7 +540,7 @@ export function ProjectSettings({
                 {labels.map((l) => (
                   <li key={l.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="flex items-center gap-3">
-                      <span className="h-3 w-3 rounded-full border border-black/20" style={{ backgroundColor: l.color }} />
+                      <span className="h-3 w-3 rounded-full border border-black/20" style={{ backgroundColor: safeColor(l.color) }} />
                       <div>
                         <span className="font-mono text-xs font-semibold">{l.name}</span>
                         {l.description && <p className="text-xs text-muted-foreground">{l.description}</p>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -33,6 +33,7 @@ export function NewIssueForm({
 }) {
   const router = useRouter();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<Array<{ issue_number: number; title: string }>>([]);
   const form = useForm<IssueCreateValues>({
     resolver: zodResolver(issueCreateSchema),
     defaultValues: {
@@ -50,6 +51,33 @@ export function NewIssueForm({
     },
   });
   const componentField = form.register("component_id");
+  const watchedTitle = form.watch("title");
+  const duplicateSeq = useRef(0);
+
+  useEffect(() => {
+    const title = watchedTitle?.trim();
+    if (!title || title.length < 6) {
+      setDuplicateCandidates([]);
+      return;
+    }
+    const seq = ++duplicateSeq.current;
+    const handle = setTimeout(async () => {
+      const supabase = createClient();
+      function escapeIlike(s: string): string {
+        return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+      }
+      const safe = title.split(/\s+/).slice(0, 3).map(escapeIlike).join("%");
+      const { data } = await supabase
+        .from("issues")
+        .select("issue_number, title")
+        .eq("project_id", projectId)
+        .ilike("title", `%${safe}%`)
+        .limit(5);
+      if (seq !== duplicateSeq.current) return;
+      if (data) setDuplicateCandidates(data as any);
+    }, 450);
+    return () => clearTimeout(handle);
+  }, [watchedTitle, projectId]);
 
   async function onSubmit(values: IssueCreateValues) {
     let issueNumber: { data: number | null; error: { message: string } | null };
@@ -100,6 +128,18 @@ export function NewIssueForm({
         <Label htmlFor="issue-title">Title</Label>
         <Input id="issue-title" placeholder="Short, specific summary" {...form.register("title")} />
         {form.formState.errors.title && <p className={errorClass}>{form.formState.errors.title.message}</p>}
+        {duplicateCandidates.length > 0 && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+            <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">Possible duplicates:</p>
+            <ul className="mt-1 space-y-1">
+              {duplicateCandidates.map((c) => (
+                <li key={c.issue_number} className="text-xs text-muted-foreground">
+                  <span className="font-mono text-primary">{formatIssueKey(projectKey, c.issue_number)}</span> · {c.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-2">

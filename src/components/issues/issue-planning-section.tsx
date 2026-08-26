@@ -16,6 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 
+function isHexColor(value: string): boolean {
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+}
+function safeColor(value: string): string {
+  return isHexColor(value) ? value : "#6366f1";
+}
 type LabelOption = {
   id: string;
   name: string;
@@ -151,7 +157,7 @@ export function IssuePlanningSection({
                   >
                     <span
                       className="mr-2 h-2.5 w-2.5 rounded-full border"
-                      style={{ backgroundColor: label.color }}
+                      style={{ backgroundColor: safeColor(label.color) }}
                     />
                     <span>{label.name}</span>
                   </DropdownMenuCheckboxItem>
@@ -170,14 +176,14 @@ export function IssuePlanningSection({
                 key={label.id}
                 className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium"
                 style={{
-                  borderColor: `${label.color}40`,
-                  backgroundColor: `${label.color}15`,
-                  color: label.color,
+                  borderColor: `${safeColor(label.color)}40`,
+                  backgroundColor: `${safeColor(label.color)}15`,
+                  color: safeColor(label.color),
                 }}
               >
                 <span
                   className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: label.color }}
+                  style={{ backgroundColor: safeColor(label.color) }}
                 />
                 {label.name}
               </span>

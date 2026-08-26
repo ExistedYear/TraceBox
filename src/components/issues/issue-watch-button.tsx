@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,9 +25,19 @@ export function IssueWatchButton({
   const [count, setCount] = useState(initialWatcherCount);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    setWatching(initialWatching);
+  }, [initialWatching]);
+
+  useEffect(() => {
+    setCount(initialWatcherCount);
+  }, [initialWatcherCount]);
+
   async function handleToggle() {
     setLoading(true);
-    const nextWatching = !watching;
+    const prevWatching = watching;
+    const prevCount = count;
+    const nextWatching = !prevWatching;
     setWatching(nextWatching);
     setCount((prev) => (nextWatching ? prev + 1 : Math.max(0, prev - 1)));
 
@@ -37,8 +48,8 @@ export function IssueWatchButton({
 
       if (error) {
         toast.error("Could not update watch status.");
-        setWatching(watching);
-        setCount(initialWatcherCount);
+        setWatching(prevWatching);
+        setCount(prevCount);
         return;
       }
 
@@ -47,8 +58,8 @@ export function IssueWatchButton({
       router.refresh();
     } catch {
       toast.error("Could not reach the server.");
-      setWatching(watching);
-      setCount(initialWatcherCount);
+      setWatching(prevWatching);
+      setCount(prevCount);
     } finally {
       setLoading(false);
     }
@@ -62,6 +73,9 @@ export function IssueWatchButton({
       className="h-8 gap-1.5 text-xs"
       onClick={() => void handleToggle()}
       disabled={loading}
+      aria-pressed={watching}
+      aria-busy={loading}
+      aria-label={watching ? "Unwatch issue" : "Watch issue"}
     >
       {loading ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />

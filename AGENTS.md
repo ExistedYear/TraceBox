@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (14 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (21 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -143,7 +143,13 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260012_comments_activity.sql` | `comments` table, `can_comment_on_issue`, RPC-only `add_comment`/`edit_comment` (archived-project guard, Reporter+ add / author-or-Developer edit, 1–10k validation), `COMMENT_ADDED`/`COMMENT_EDITED` audit + `updated_at` bump, project-member RLS |
 | `supabase/migrations/202608260013_security_role_refinements.sql` | `project_role` Org Admin precedence, author self-edit REPORTER+ check, title/name trimming, background trigger context bypass |
 | `supabase/migrations/202608260014_fix_create_project_values.sql` | `create_project` fix adding `v_user` (`created_by`) to resolve PostgreSQL syntax error 42601 |
-| `src/components/issues/comments-section.tsx` | Unified activity timeline (vertical trace line, dots) merging `issue_events` + `comments`; composer with `commentSchema` + `add_comment`; inline edit via `edit_comment`; mention/issue-ref token styling |
+| `supabase/migrations/202608260015_phase6_assignment_workflow.sql` | Phase 6: `can_transition_issue`, `transition_issue` (workflow validation, resolution, reopen), `assign_issue`, `reopen_issue` with top-down locking |
+| `supabase/migrations/202608260016_phase7_labels_versions_milestones.sql` | Phase 7: `labels`, `issue_labels`, `versions`, `milestones`, `affected_version_id`/`target_milestone_id` on issues, 9 planning RPCs |
+| `supabase/migrations/202608260017_phase8_watchers_notifications.sql` | Phase 8: `issue_watchers`, `notifications`, `notification_preferences`, auto-watch via triggers, `toggle_watch_issue`/`watch_issue`/`unwatch_issue`, notification center |
+| `supabase/migrations/202608260018_phase10_search_saved_views.sql` | Phase 10: `saved_views`, `pg_trgm` + `tsvector` indexes, search & saved view RPCs |
+| `supabase/migrations/202608260019_phase11_issue_links.sql` | Phase 11: `issue_links` (BLOCKS/DEPENDS_ON/DUPLICATE_OF etc.), `add_issue_link`/`remove_issue_link`/`find_duplicate_candidates` |
+| `supabase/migrations/202608260020_security_audit_fixes.sql` | Deep audit fixes: `remove_issue_link` authz, `find_duplicate_candidates` isolation, `saved_views` RLS, project locks, duplicate handling |
+| `supabase/migrations/202608260021_label_realtime_fixes.sql` | Label hex constraint + `supabase_realtime` publication for comments/issues/notifications |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |

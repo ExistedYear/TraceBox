@@ -10,9 +10,9 @@ import { toast } from "sonner";
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeComments } from "@/hooks/use-realtime";
 import { buildTimeline, eventSummary, personLabel, tokenizeCommentBody, type TimelineComment, type TimelineEventRow } from "@/lib/issues";
 import { commentSchema, type CommentValues } from "@/lib/validation/comment";
-
 type Props = {
   issueId: string;
   projectKey: string;
@@ -85,6 +85,7 @@ function Composer({ issueId, currentUserId, onAdded }: { issueId: string; curren
     } catch (err) {
       console.error("Unexpected comment creation error:", err);
       toast.error("Could not reach the server. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -164,6 +165,7 @@ function EditableComment({
     } catch (err) {
       console.error("Unexpected comment edit error:", err);
       toast.error("Could not reach the server. Please try again.");
+    } finally {
       setSaving(false);
     }
   }
@@ -214,6 +216,12 @@ export function CommentsSection({ issueId, projectKey: _projectKey, currentUserI
     setComments(initialComments);
   }
   const timeline = useMemo(() => buildTimeline(events, comments), [events, comments]);
+
+  useRealtimeComments(issueId, (payload) => {
+    const newComment = payload as TimelineComment;
+    // Avoid duplicate if already added optimistically
+    setComments((prev) => (prev.some((c) => c.id === newComment.id) ? prev : [...prev, newComment]));
+  });
 
   function handleAdded(comment: TimelineComment) {
     // Resolve author via passed currentUserId if RPC returned empty author fetch

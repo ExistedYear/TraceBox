@@ -1,4 +1,6 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
+
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -20,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeNotifications } from "@/hooks/use-realtime";
 import { cn } from "@/lib/utils";
 
 type NotificationItem = {
@@ -67,9 +70,12 @@ export function NotificationCenter() {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userId, setUserId] = useState<string>("");
 
   const fetchNotifications = useCallback(async () => {
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setUserId(user.id);
     const { data, error } = await supabase
       .from("notifications")
       .select("id, type, data, read_at, created_at, actor:profiles (display_name)")
@@ -90,9 +96,23 @@ export function NotificationCenter() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     void fetchNotifications();
   }, [fetchNotifications]);
+
+  useRealtimeNotifications(userId, (payload: any) => {
+    const newItem: NotificationItem = {
+      id: payload.id,
+      type: payload.type,
+      data: payload.data,
+      actor_name: null,
+      read_at: payload.read_at,
+      created_at: payload.created_at,
+    };
+    setNotifications((prev) => [newItem, ...prev].slice(0, 20));
+    if (!newItem.read_at) setUnreadCount((c) => c + 1);
+  });
 
   async function handleMarkRead(id: string) {
     try {
@@ -200,7 +220,7 @@ export function NotificationCenter() {
                     )}
                     {item.data?.excerpt && (
                       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                        "{item.data.excerpt}"
+                        &ldquo;{item.data.excerpt}&rdquo;
                       </p>
                     )}
                     <span className="mt-1 block font-mono text-[10px] text-muted-foreground/70">

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -17,6 +18,8 @@ import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SavedViewsBar } from "@/components/issues/saved-views-bar";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -92,19 +95,35 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [savedViews, setSavedViews] = useState<Array<{ id: string; project_id: string; name: string; filters: Record<string, string>; is_shared: boolean; created_by: string }>>([]);
 
   // Monotonic request id: stale responses never overwrite newer results.
   const requestSeq = useRef(0);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.from("saved_views").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+      if (data) setSavedViews(data as any);
+    })();
+  }, [projectId]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setPage(0);
-  }, [filters, sorting]);
+  }, [filters, sorting, searchQuery]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const url = new URL(window.location.href);
     url.search = new URLSearchParams(encodeIssueFilters(filters)).toString();
+    if (searchQuery.trim()) url.searchParams.set("q", searchQuery.trim());
     window.history.replaceState(null, "", url);
-  }, [filters]);
+  }, [filters, searchQuery]);
+
+
 
   const fetchData = useCallback(async () => {
     const seq = ++requestSeq.current;
@@ -116,12 +135,16 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
+    if (searchQuery.trim()) {
+      const raw = searchQuery.trim();
+      const escaped = raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "\\,").replace(/"/g, '\\"');
+      query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+    }
     if (filters.statusId) query = query.eq("status_id", filters.statusId);
     if (filters.priority) query = query.eq("priority", filters.priority);
     if (filters.severity) query = query.eq("severity", filters.severity);
     if (filters.type) query = query.eq("type", filters.type);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
-
     // Only real root columns may be ordered; display columns are unsortable.
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
@@ -169,7 +192,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     );
     setTotal(count ?? 0);
     setLoading(false);
-  }, [projectId, filters, sorting, page]);
+  }, [projectId, filters, sorting, page, searchQuery]);
 
   useEffect(() => {
     void fetchData();
@@ -350,9 +373,26 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
   return (
     <div className="space-y-3">
+      <SavedViewsBar
+        projectId={projectId}
+        currentFilters={encodeIssueFilters(filters)}
+        savedViews={savedViews}
+        onApply={(filters) => {
+          const next: Record<string, string> = {};
+          for (const [k, v] of Object.entries(filters)) next[k] = v as string;
+          setFilters(next as any);
+        }}
+        onViewsChange={setSavedViews}
+      />
       <div className="flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Search by title, description, or KEY-123..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-7 w-48 text-xs sm:w-64"
+          aria-label="Search issues"
+        />
         <select aria-label="Status filter" className={selectClass} value={filters.statusId ?? ""} onChange={(event) => setFilter("statusId", event.target.value)}>
-          <option value="">All statuses</option>
           {states.map((state) => (
             <option key={state.value} value={state.value}>{state.label}</option>
           ))}
