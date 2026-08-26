@@ -11,7 +11,7 @@ TraceBox is a small, deployable foundation for an engineering workspace. It prov
 
 ## Local setup
 
-1. Install Node.js 20 or newer and the [Supabase CLI](https://supabase.com/docs/guides/cli). On Windows, `scoop install supabase` is a convenient option.
+1. Install Node.js 20 or newer and the [Supabase CLI](https://supabase.com/docs/guides/cli). Use `npx supabase ...` from the project directory for the CLI commands below.
 2. Install dependencies with `npm install`.
 3. Copy `.env.example` to `.env.local` and add the URL and anon key from Supabase. Keep the service-role key server-only; it is not used by the initial client flow.
 4. For local Supabase, run `npm run db:start`, then `npm run db:reset` to apply migrations and seed data.
@@ -27,12 +27,17 @@ The initial migration creates `public.profiles`, timestamps, the new-user profil
 
 ## Quality checks
 
-```text
+```bash
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
 ## Deploying
 
-Push this repository to GitHub, import it into Vercel with the Next.js preset, and add the three variables from `.env.example` in the Vercel Project Settings for Development, Preview, and Production. Link the Supabase CLI to the production project and run `supabase db push` before testing production signup. In Supabase Auth URL Configuration, set the production Site URL to the Vercel production domain and add localhost, the production domain, and `https://*.vercel.app/**` as redirect URLs. If GitHub OAuth is enabled, configure the provider in Supabase with the callback URL shown there; never put its secret in Vercel.
+Push this repository to GitHub and connect it to Vercel with the Next.js preset. Vercel will create preview deployments for pull requests and production deployments for pushes to `main`. For the current application, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to Vercel for Production, Preview, and Development as needed. The service-role key is not required by this foundation and must never be exposed to the browser.
+
+Link the Supabase CLI to the production project and run `npx supabase db push` before testing production signup. In Supabase Auth URL Configuration, set the production Site URL to the Vercel production domain and add the exact callback URL `https://<vercel-production-domain>/auth/callback`. Keep `http://localhost:3000/auth/callback` for local development. If GitHub OAuth is enabled, configure the provider in Supabase with the callback URL shown there; never put its secret in Vercel.
+
+GitHub Actions runs lint, typecheck, unit tests, and the production build on pull requests and pushes to `main`. Vercel's Git integration owns deployments, so no duplicate Vercel deployment workflow or Vercel token is required.
