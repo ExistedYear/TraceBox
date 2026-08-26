@@ -9,9 +9,3 @@ export async function displayNameMap(userIds: (string | null | undefined)[]) {
   const { data } = await supabase.from("profiles").select("id, display_name").in("id", unique);
   return new Map((data ?? []).map((row) => [row.id, row.display_name ?? ""]));
 }
-
-export function personLabel(displayName: string | undefined | null, userId: string | null | undefined) {
-  if (displayName) return displayName;
-  if (!userId) return "—";
-  return `user-${userId.slice(0, 6)}`;
-}

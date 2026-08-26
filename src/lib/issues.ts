@@ -91,11 +91,14 @@ export function decodeIssueSearchParams(
   };
   const statusId = pick("status");
   const componentId = pick("component");
+  const priority = PRIORITIES.find((value) => value === pick("priority"));
+  const severity = SEVERITIES.find((value) => value === pick("severity"));
+  const type = ISSUE_TYPES.find((value) => value === pick("type"));
   return {
     statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
-    priority: pick("priority"),
-    severity: pick("severity"),
-    type: pick("type"),
+    priority,
+    severity,
+    type,
     componentId: componentId && valid.componentIds.has(componentId) ? componentId : undefined,
   };
 }

@@ -56,6 +56,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
         <Surface className="p-8 text-center text-sm text-muted-foreground">This project has no workflow states yet.</Surface>
       ) : (
         <IssueTable
+          key={projectId}
           projectKey={context.activeProject.key}
           projectId={projectId}
           canEdit={role === "DEVELOPER" || role === "MAINTAINER"}

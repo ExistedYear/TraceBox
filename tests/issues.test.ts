@@ -83,3 +83,16 @@ describe("issue filter codecs", () => {
     expect(decodeIssueSearchParams({ status: ["s1"] }, valid).statusId).toBeUndefined();
   });
 });
+
+describe("decodeIssueSearchParams enum whitelisting", () => {
+  const valid = { stateIds: new Set(["s1"]), componentIds: new Set(["c1"]) };
+
+  it("drops priority/severity/type values outside their enums", () => {
+    expect(decodeIssueSearchParams({ priority: "P9", severity: "HUGE", type: "NOT_A_TYPE" }, valid)).toEqual({});
+    expect(decodeIssueSearchParams({ priority: "P1", severity: "MAJOR", type: "BUG" }, valid)).toEqual({
+      priority: "P1",
+      severity: "MAJOR",
+      type: "BUG",
+    });
+  });
+});

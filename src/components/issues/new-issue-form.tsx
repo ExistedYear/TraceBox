@@ -51,28 +51,36 @@ export function NewIssueForm({
   });
 
   async function onSubmit(values: IssueCreateValues) {
-    const issueNumber = await createClient().rpc("create_issue", {
-      p_project_id: projectId,
-      p_title: values.title,
-      p_type: values.type,
-      p_description: values.description || undefined,
-      p_component_id: values.component_id || undefined,
-      p_priority: values.priority,
-      p_severity: values.severity,
-      p_assignee_id: values.assignee_id || undefined,
-      p_environment: values.environment || undefined,
-      p_steps_to_reproduce: values.steps_to_reproduce || undefined,
-      p_expected_behavior: values.expected_behavior || undefined,
-      p_actual_behavior: values.actual_behavior || undefined,
-    });
-    if (typeof issueNumber.error === "object" && issueNumber.error) {
+    let issueNumber: { data: number | null; error: { message: string } | null };
+    try {
+      issueNumber = await createClient().rpc("create_issue", {
+        p_project_id: projectId,
+        p_title: values.title,
+        p_type: values.type,
+        p_description: values.description || undefined,
+        p_component_id: values.component_id || undefined,
+        p_priority: values.priority,
+        p_severity: values.severity,
+        p_assignee_id: values.assignee_id || undefined,
+        p_environment: values.environment || undefined,
+        p_steps_to_reproduce: values.steps_to_reproduce || undefined,
+        p_expected_behavior: values.expected_behavior || undefined,
+        p_actual_behavior: values.actual_behavior || undefined,
+      });
+    } catch {
+      toast.error("Could not reach the server. Please try again.");
+      return;
+    }
+    if (issueNumber.error) {
       const message = String(issueNumber.error.message);
       toast.error(
         message.includes("NOT_ALLOWED")
           ? "Viewers cannot file issues in this project."
-          : message.includes("INVALID_COMPONENT")
-            ? "That component is not available."
-            : "Could not create the issue.",
+          : message.includes("PROJECT_ARCHIVED")
+            ? "This project is archived."
+            : message.includes("INVALID_COMPONENT")
+              ? "That component is not available."
+              : "Could not create the issue.",
       );
       return;
     }
@@ -100,6 +108,7 @@ export function NewIssueForm({
         <div className="space-y-2">
           <Label htmlFor="issue-component">Component</Label>
           <select id="issue-component" className={selectClass} {...form.register("component_id")}>
+            <option value="">None</option>
             {components.map((component) => (
               <option key={component.id} value={component.id}>{component.name}</option>
             ))}

@@ -41,7 +41,7 @@ src/components/
   ui/                      stock shadcn/ui (default style, cva, Radix, forwardRef/asChild)
   layout/                  app chrome: app-header, app-sidebar, user-menu,
                            workspace-switcher (org/project dropdowns + new-project dialog),
-                           theme-toggle, page-header
+                           theme-toggle
   auth/auth-form.tsx       dual-mode ('use client') login/signup form
   tracebox/                brand marks (trace-mark), dashboard overview, primitives kit
   issues/                  new-issue-form, issue-table (TanStack v8 client table)
@@ -59,7 +59,7 @@ src/lib/
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
   types/database.ts        generated DB types incl. RPC function signatures
-supabase/                  config.toml, migrations/ (5 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (7 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -107,7 +107,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Forms**: zod schema in `src/lib/validation/`, inferred type export, `useForm<T>({ resolver: zodResolver(schema) })`.
 - **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath` (control chars rejected).
 - **UI**: shadcn/ui default style + Lucide icons + Tailwind HSL CSS-variable tokens (`darkMode: ["class"]`; root html is dark by default). Add primitives with the shadcn CLI, configured by `components.json` (aliases `@/components`, `@/components/ui`, `@/lib/utils`).
-- **Repo laws** (enforced by both plans in `docs/`): every schema change ships as a versioned migration (`supabase/migrations/YYYYMMDDNNNN_name.sql`) — never dashboard-only changes; never disable RLS; never expose service-role keys to client bundles; no fake navigation/pages for unimplemented features (current fixture pages are acknowledged demo debt, not a pattern to copy).
+- **Repo laws** (enforced by both plans in `docs/`): every schema change ships as a versioned migration (`supabase/migrations/YYYYMMDDNNNN_name.sql`) — never dashboard-only changes; never disable RLS; never expose service-role keys to client bundles; no fake navigation/pages for unimplemented features.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`) own transactional writes incl. membership rows; clients call `supabase.rpc(...)` via the browser client. Direct client inserts into membership tables are blocked by missing INSERT policies — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
@@ -129,6 +129,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260004_create_issues.sql` | issues + immutable issue_events; atomic `create_issue` (counter lock, ISSUE_CREATED event); `project_role`, `can_view_issue`; Reporter+ insert policy |
 | `supabase/migrations/202608260005_update_issue_fields.sql` | `update_issue_fields` RPC — Developer/Maintainer inline edits with per-field audit events |
 | `supabase/migrations/202608260006_security_hardening.sql` | audit hardening: issues INSERT policy dropped (RPC-only creation), owner/created-by/reporter FKs RESTRICT, column-scoped UPDATE grants on orgs/projects, org-aware `project_role`, owner-honoring `is_org_admin`, FOR UPDATE audit reads, duplicate index dropped |
+| `supabase/migrations/202608260007_archived_guards_audit.sql` | archived projects reject create/edit RPCs; archived components rejected on edit; assignee eligibility honors org admins; `handle_new_user` clamps display names; component client-DELETE policy retired (archive-only) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |

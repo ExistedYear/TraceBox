@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, ArrowRight, Loader2, Plus } from "lucide-react";
+import { Archive, ArrowRight, Loader2, Pencil, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -70,12 +70,46 @@ export function ProjectSettings({
   const [tab, setTab] = useState<"components" | "workflow">("components");
   const [components, setComponents] = useState(initialComponents);
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<ComponentRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const form = useForm<ComponentValues>({
     resolver: zodResolver(componentSchema),
     defaultValues: { name: "", description: "", default_assignee_id: "" },
   });
+
+  function openEdit(component: ComponentRow) {
+    setEditing(component);
+    form.reset({
+      name: component.name,
+      description: component.description ?? "",
+      default_assignee_id: component.default_assignee_id ?? "",
+    });
+  }
+
+  async function saveComponent(values: ComponentValues) {
+    if (editing) {
+      const { error } = await createClient()
+        .from("components")
+        .update({
+          name: values.name,
+          description: values.description || null,
+          default_assignee_id: values.default_assignee_id || null,
+        })
+        .eq("id", editing.id);
+      if (error) {
+        toast.error(/duplicate key/i.test(error.message) ? "A component with that name exists." : "Could not update the component.");
+        return;
+      }
+      setComponents((current) => current.map((row) => (row.id === editing.id ? { ...row, name: values.name, description: values.description || null, default_assignee_id: values.default_assignee_id || null } : row)).sort((a, b) => a.name.localeCompare(b.name)));
+      toast.success("Component updated.");
+    } else {
+      await addComponent(values);
+      return;
+    }
+    form.reset();
+    setEditing(null);
+  }
 
   async function addComponent(values: ComponentValues) {
     const { data, error } = await createClient()
@@ -135,16 +169,16 @@ export function ProjectSettings({
               <p className="mt-0.5 text-xs text-muted-foreground">Group issues by area; a default assignee can be preselected at creation.</p>
             </div>
             {canManage && (
-              <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setEditing(null); }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-8 gap-1.5 text-xs"><Plus className="h-3.5 w-3.5" /> Add component</Button>
+                  <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { setEditing(null); form.reset(); }}><Plus className="h-3.5 w-3.5" /> Add component</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md rounded-[10px]">
                   <DialogHeader>
-                    <DialogTitle className="text-base">New component</DialogTitle>
+                    <DialogTitle className="text-base">{editing ? "Edit component" : "New component"}</DialogTitle>
                     <DialogDescription>Component names are unique within the project.</DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={form.handleSubmit(addComponent)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(saveComponent)} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="component-name">Name</Label>
                       <Input id="component-name" placeholder="Authentication" {...form.register("name")} />
@@ -166,7 +200,7 @@ export function ProjectSettings({
                     <DialogFooter>
                       <Button type="submit" disabled={form.formState.isSubmitting}>
                         {form.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Create component
+                        {editing ? "Save changes" : "Create component"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -185,10 +219,15 @@ export function ProjectSettings({
                     <p className="truncate text-xs text-muted-foreground">{component.description ?? memberLabel(members, component.default_assignee_id)}</p>
                   </div>
                   {canManage && (
-                    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground" onClick={() => toggleArchive(component)} disabled={busyId === component.id}>
-                      {busyId === component.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
-                      {component.is_archived ? "Restore" : "Archive"}
-                    </Button>
+                    <>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => { openEdit(component); setAddOpen(true); }}>
+                        <Pencil className="h-3 w-3" /> Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground" onClick={() => toggleArchive(component)} disabled={busyId === component.id}>
+                        {busyId === component.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
+                        {component.is_archived ? "Restore" : "Archive"}
+                      </Button>
+                    </>
                   )}
                 </li>
               ))}
