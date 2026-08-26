@@ -59,7 +59,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 13 ordered migrations, `202608260001` through `202608260013`. Inspect the installed CLI options before applying migrations:
+The repository contains 14 ordered migrations, `202608260001` through `202608260014`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help
