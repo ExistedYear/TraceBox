@@ -184,14 +184,15 @@ export function ProjectSettings({
 
       <div role="tablist" aria-label="Settings sections" className="flex gap-1 border-b border-border/80">
         {(["components", "workflow"] as const).map((value) => (
-          <button key={value} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+          <button key={value} id={`tab-${value}`} aria-controls={`panel-${value}`} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
             {value}
           </button>
         ))}
       </div>
 
       {tab === "components" ? (
-        <Surface>
+        <div role="tabpanel" id="panel-components" aria-labelledby="tab-components">
+          <Surface>
           <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold">Components</h2>
@@ -262,9 +263,10 @@ export function ProjectSettings({
               ))}
             </ul>
           )}
-        </Surface>
+          </Surface>
+        </div>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div role="tabpanel" id="panel-workflow" aria-labelledby="tab-workflow" className="grid gap-3 lg:grid-cols-2">
           <Card className="rounded-[10px] border-border/80">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">States</CardTitle>

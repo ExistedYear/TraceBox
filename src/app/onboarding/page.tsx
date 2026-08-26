@@ -12,7 +12,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/onboarding");
 
-  const { data: memberships } = await supabase.from("organization_members").select("organization_id");
+  const { data: memberships } = await supabase.from("organization_members").select("organization_id").eq("user_id", user.id);
   if ((memberships?.length ?? 0) > 0 && !create) redirect("/dashboard");
 
   return <OnboardingFlow />;

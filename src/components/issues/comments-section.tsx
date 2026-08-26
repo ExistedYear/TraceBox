@@ -171,7 +171,7 @@ function EditableComment({
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-medium">{authorLabel}</span>
         <span className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-muted-foreground">{formatDate(comment.created_at)} · {formatTime(comment.created_at)}</span>
+          <span suppressHydrationWarning className="font-mono text-[10px] text-muted-foreground">{formatDate(comment.created_at)} · {formatTime(comment.created_at)}</span>
           {comment.edited_at && <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">edited</span>}
           {canEdit && !editing && (
             <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] hover:bg-accent" aria-label="Edit comment">
@@ -187,7 +187,7 @@ function EditableComment({
       </div>
       {editing ? (
         <div className="space-y-2">
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          <textarea aria-label="Edit comment body" value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditing(false); setDraft(comment.body); }}>Cancel</Button>
             <Button type="button" size="sm" className="h-7 gap-1 text-xs" onClick={() => void save()} disabled={saving}>
@@ -204,8 +204,13 @@ function EditableComment({
 
 export function CommentsSection({ issueId, projectKey: _projectKey, currentUserId, canComment, canEditAnyComment, comments: initialComments, events, displayNames, componentNames }: Props) {
   const router = useRouter();
+  const [prevInitial, setPrevInitial] = useState(initialComments);
   const [comments, setComments] = useState<TimelineComment[]>(initialComments);
 
+  if (initialComments !== prevInitial) {
+    setPrevInitial(initialComments);
+    setComments(initialComments);
+  }
   const timeline = useMemo(() => buildTimeline(events, comments), [events, comments]);
 
   function handleAdded(comment: TimelineComment) {
@@ -261,7 +266,7 @@ export function CommentsSection({ issueId, projectKey: _projectKey, currentUserI
                       {summary.detail && !isCommentEvent && <span className="ml-1 font-mono text-xs">{summary.detail}</span>}
                       {isCommentEvent && summary.detail && <span className="ml-1 truncate font-mono text-xs text-muted-foreground">“{summary.detail.slice(0, 80)}”</span>}
                     </span>
-                    <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">{formatTime(entry.at)}</span>
+                    <span suppressHydrationWarning className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">{formatTime(entry.at)}</span>
                   </li>
                 );
               })}
