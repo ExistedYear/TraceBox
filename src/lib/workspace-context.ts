@@ -21,12 +21,10 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data: profile } = await supabase.from("profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle();
-
-  const { data: membershipRows } = await supabase
-    .from("organization_members")
-    .select("organization:organizations (id, name, slug)")
-    .order("joined_at");
+  const [{ data: profile }, { data: membershipRows }] = await Promise.all([
+    supabase.from("profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle(),
+    supabase.from("organization_members").select("organization:organizations (id, name, slug)").order("joined_at"),
+  ]);
   const organizations = (membershipRows ?? []).flatMap((row) => (row.organization ? [row.organization] : []));
   if (organizations.length === 0) redirect("/onboarding");
 

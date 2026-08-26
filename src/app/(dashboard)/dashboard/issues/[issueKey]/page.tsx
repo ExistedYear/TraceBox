@@ -43,21 +43,17 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     .maybeSingle();
   if (!issue) notFound();
 
-  const [{ data: events }, { data: comments }, names, { data: componentRows }, { data: viewerRole }] = await Promise.all([
+  const [{ data: events }, { data: comments }, { data: componentRows }, { data: viewerRole }] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
-    displayNameMap([issue.reporter_id, issue.assignee_id]),
     supabase.from("components").select("id, name").eq("project_id", project.id),
     supabase.rpc("project_role", { p_project_id: project.id }),
   ]);
 
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
-
   const actorIds = (events ?? []).map((event) => event.actor_id);
   const commentAuthorIds = (comments ?? []).map((comment) => comment.author_id);
-  const actorNames = await displayNameMap([...actorIds, ...commentAuthorIds]);
-
-  const mergedNames = new Map<string, string>([...names, ...actorNames]);
+  const mergedNames = await displayNameMap([issue.reporter_id, issue.assignee_id, ...actorIds, ...commentAuthorIds]);
   const canComment = viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
   const canEditAnyComment = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
 
@@ -69,8 +65,8 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     ["Severity", issue.severity],
     ["Type", issue.type],
     ["Component", issue.component?.name ?? "—"],
-    ["Assignee", personLabel(names.get(issue.assignee_id ?? ""), issue.assignee_id)],
-    ["Reporter", personLabel(names.get(issue.reporter_id), issue.reporter_id)],
+    ["Assignee", personLabel(mergedNames.get(issue.assignee_id ?? ""), issue.assignee_id)],
+    ["Reporter", personLabel(mergedNames.get(issue.reporter_id), issue.reporter_id)],
     ["Visibility", issue.visibility],
     ["Created", new Date(issue.created_at).toLocaleString()],
     ["Updated", new Date(issue.updated_at).toLocaleString()],
