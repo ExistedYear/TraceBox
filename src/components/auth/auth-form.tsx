@@ -74,8 +74,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md border-border/80 bg-card/70 shadow-xl shadow-black/10">
-      <CardHeader className="space-y-2"><CardTitle className="text-2xl">{isSignup ? "Create your account" : "Welcome back"}</CardTitle><CardDescription>{isSignup ? "Set up your TraceBox workspace in a few seconds." : "Log in to continue to your workspace."}</CardDescription></CardHeader>
+    <Card className="w-full max-w-[420px] rounded-[10px] border-border/80 bg-card shadow-xl shadow-black/10">
+      <CardHeader className="space-y-3"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-primary">{isSignup ? "New workspace" : "Secure access"}</p><CardTitle className="text-2xl tracking-tight">{isSignup ? "Create your account" : "Welcome back"}</CardTitle><CardDescription>{isSignup ? "Set up your TraceBox workspace in a few seconds." : "Log in to continue to your workspace."}</CardDescription></CardHeader>
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {isSignup && <div className="space-y-2"><Label htmlFor="displayName">Display name</Label><Input id="displayName" autoComplete="name" placeholder="Ada Lovelace" {...form.register("displayName" as const)} />{displayNameError && <p className="text-xs text-destructive">{displayNameError.message}</p>}</div>}

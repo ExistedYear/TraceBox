@@ -9,12 +9,12 @@ export const metadata: Metadata = {
     default: "TraceBox",
     template: "%s · TraceBox",
   },
-  description: "A focused foundation for shipping reliable software projects.",
+  description: "Trace the work. Ship with confidence.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body>
         {children}
         <Toaster />

@@ -1,14 +1,17 @@
 import Link from "next/link";
 
+import { TraceLogo, TraceMark } from "@/components/tracebox/trace-mark";
+
 export default function AuthLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <main className="min-h-screen lg:grid lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="hidden border-r border-border bg-card/30 p-10 lg:flex lg:flex-col lg:justify-between">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><span className="h-3 w-3 rounded-sm bg-current" /></span>TraceBox</Link>
-        <div className="max-w-md"><p className="text-sm font-medium text-primary">A calmer way to ship</p><h1 className="mt-4 text-4xl font-semibold tracking-tight">Start with a foundation you can trust.</h1><p className="mt-5 leading-7 text-muted-foreground">Your workspace is backed by Supabase Auth, PostgreSQL row-level security, and a deployment path designed for incremental product work.</p></div>
-        <p className="text-xs text-muted-foreground">TraceBox foundation · 2026</p>
+    <main className="min-h-screen bg-background lg:grid lg:grid-cols-[0.85fr_1.15fr]">
+      <section className="relative hidden overflow-hidden border-r border-border/80 bg-card/40 p-10 lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -right-24 top-1/4 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+        <Link href="/" aria-label="TraceBox home"><TraceLogo /></Link>
+        <div className="relative max-w-md"><p className="mb-5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-primary"><TraceMark className="h-4 w-4" /> A calmer way to ship</p><h1 className="text-4xl font-semibold tracking-[-0.04em]">Start with a foundation you can trust.</h1><p className="mt-5 max-w-sm leading-7 text-muted-foreground">Trace issues from the first report to the final release with a workspace designed for signal, not noise.</p><div className="mt-8 space-y-3 border-l border-primary/40 pl-4 text-sm text-muted-foreground"><p>Typed data boundaries</p><p>Secure Supabase sessions</p><p>Workflow ready for your team</p></div></div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">TraceBox foundation · 2026</p>
       </section>
-      <section className="flex min-h-screen flex-col px-6 py-8 sm:px-10"><Link href="/" className="flex items-center gap-2 font-semibold tracking-tight lg:hidden"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><span className="h-3 w-3 rounded-sm bg-current" /></span>TraceBox</Link><div className="flex flex-1 items-center justify-center py-12">{children}</div></section>
+      <section className="flex min-h-screen flex-col px-5 py-6 sm:px-10"><Link href="/" className="lg:hidden" aria-label="TraceBox home"><TraceLogo /></Link><div className="flex flex-1 items-center justify-center py-12">{children}</div><p className="text-center text-xs text-muted-foreground">By continuing, you agree to keep your workspace secure.</p></section>
     </main>
   );
 }

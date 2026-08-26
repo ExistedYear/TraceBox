@@ -1,54 +1,33 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Github, Layers3, ShieldCheck, Zap } from "lucide-react";
+import { ArrowUpRight, CircleDot, Github, Layers3, ShieldCheck, Zap } from "lucide-react";
 
+import { TraceLogo, TraceMark } from "@/components/tracebox/trace-mark";
 import { Button } from "@/components/ui/button";
 
-const highlights = [
-  { icon: ShieldCheck, label: "Secure by default", detail: "Supabase Auth and RLS from the first migration." },
-  { icon: Zap, label: "Ready to ship", detail: "A small, typed foundation that deploys cleanly to Vercel." },
-  { icon: Layers3, label: "Built to extend", detail: "A focused shell that leaves room for future product slices." },
+const signals = [
+  { icon: ShieldCheck, label: "Protected by default", detail: "Supabase Auth, typed data, and RLS-ready boundaries." },
+  { icon: Layers3, label: "One traceable workflow", detail: "Connect issues, people, branches, and releases in one view." },
+  { icon: Zap, label: "Built for momentum", detail: "Keep triage compact, visible, and ready for the next decision." },
+];
+
+const activity = [
+  { id: "TRC-142", title: "Keep filters when opening issue detail", label: "In progress", tone: "bg-violet-400" },
+  { id: "TRC-139", title: "Add release health summary", label: "Review", tone: "bg-amber-400" },
+  { id: "TRC-136", title: "Keyboard shortcut hint overlaps mobile nav", label: "Open", tone: "bg-blue-400" },
 ];
 
 export default function HomePage() {
-  return (
-    <main className="min-h-screen overflow-hidden">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-8 lg:px-10">
-        <header className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"><span className="h-3 w-3 rounded-sm bg-current" /></span>
-            TraceBox
-          </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" asChild><Link href="/login">Log in</Link></Button>
-            <Button asChild><Link href="/signup">Get started <ArrowRight className="h-4 w-4" /></Link></Button>
-          </div>
-        </header>
+  return <main className="min-h-screen overflow-hidden bg-background">
+    <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-5 sm:px-8 lg:px-10">
+      <header className="flex items-center justify-between border-b border-border/70 pb-5"><Link href="/" aria-label="TraceBox home"><TraceLogo /></Link><nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex"><a href="#workflow" className="hover:text-foreground">Workflow</a><a href="#principles" className="hover:text-foreground">Principles</a><a href="#security" className="hover:text-foreground">Security</a></nav><div className="flex items-center gap-2"><Button variant="ghost" size="sm" asChild><Link href="/login">Sign in</Link></Button><Button size="sm" asChild><Link href="/signup">Start with TraceBox <ArrowUpRight className="h-3.5 w-3.5" /></Link></Button></div></header>
 
-        <section className="flex flex-1 items-center py-20 lg:py-28">
-          <div className="grid w-full gap-16 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-            <div>
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"><CheckCircle2 className="h-3.5 w-3.5" /> Deployment foundation ready</div>
-              <h1 className="max-w-3xl text-balance text-5xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">A dependable home for your engineering work.</h1>
-              <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">TraceBox is a focused project foundation with secure authentication, a typed Supabase database, and a clean workspace shell ready for the next vertical slice.</p>
-              <div className="mt-9 flex flex-wrap items-center gap-3"><Button size="lg" asChild><Link href="/signup">Create your account <ArrowRight className="h-4 w-4" /></Link></Button><Button size="lg" variant="outline" asChild><Link href="/login">Log in</Link></Button></div>
-              <p className="mt-5 flex items-center gap-2 text-sm text-muted-foreground"><Github className="h-4 w-4" /> Email/password is ready. GitHub OAuth can be enabled in Supabase.</p>
-            </div>
+      <section className="grid flex-1 items-center gap-14 py-16 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20 lg:py-24"><div><p className="mb-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Trace the work · ship with confidence</p><h1 className="max-w-2xl text-balance text-5xl font-semibold tracking-[-0.045em] sm:text-6xl lg:text-7xl">The calm center of your engineering workflow.</h1><p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">TraceBox gives teams a precise place to triage issues, follow the signal through delivery, and keep every release moving with confidence.</p><div className="mt-9 flex flex-wrap items-center gap-3"><Button size="lg" asChild><Link href="/signup">Create your workspace <ArrowUpRight className="h-4 w-4" /></Link></Button><Button size="lg" variant="outline" asChild><Link href="/login">Explore the command center</Link></Button></div><p className="mt-5 flex items-center gap-2 text-xs text-muted-foreground"><Github className="h-3.5 w-3.5" /> Built for teams that ship from branches to production.</p></div>
 
-            <div className="relative">
-              <div className="absolute -inset-10 rounded-full bg-primary/10 blur-3xl" />
-              <div className="relative rounded-2xl border border-border/80 bg-card/80 p-4 shadow-2xl shadow-black/20 backdrop-blur">
-                <div className="rounded-xl border border-border bg-background/70 p-5">
-                  <div className="mb-7 flex items-center justify-between"><div><p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Workspace</p><p className="mt-1 text-lg font-semibold">Deployment status</p></div><span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300">All systems go</span></div>
-                  <div className="space-y-3">{["Next.js application", "Supabase authentication", "PostgreSQL + RLS", "Vercel runtime"].map((item) => <div key={item} className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3.5 py-3"><span className="text-sm text-muted-foreground">{item}</span><CheckCircle2 className="h-4 w-4 text-emerald-300" /></div>)}</div>
-                  <div className="mt-5 flex items-center gap-2 border-t border-border pt-4 text-xs text-muted-foreground"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Authenticated database query verified</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <div className="relative" id="workflow"><div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/10 blur-3xl" /><div className="relative overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xl shadow-black/10"><div className="flex items-center justify-between border-b border-border/80 px-4 py-3"><div className="flex items-center gap-2"><TraceMark className="h-4 w-4 text-primary" /><span className="font-mono text-[11px] text-muted-foreground">platform / command center</span></div><span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Healthy</span></div><div className="grid min-h-[390px] grid-cols-[148px_1fr] sm:grid-cols-[170px_1fr]"><aside className="border-r border-border/80 bg-background/35 p-3"><div className="mb-5 flex items-center gap-2 text-xs font-semibold"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground"><TraceMark className="h-4 w-4" /></span>TraceBox</div><div className="space-y-1 text-[11px]"><div className="rounded-md bg-primary/12 px-2.5 py-2 font-medium text-primary">Overview <span className="float-right font-mono">⌘1</span></div><div className="px-2.5 py-2 text-muted-foreground">Issues <span className="float-right font-mono">38</span></div><div className="px-2.5 py-2 text-muted-foreground">Teams</div><div className="px-2.5 py-2 text-muted-foreground">Releases</div></div><div className="mt-24 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">Platform team<br /><span className="font-mono">v0.1 / ready</span></div></aside><div className="min-w-0 p-4 sm:p-5"><div className="mb-5 flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Tuesday, August 26</p><h2 className="mt-1 text-lg font-semibold">Good morning, team.</h2></div><div className="hidden rounded-md border border-border/80 px-2 py-1.5 font-mono text-[10px] text-muted-foreground sm:block">⌘ K&nbsp;&nbsp; Search</div></div><div className="grid gap-2 sm:grid-cols-3"><div className="rounded-lg border border-border/70 bg-background/35 p-3"><p className="text-[10px] text-muted-foreground">Open issues</p><p className="mt-2 font-mono text-xl font-semibold">38</p><p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300">↓ 12% this week</p></div><div className="rounded-lg border border-border/70 bg-background/35 p-3"><p className="text-[10px] text-muted-foreground">Needs triage</p><p className="mt-2 font-mono text-xl font-semibold">06</p><p className="mt-1 text-[10px] text-amber-600 dark:text-amber-300">2 urgent</p></div><div className="rounded-lg border border-border/70 bg-background/35 p-3"><p className="text-[10px] text-muted-foreground">Release health</p><p className="mt-2 font-mono text-xl font-semibold">92%</p><p className="mt-1 text-[10px] text-primary">v0.4.0 · on track</p></div></div><div className="mt-4 rounded-lg border border-border/70"><div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5"><span className="text-xs font-medium">Recent trace</span><span className="font-mono text-[10px] text-muted-foreground">view all</span></div>{activity.map((item) => <div key={item.id} className="flex items-center gap-2.5 border-b border-border/50 px-3 py-2.5 last:border-b-0"><span className={`h-1.5 w-1.5 rounded-full ${item.tone}`} /><span className="font-mono text-[10px] text-muted-foreground">{item.id}</span><span className="min-w-0 flex-1 truncate text-[11px]">{item.title}</span><span className="hidden text-[10px] text-muted-foreground sm:block">{item.label}</span></div>)}</div></div></div></div></div>
+      </section>
 
-        <section className="grid gap-4 border-t border-border py-8 sm:grid-cols-3">{highlights.map(({ icon: Icon, label, detail }) => <div key={label} className="flex gap-3"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><p className="text-sm font-medium">{label}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p></div></div>)}</section>
-      </div>
-    </main>
-  );
+      <section id="principles" className="grid gap-5 border-t border-border/70 py-8 sm:grid-cols-3">{signals.map(({ icon: Icon, label, detail }) => <div key={label} className="flex gap-3"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><p className="text-sm font-medium">{label}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p></div></div>)}</section>
+      <footer id="security" className="flex flex-col gap-2 border-t border-border/70 pt-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><span>TraceBox · a focused engineering command center.</span><span className="flex items-center gap-2 font-mono"><CircleDot className="h-3 w-3 text-primary" /> auth + database boundaries stay yours</span></footer>
+    </div>
+  </main>;
 }

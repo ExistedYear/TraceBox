@@ -12,5 +12,5 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   const { data: profile } = await supabase.from("profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle();
 
-  return <div className="flex min-h-screen"><AppSidebar /><div className="flex min-w-0 flex-1 flex-col"><AppHeader email={user.email ?? ""} displayName={profile?.display_name} avatarUrl={profile?.avatar_url} /><div className="flex-1">{children}</div></div></div>;
+  return <div className="flex min-h-screen bg-background"><AppSidebar /><div className="flex min-w-0 flex-1 flex-col"><AppHeader email={user.email ?? ""} displayName={profile?.display_name} avatarUrl={profile?.avatar_url} /><div className="flex-1">{children}</div></div></div>;
 }
