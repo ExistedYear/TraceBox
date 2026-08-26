@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings2 } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 import { createClient } from "@/lib/supabase/client";
@@ -34,5 +33,5 @@ export function UserMenu({ email, displayName, avatarUrl }: UserMenuProps) {
     router.refresh();
   }
 
-  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-auto gap-3 px-2 py-1.5" disabled={isSigningOut}><Avatar className="h-8 w-8"><AvatarImage src={avatarUrl ?? undefined} alt="" /><AvatarFallback>{initials(label)}</AvatarFallback></Avatar><span className="hidden max-w-40 truncate text-left text-sm sm:block">{label}</span><span className="sr-only">Open user menu</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56"><DropdownMenuLabel><span className="block truncate">{label}</span><span className="mt-1 block truncate text-xs font-normal text-muted-foreground">{email}</span></DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings2 className="mr-2 h-4 w-4" />Workspace settings</Link></DropdownMenuItem><DropdownMenuItem onSelect={() => void signOut()}><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
+  return <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-auto gap-3 px-2 py-1.5" disabled={isSigningOut}><Avatar className="h-8 w-8"><AvatarImage src={avatarUrl ?? undefined} alt="" /><AvatarFallback>{initials(label)}</AvatarFallback></Avatar><span className="hidden max-w-40 truncate text-left text-sm sm:block">{label}</span><span className="sr-only">Open user menu</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-56"><DropdownMenuLabel><span className="block truncate">{label}</span><span className="mt-1 block truncate text-xs font-normal text-muted-foreground">{email}</span></DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => void signOut()}><LogOut className="mr-2 h-4 w-4" />Log out</DropdownMenuItem></DropdownMenuContent></DropdownMenu>;
 }

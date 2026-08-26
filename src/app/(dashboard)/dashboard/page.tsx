@@ -12,5 +12,5 @@ export default async function DashboardPage() {
 
   const displayName = profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "there";
 
-  return <DashboardOverview displayName={displayName} />;
+  return <DashboardOverview displayName={displayName} email={user.email ?? ""} />;
 }

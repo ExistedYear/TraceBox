@@ -7,6 +7,8 @@ coverage/
 .env
 .env.*
 !.env.example
+info/
+.omp/
 
 supabase/.branches/
 supabase/.temp/

@@ -1,14 +1,3 @@
-export class AppError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly status = 400,
-  ) {
-    super(message);
-    this.name = "AppError";
-  }
-}
-
 export function getSafeAuthErrorMessage(message: string) {
   const normalized = message.toLowerCase();
 
@@ -26,6 +15,24 @@ export function getSafeAuthErrorMessage(message: string) {
 
   if (normalized.includes("password should be at least")) {
     return "Choose a password with at least 8 characters.";
+  }
+
+  return "Something went wrong. Please try again.";
+}
+
+export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: string }) {
+  if (error.code === "23505" || /duplicate key|unique constraint/i.test(error.message ?? "")) {
+    if (/organizations_slug_key/i.test(error.message ?? "")) {
+      return "That workspace URL is already taken. Try another slug.";
+    }
+    if (/(projects_organization_id_key_key|projects_organization_id_slug_key)/i.test(error.message ?? "")) {
+      return "A project with that key already exists in this workspace.";
+    }
+    return "That name is already taken.";
+  }
+
+  if (error.message === "NOT_ORG_ADMIN") {
+    return "Only workspace owners and admins can create projects.";
   }
 
   return "Something went wrong. Please try again.";
