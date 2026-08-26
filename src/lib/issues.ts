@@ -46,7 +46,67 @@ export function eventSummary(event: {
   }
 }
 
+
+// Tailwind classes per workflow category; mirrors the Geist reference pill system.
+export function categoryClasses(category: string) {
+  switch (category) {
+    case "TRIAGE":
+      return "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+    case "OPEN":
+      return "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300";
+    case "IN_PROGRESS":
+      return "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300";
+    case "REVIEW":
+      return "border-purple-500/25 bg-purple-500/10 text-purple-700 dark:text-purple-300";
+    case "RESOLVED":
+      return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    case "CLOSED":
+      return "border-zinc-500/25 bg-zinc-500/10 text-zinc-600 dark:text-zinc-300";
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+}
+
+export type IssueFilters = {
+  statusId?: string;
+  priority?: string;
+  severity?: string;
+  type?: string;
+  componentId?: string;
+};
+
+export const DEFAULT_FILTERS: IssueFilters = {};
+
+export function encodeIssueFilters(filters: IssueFilters): Record<string, string> {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value))) as Record<string, string>;
+}
+
+export function decodeIssueSearchParams(
+  params: Record<string, string | string[] | undefined>,
+  valid: { stateIds: Set<string>; componentIds: Set<string> },
+): IssueFilters {
+  const pick = (name: string) => {
+    const value = params[name];
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const statusId = pick("status");
+  const componentId = pick("component");
+  return {
+    statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
+    priority: pick("priority"),
+    severity: pick("severity"),
+    type: pick("type"),
+    componentId: componentId && valid.componentIds.has(componentId) ? componentId : undefined,
+  };
+}
+
 function labelOf(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
+}
+
+export function personLabel(displayName: string | undefined | null, userId: string | null | undefined) {
+  if (displayName) return displayName;
+  if (!userId) return "—";
+  return `user-${userId.slice(0, 6)}`;
 }

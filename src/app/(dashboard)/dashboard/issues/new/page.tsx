@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { NewIssueForm } from "@/components/issues/new-issue-form";
 import { createClient } from "@/lib/supabase/server";
-import { displayNameMap, personLabel } from "@/lib/server-people";
+import { displayNameMap } from "@/lib/server-people";
+import { personLabel } from "@/lib/issues";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 export const metadata: Metadata = { title: "New issue" };

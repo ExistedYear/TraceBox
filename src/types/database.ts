@@ -519,6 +519,10 @@ export type Database = {
         };
         Returns: number;
       };
+      update_issue_fields: {
+        Args: { p_issue_id: string; p_updates: Json };
+        Returns: undefined;
+      };
       create_organization: {
         Args: { p_name: string; p_slug: string };
         Returns: string;

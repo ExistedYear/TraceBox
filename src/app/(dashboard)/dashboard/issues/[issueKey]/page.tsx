@@ -6,7 +6,8 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { eventSummary, formatIssueKey, parseIssueKey } from "@/lib/issues";
-import { displayNameMap, personLabel } from "@/lib/server-people";
+import { displayNameMap } from "@/lib/server-people";
+import { personLabel } from "@/lib/issues";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 type Params = Promise<{ issueKey: string }>;

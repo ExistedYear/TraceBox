@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { eventSummary, formatIssueKey, parseIssueKey } from "../src/lib/issues";
+import { decodeIssueSearchParams, encodeIssueFilters, eventSummary, formatIssueKey, parseIssueKey } from "../src/lib/issues";
 import { issueCreateSchema } from "../src/lib/validation/issue";
 
 describe("formatIssueKey", () => {
@@ -58,5 +58,26 @@ describe("issueCreateSchema", () => {
 
   it("rejects non-uuid component or assignee hints", () => {
     expect(issueCreateSchema.safeParse({ title: "ok", type: "BUG", component_id: "nope" }).success).toBe(false);
+  });
+});
+
+describe("issue filter codecs", () => {
+  it("round-trips set filters and omits empty ones", () => {
+    const filters = { priority: "P1", type: "BUG" };
+    expect(encodeIssueFilters(filters)).toEqual({ priority: "P1", type: "BUG" });
+    expect(encodeIssueFilters({})).toEqual({});
+  });
+
+  it("decodes only whitelisted ids and enum-ish values", () => {
+    const valid = { stateIds: new Set(["s1"]), componentIds: new Set(["c1"]) };
+    expect(decodeIssueSearchParams({ status: "s1", component: "c1", priority: "P0" }, valid)).toEqual({
+      statusId: "s1",
+      componentId: "c1",
+      priority: "P0",
+      severity: undefined,
+      type: undefined,
+    });
+    expect(decodeIssueSearchParams({ status: "bogus", component: "nope" }, valid).statusId).toBeUndefined();
+    expect(decodeIssueSearchParams({ status: ["s1"] }, valid).statusId).toBeUndefined();
   });
 });
