@@ -43,17 +43,24 @@ src/components/
                            workspace-switcher (org/project dropdowns + new-project dialog),
                            theme-toggle, page-header
   auth/auth-form.tsx       dual-mode ('use client') login/signup form
-  tracebox/                domain UI; fixtures in issue-data.ts; brand marks in trace-mark.tsx
+  tracebox/                brand marks (trace-mark) + remaining fixture demo sections
+  issues/                  new-issue-form, issue-table (TanStack v8 client table)
+  settings/project-settings.tsx   components manager + workflow viewer tabs
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
   validation/auth.ts       zod schemas + inferred LoginValues/SignupValues
   validation/workspace.ts  workspaceSchema (name+slug) / projectSchema (name+KEY+description)
+  validation/issue.ts      issueCreateSchema (title/type/component + advanced fields)
+  validation/components.ts componentSchema
+  issues.ts                KEY format/parse, event timeline copy, category pills, filter codecs
+  workspace-context.ts     server helper resolving cookie-backed org/project context
+  server-people.ts         server-only profile display-name maps
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-  types/database.ts        generated DB types (profiles + orgs/projects schema)
-supabase/                  config.toml, migrations/ (2 applied), seed.sql (intentionally empty)
-tests/                     vitest unit tests (relative ../src imports)
+  types/database.ts        generated DB types incl. RPC function signatures
+supabase/                  config.toml, migrations/ (5 applied), seed.sql (intentionally empty)
+tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
 ```
@@ -118,6 +125,9 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/auth/auth-form.tsx` | All credential/OAuth flows |
 | `supabase/migrations/202608260001_initial_profiles.sql` | profiles table, triggers, RLS policies |
 | `supabase/migrations/202608260002_create_organizations_projects.sql` | orgs/members/projects tables, RLS helpers (`is_org_member`, `is_org_admin`, `is_project_member`, `can_manage_project`), owner/admin policies, `create_organization`/`create_project` RPCs |
+| `supabase/migrations/202608260003_create_components_workflow.sql` | components + workflow_states/workflow_transitions; `create_project` seeds the 7-state default workflow and transitions |
+| `supabase/migrations/202608260004_create_issues.sql` | issues + immutable issue_events; atomic `create_issue` (counter lock, ISSUE_CREATED event); `project_role`, `can_view_issue`; Reporter+ insert policy |
+| `supabase/migrations/202608260005_update_issue_fields.sql` | `update_issue_fields` RPC — Developer/Maintainer inline edits with per-field audit events |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
@@ -130,12 +140,13 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - TypeScript `strict`, target ES2017, moduleResolution `bundler`, isolatedModules.
 - ESLint 9 flat config re-exporting `eslint-config-next/core-web-vitals` — no custom rules; keep it that way unless required.
 - Tailwind v3 (not v4): content globs cover `src/{app,components,pages}`.
+- **TanStack Table is pinned to v8** (`^8.21.3`); v9 renamed the API (`ReactTable`, `createCoreRowModel`) and will not typecheck against `useReactTable`. Column defs must be *inferred* from `createColumnHelper` — explicit `ColumnDef<T>[]` annotations break variance.
 - Deploy: Vercel (`vercel.json` pins framework + `npm run build`); GitHub Actions runs the same four gates on PRs and pushes to `main` — keep them green before yielding.
 
 ## Testing & QA
 
 - **Vitest 4**, run-only: `npm test` (equivalent to `vitest run`).
-- Tests live in `tests/*.test.ts` and import source via **relative paths** (`../src/lib/utils`) — the `@/` alias is NOT wired up for Vitest (no vitest/vite config file exists). Keep new tests relative-importing, or add alias config deliberately.
-- Current scope: pure functions only — zod schemas (`tests/auth-validation.test.ts`, `tests/workspace-validation.test.ts` incl. `slugify`), redirect sanitizer + error-message mapping (`tests/utils.test.ts`).
+- Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
+- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`).
 - Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build`.
 - E2E (Playwright) and pgTAP database tests are planned but do not exist yet; don't invent harnesses without need.
