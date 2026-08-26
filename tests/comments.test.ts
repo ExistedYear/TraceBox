@@ -30,6 +30,21 @@ describe("eventSummary comment events", () => {
   it("describes COMMENT_EDITED without detail", () => {
     expect(eventSummary({ event_type: "COMMENT_EDITED" })).toEqual({ heading: "edited a comment" });
   });
+
+  it("describes core field changes with old and new values", () => {
+    expect(eventSummary({ event_type: "TITLE_CHANGED", old_value: "Old title", new_value: "New title" })).toEqual({
+      heading: "renamed the issue",
+      detail: "Old title → New title",
+    });
+    expect(eventSummary({ event_type: "STATUS_CHANGED", old_value: "Triage", new_value: "Open" })).toEqual({
+      heading: "changed status",
+      detail: "Triage → Open",
+    });
+    expect(eventSummary({ event_type: "RESOLUTION_CHANGED", new_value: "FIXED" })).toEqual({
+      heading: "set resolution",
+      detail: "FIXED",
+    });
+  });
 });
 
 describe("excerptBody", () => {
@@ -57,6 +72,18 @@ describe("tokenizeCommentBody", () => {
 
   it("returns single text token for plain bodies", () => {
     expect(tokenizeCommentBody("plain text")).toEqual([{ text: "plain text", kind: "text" }]);
+  });
+  it("handles complex mentions with dots and hyphens and punctuation", () => {
+    const tokens = tokenizeCommentBody("cc @adithya.k and @team-lead (see TRACE-1)");
+    expect(tokens).toEqual([
+      { text: "cc ", kind: "text" },
+      { text: "@adithya.k", kind: "mention" },
+      { text: " and ", kind: "text" },
+      { text: "@team-lead", kind: "mention" },
+      { text: " (see ", kind: "text" },
+      { text: "TRACE-1", kind: "issue-ref" },
+      { text: ")", kind: "text" },
+    ]);
   });
 
   it("handles empty bodies", () => {

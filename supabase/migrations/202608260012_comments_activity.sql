@@ -150,7 +150,8 @@ begin
     raise exception 'VALIDATION' using errcode = '22023';
   end if;
 
-  select * into v_old from public.comments where id = p_comment_id for update;
+  -- Resolve the target comment and its project without locks first.
+  select * into v_old from public.comments where id = p_comment_id;
   if not found then
     raise exception 'NOT_FOUND' using errcode = 'P0002';
   end if;
@@ -164,7 +165,14 @@ begin
     raise exception 'NOT_FOUND' using errcode = 'P0002';
   end if;
 
-  select p.is_archived into v_archived from public.projects p where p.id = v_project_id for update;
+  -- Lock project row first (consistent hierarchy: projects -> issues -> components -> comments).
+  select p.is_archived into v_archived
+  from public.projects p
+  where p.id = v_project_id
+  for update;
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
   if v_archived then
     raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
   end if;
@@ -177,6 +185,8 @@ begin
     end if;
   end if;
 
+  -- Lock comment row under the project lock.
+  perform 1 from public.comments where id = p_comment_id for update;
   update public.comments
   set body = v_body,
       edited_at = timezone('utc'::text, now())
