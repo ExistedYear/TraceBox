@@ -225,7 +225,20 @@ export async function POST(request: NextRequest) {
     p_github_repository_id: Number.isSafeInteger(repositoryId) ? repositoryId : null,
     p_payload: payload,
   });
-  if (deliveryError) return NextResponse.json({ error: "Could not record webhook delivery." }, { status: 500 });
+  if (deliveryError) {
+    console.error("GitHub webhook delivery persistence failed", {
+      code: deliveryError.code,
+      message: deliveryError.message,
+      details: deliveryError.details,
+      hint: deliveryError.hint,
+      deliveryId,
+      event,
+      action,
+      installationId: Number.isSafeInteger(installationId) ? installationId : null,
+      repositoryId: Number.isSafeInteger(repositoryId) ? repositoryId : null,
+    });
+    return NextResponse.json({ error: "Could not record webhook delivery." }, { status: 500 });
+  }
   if (!delivery) return NextResponse.json({ accepted: true, duplicate: true, linked: 0, resolved: 0 });
 
   after(async () => {

@@ -125,7 +125,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
 - **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
-- **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` for idempotency, process lifecycle events, and retain historical TraceBox links when GitHub access is removed. Never send restricted issue metadata back to GitHub.
+- **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` for idempotency, process lifecycle events, and retain historical TraceBox links when GitHub access is removed. Log structured Supabase RPC failures server-side while keeping webhook responses generic. Never send restricted issue metadata back to GitHub.
 
 ## Important Files
 
