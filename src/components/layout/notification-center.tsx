@@ -3,6 +3,7 @@
 
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Check,
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 type NotificationItem = {
   id: string;
+  issue_id: string | null;
   type: string;
   data: {
     issue_number?: number;
@@ -66,6 +68,7 @@ function typeIcon(type: string) {
 }
 
 export function NotificationCenter() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -78,15 +81,16 @@ export function NotificationCenter() {
     if (user) setUserId(user.id);
     const { data, error } = await supabase
       .from("notifications")
-      .select("id, type, data, read_at, created_at, actor:profiles (display_name)")
+      .select("id, issue_id, type, data, read_at, created_at, actor:profiles (display_name), issue:issues (issue_number, project:projects (key))")
       .order("created_at", { ascending: false })
       .limit(20);
 
     if (!error && data) {
       const items: NotificationItem[] = data.map((row: any) => ({
         id: row.id,
+        issue_id: row.issue_id,
         type: row.type,
-        data: row.data as any,
+        data: { ...((row.data as any) ?? {}), issue_number: row.issue?.issue_number ?? (row.data as any)?.issue_number, project_key: row.issue?.project?.key ?? (row.data as any)?.project_key },
         actor_name: row.actor?.display_name ?? null,
         read_at: row.read_at,
         created_at: row.created_at,
@@ -101,20 +105,24 @@ export function NotificationCenter() {
   }, [fetchNotifications]);
 
   useRealtimeNotifications(userId, (payload: any) => {
-    const newItem: NotificationItem = {
-      id: payload.id,
-      type: payload.type,
-      data: payload.data,
-      actor_name: null,
-      read_at: payload.read_at,
-      created_at: payload.created_at,
-    };
-    setNotifications((prev) => {
-      if (prev.some((item) => item.id === newItem.id)) return prev;
-      if (!newItem.read_at) setUnreadCount((count) => count + 1);
-      return [newItem, ...prev].slice(0, 20);
-    });
-  });
+    void (async () => {
+      const { data: issue } = payload.issue_id ? await createClient().from("issues").select("issue_number, project:projects (key)").eq("id", payload.issue_id).maybeSingle() : { data: null };
+      const newItem: NotificationItem = { id: payload.id, issue_id: payload.issue_id ?? null, type: payload.type, data: { ...(payload.data ?? {}), issue_number: issue?.issue_number ?? payload.data?.issue_number, project_key: issue?.project?.key ?? payload.data?.project_key }, actor_name: null, read_at: payload.read_at, created_at: payload.created_at };
+      setNotifications((prev) => {
+        if (prev.some((item) => item.id === newItem.id)) return prev;
+        if (!newItem.read_at) setUnreadCount((count) => count + 1);
+        return [newItem, ...prev].slice(0, 20);
+      });
+    })();
+  }, () => toast.error("Live notifications are unavailable. Refresh to update the list."));
+
+  async function openNotification(item: NotificationItem) {
+    if (!item.read_at) await handleMarkRead(item.id);
+    if (item.data?.project_key && item.data.issue_number) {
+      setOpen(false);
+      router.push(`/dashboard/issues/${item.data.project_key}-${item.data.issue_number}`);
+    }
+  }
 
   async function handleMarkRead(id: string) {
     try {
@@ -202,10 +210,11 @@ export function NotificationCenter() {
                 <li
                   key={item.id}
                   className={cn(
-                    "flex items-start gap-3 p-3 text-xs transition-colors hover:bg-accent/40",
+                    "flex items-start gap-1 p-1 text-xs transition-colors hover:bg-accent/40",
                     !item.read_at && "bg-primary/5",
                   )}
                 >
+                  <button type="button" onClick={() => void openNotification(item)} disabled={!item.data?.project_key || !item.data.issue_number} className="flex min-w-0 flex-1 items-start gap-3 p-2 text-left disabled:cursor-default">
                   <span className="mt-0.5 shrink-0">{typeIcon(item.type)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="text-foreground">
@@ -227,6 +236,7 @@ export function NotificationCenter() {
                         {item.data.title}
                       </p>
                     )}
+                    {item.data?.project_key && item.data.issue_number && <span className="mt-1 block font-mono text-[10px] text-primary">{item.data.project_key}-{item.data.issue_number} · Open issue</span>}
                     {item.data?.excerpt && (
                       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                         &ldquo;{item.data.excerpt}&rdquo;
@@ -236,6 +246,7 @@ export function NotificationCenter() {
                       {relativeTime(item.created_at)}
                     </span>
                   </div>
+                  </button>
                   {!item.read_at && (
                     <button
                       type="button"

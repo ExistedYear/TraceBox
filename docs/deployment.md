@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 38) via SQL Script
+### 1.3 Apply Database Migrations (1 through 39) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 38 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 39 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 38 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 39 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -77,6 +77,7 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 36. `202608260036_notification_lifecycle.sql`
 37. `202608260037_restricted_notification_guards.sql`
 38. `202608260038_final_invariant_hardening.sql`
+39. `202608260039_release_validation_fixes.sql`
 
 ### 1.4 Configure Supabase Authentication
 
@@ -167,6 +168,28 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 
 The service-role key is required by `/api/v1/*` and `/api/webhooks/github`. Vercel server functions may use it, but it must never be named `NEXT_PUBLIC_*`, exposed in client code, returned by an endpoint, logged, or committed.
 
+### 3.5 API and webhook contract
+
+The deployed API routes are:
+
+- `GET /api/v1/projects` — `projects:read`
+- `GET|POST /api/v1/issues` — `issues:read` / `issues:write`
+- `GET /api/v1/issues/:issueKey` — `issues:read`
+- `POST /api/v1/issues/:issueKey/comments` — `comments:write`
+- `GET /api/v1/milestones` — `milestones:read`
+- `GET /api/v1/search` — `search:read`
+
+Legacy `read` and `write` token scopes remain accepted for compatibility. New
+tokens should use the narrow resource scopes above. Every API request must use
+`Authorization: Bearer <token>`; never put a token in a URL or browser bundle.
+
+The GitHub webhook accepts signed `pull_request` and `push` events at
+`/api/webhooks/github`. GitHub must send `X-Hub-Signature-256`, and the value
+must be generated from the raw request body using the same secret as
+`GITHUB_WEBHOOK_SECRET`. Issue keys are read case-insensitively; merged pull
+requests can resolve linked issues only when the project integration toggle is
+enabled and the PR body/title uses a closing phrase such as `Fixes CORE-123`.
+
 ### 3.4 Deploy
 
 1. Click **Deploy**.
@@ -208,7 +231,7 @@ npx supabase migration repair --status applied <migration_version>
 
 ## Step 5: Live End-to-End Verification Walkthrough
 
-Once deployed (or running locally), verify the full user experience across all 20 phases:
+Once deployed (or running locally), verify the full user experience across all 20 phases. This checkout contains an ignored Playwright suite under `qa/live/`; run it first with a disposable API token and webhook secret, then perform the authenticated browser flow below.
 
 1. **Sign Up**: Navigate to `/signup`, create an account (`admin@example.com`), and verify immediate login.
 2. **Onboarding**: You will be automatically redirected to `/onboarding`. Enter workspace name (e.g. `Acme Corp`) and create your initial project (e.g. `Core Engine` with key `CORE`).
@@ -228,6 +251,7 @@ Once deployed (or running locally), verify the full user experience across all 2
 10. **Notification Center**: Trigger an event or mention and check the bell icon in the top header.
 11. **Settings**: Go to `/dashboard/settings` and test component creation, label management, version archival, milestone tracking, and workflow visualization.
 12. **Log Out**: Click your avatar menu in the top right → **Log out**. Verify protected routes redirect to `/login`.
-13. **GitHub integration**: In `/dashboard/settings/integrations`, connect `owner/repository`; configure the GitHub webhook URL as `https://<deployment>/api/webhooks/github`, select pull-request and push events, and use the exact `GITHUB_WEBHOOK_SECRET`.
-14. **Restricted issues**: Set an issue to restricted, grant only project members, verify an ungranted member cannot open/search/read its comments, attachments, labels, links, or notifications.
-15. **Custom fields and API**: Create a custom field, set its value on an issue, create a read-only token and a read/write token, verify scope enforcement, then revoke the token and verify 401 responses.
+13. **GitHub OAuth**: On `/login`, click **Continue with GitHub** and verify the browser reaches GitHub’s authorization page, then complete the flow with a disposable GitHub account and confirm the callback returns to TraceBox.
+14. **GitHub integration**: In `/dashboard/settings/integrations`, connect `owner/repository`; configure the GitHub webhook URL as `https://<deployment>/api/webhooks/github`, select pull-request and push events, and use the exact `GITHUB_WEBHOOK_SECRET`. Deliver a test PR or push containing an issue key and verify the link/status update.
+15. **Restricted issues**: Set an issue to restricted, grant only project members, verify an ungranted member cannot open/search/read its comments, attachments, labels, links, or notifications.
+16. **Custom fields and API**: Create a custom field, set its value on an issue, create narrow read/write tokens, verify allowed and denied scopes, test pagination and search/milestones/comments, then revoke a token and verify `401` responses.

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authenticateApiRequest, filterApiVisibleIssues } from "@/lib/api-auth";
+import { authenticateApiRequest, filterApiVisibleIssues, type ApiScope } from "@/lib/api-auth";
 import { parseIssueKey } from "@/lib/issues";
 import type { Json } from "@/types/database";
 
 type Params = Promise<{ issueKey: string }>;
 
-async function getIssue(request: NextRequest, issueKey: string, scope: "read" | "write") {
+async function getIssue(request: NextRequest, issueKey: string, scope: ApiScope) {
   const auth = await authenticateApiRequest(request, scope);
   if ("response" in auth) return { auth: null, response: auth.response } as const;
   const parsed = parseIssueKey(issueKey);
@@ -21,7 +21,7 @@ async function getIssue(request: NextRequest, issueKey: string, scope: "read" | 
 }
 
 export async function GET(request: NextRequest, { params }: { params: Params }) {
-  const result = await getIssue(request, (await params).issueKey, "read");
+  const result = await getIssue(request, (await params).issueKey, "issues:read");
   if (result.response) return result.response;
   const { data: issue, error } = await result.auth!.client.from("issues").select("*, status:workflow_states(name, category), component:components(name)").eq("id", result.issue.id).maybeSingle();
   if (error || !issue) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Params }) {
-  const result = await getIssue(request, (await params).issueKey, "write");
+  const result = await getIssue(request, (await params).issueKey, "issues:write");
   if (result.response) return result.response;
   let updates: unknown;
   try { updates = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }

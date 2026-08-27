@@ -1,9 +1,8 @@
-# Known Issues & Feature Gaps
+# Release Validation Log
 
 ## 1. GitHub OAuth Authentication
-- **Observation**: Clicking **"Continue with GitHub"** fails or redirects with an error when used on a fresh Supabase instance.
-- **Root Cause**: GitHub OAuth requires external credentials that live outside the repository in GitHub Developer Settings and the Supabase Dashboard.
-- **Setup Requirements**:
+- **Status**: Source flow implemented. A fresh deployment still requires external provider configuration; a provider error is not fixed in application code until these settings exist.
+- **Setup requirements**:
   1. **GitHub Developer Settings** (`https://github.com/settings/developers` → OAuth Apps):
      - **Homepage URL**: `http://localhost:3000` (or `https://<your-vercel-domain>.vercel.app`)
      - **Authorization callback URL**:
@@ -21,24 +20,20 @@
 
 ---
 
-## 2. Forgot Password / Password Reset Flow
-- **Observation**: There is currently no "Forgot password?" recovery link or password reset flow on the `/login` screen.
-- **Status**: Scheduled feature enhancement.
-- **Implementation Plan**:
-  1. Add a "Forgot password?" link on `/login` routing to `/forgot-password`.
-  2. Create `ForgotPasswordForm` calling `supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback?next=/reset-password` })`.
-  3. Add `/reset-password` page with `ResetPasswordForm` calling `supabase.auth.updateUser({ password: newPassword })`.
+## 2. Password recovery and signup validation
+- **Status**: Implemented.
+- `/login` now has a **Forgot password?** entry point.
+- `/forgot-password` sends a recovery email through Supabase Auth.
+- `/reset-password` updates the password after the recovery session is established.
+- Signup requires matching password and confirmation fields.
 
-## 3. Confirm Password during SignUp does not exist.
-
-## 4. External deployment validation
+## 3. External deployment validation
 
 - **Status**: Pending external setup, not a source-code defect.
-- Apply migrations `202608260001` through `202608260038` to the intended Supabase project.
+- Apply migrations `202608260001` through `202608260039` to the intended Supabase project.
 - Verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, Vercel server-only variables, and GitHub webhook.
 - Run the full live flow documented in `deployment.md`, including restricted issue isolation, attachment lifecycle, API-token scopes, and webhook linking.
 
-## 5. Current product limitation
+## 4. Live-test limitation
 
-- Password recovery is not implemented yet. The login screen does not provide a forgot-password or reset-password flow.
-- GitHub OAuth login remains disabled until provider credentials are configured in Supabase.
+The source-level gates pass, but hosted behavior must be verified after the commit is deployed. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes. It must be run with the production URL and secrets supplied through its ignored `.env` file.

@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (38 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (39 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -82,6 +82,7 @@ npm run lint         # eslint .
 npm run typecheck    # tsc --noEmit
 npm test             # vitest run (no watch script)
 npm run check:migrations # contiguous chain + full_schema sync
+npm run sync:migrations  # regenerate full_schema.sql from ordered migrations
 
 # Local Supabase (requires Supabase CLI)
 npm run db:start / db:stop / db:reset      # reset applies migrations + seed
@@ -113,6 +114,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Forms**: zod schema in `src/lib/validation/`, inferred type export, `useForm<T>({ resolver: zodResolver(schema) })`.
 - **Errors**: log server-side as structured objects — `console.error("msg", { code, message })`; never surface raw Supabase/DB text. Map through `getSafeAuthErrorMessage` and show via sonner `toast.error`. Redirect targets always pass through `getSafeRedirectPath` (control chars rejected).
 - **UI**: shadcn/ui default style + Lucide icons + Tailwind HSL CSS-variable tokens (`darkMode: ["class"]`; root html is dark by default). Add primitives with the shadcn CLI, configured by `components.json` (aliases `@/components`, `@/components/ui`, `@/lib/utils`).
+- **Theme**: light/dark mode and accent are independent. Blue is the default accent; neutral, amber, purple, and emerald are selected from the header palette and persisted in `tracebox-accent`. Accent variants override only `--primary`, `--primary-foreground`, and `--ring` through `html[data-accent]`.
 - **Issue components**: `component_id` is optional when a project has no components yet; the RPC accepts null and the form exposes `None`. When a component is selected, its configured default assignee is preselected if the user has not chosen one.
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
@@ -168,6 +170,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260036_notification_lifecycle.sql` | Assignment/status/mention notification triggers with preference-aware dispatcher |
 | `supabase/migrations/202608260037_restricted_notification_guards.sql` | Restricted issue watcher and mention notification guards |
 | `supabase/migrations/202608260038_final_invariant_hardening.sql` | Archived-project watcher checks and API token hash constraints |
+| `supabase/migrations/202608260039_release_validation_fixes.sql` | Release validation fixes: API issue argument ordering and granular scopes/comments, GitHub webhook upserts + optional merge resolution, issue-link authorization, typed custom-field validation, and saved-view sharing |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -175,8 +178,10 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/reports/reports-dashboard.tsx` | Phase 14 time-window metrics, MTTR, aging, component, and priority reports |
 | `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
 | `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
-| `src/app/api/v1/` | Scoped REST project/issue reads and writes |
+| `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, and search |
 | `src/app/api/webhooks/github/` | HMAC-verified GitHub PR/commit issue-key webhook ingestion |
+| `src/components/tracebox/markdown-content.tsx` | Safe GFM renderer for issue descriptions and comments; raw HTML remains disabled |
+| `src/lib/github.ts` | Repository normalization and case-insensitive issue/closing-key extraction |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 
@@ -190,6 +195,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - Tailwind v3 (not v4): content globs cover `src/{app,components}`.
 - **TanStack Table is pinned to v8** (`^8.21.3`); v9 renamed the API (`ReactTable`, `createCoreRowModel`) and will not typecheck against `useReactTable`. Column defs must be *inferred* from `createColumnHelper` — explicit `ColumnDef<T>[]` annotations break variance.
 - Deploy: Vercel (`vercel.json` pins framework + `npm run build`); GitHub Actions runs the same four gates on PRs and pushes to `main` — keep them green before yielding.
+- Root ESLint intentionally ignores the local-only `qa/live/**` directory; that suite has its own Playwright command and dependency lockfile.
 
 ## Testing & QA
 
@@ -197,4 +203,4 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
 - Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`, `comment`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`), comment helpers (`tokenizeCommentBody`, `buildTimeline`, `excerptBody`, `COMMENT_ADDED/EDITED` summaries).
 - Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build`.
-- E2E (Playwright) and pgTAP database tests are planned but do not exist yet; don't invent harnesses without need.
+- The tracked unit suite remains Vitest-only. A separate ignored black-box Playwright suite exists under `qa/live/`; it is installed and run independently with deployment credentials and must not be added to CI or committed with secrets.

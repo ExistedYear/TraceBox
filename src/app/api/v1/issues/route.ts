@@ -14,7 +14,7 @@ function parseBoundedInteger(value: string | null, fallback: number, minimum: nu
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await authenticateApiRequest(request, "read");
+  const auth = await authenticateApiRequest(request, "issues:read");
   if ("response" in auth) return auth.response;
 
   const projectId = request.nextUrl.searchParams.get("project_id");
@@ -26,38 +26,40 @@ export async function GET(request: NextRequest) {
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
 
-  let query = auth.client
-    .from("issues")
-    .select("id, project_id, visibility, reporter_id, assignee_id, issue_number, title, type, priority, severity, status:workflow_states(name, category), component:components(name), created_at, updated_at")
-    .eq("project_id", projectId)
-    .limit(1000)
-    .order("created_at", { ascending: false });
-
   const status = request.nextUrl.searchParams.get("status");
   const type = request.nextUrl.searchParams.get("type");
   const priority = request.nextUrl.searchParams.get("priority");
-  if (status) {
-    if (!UUID_RE.test(status)) return NextResponse.json({ error: "status must be a valid UUID." }, { status: 400 });
-    query = query.eq("status_id", status);
-  }
+  if (status && !UUID_RE.test(status)) return NextResponse.json({ error: "status must be a valid UUID." }, { status: 400 });
   if (type) {
     if (!(ISSUE_TYPES as readonly string[]).includes(type)) return NextResponse.json({ error: "Invalid issue type." }, { status: 400 });
-    query = query.eq("type", type);
   }
   if (priority) {
     if (!(PRIORITIES as readonly string[]).includes(priority)) return NextResponse.json({ error: "Invalid priority." }, { status: 400 });
-    query = query.eq("priority", priority);
   }
-
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: "Could not load issues." }, { status: 500 });
-  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, (data ?? []) as any));
-  const visible = (data ?? []).filter((issue: any) => visibleIds.has(issue.id));
+  const allIssues: any[] = [];
+  const batchSize = 1000;
+  for (let from = 0; ; from += batchSize) {
+    let query = auth.client
+      .from("issues")
+      .select("id, project_id, visibility, reporter_id, assignee_id, issue_number, title, type, priority, severity, status:workflow_states(name, category), component:components(name), created_at, updated_at")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .range(from, from + batchSize - 1);
+    if (status) query = query.eq("status_id", status);
+    if (type) query = query.eq("type", type);
+    if (priority) query = query.eq("priority", priority);
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ error: "Could not load issues." }, { status: 500 });
+    allIssues.push(...(data ?? []));
+    if ((data ?? []).length < batchSize) break;
+  }
+  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, allIssues as any));
+  const visible = allIssues.filter((issue: any) => visibleIds.has(issue.id));
   return NextResponse.json({ data: visible.slice(offset, offset + limit), total: visible.length, limit, offset });
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await authenticateApiRequest(request, "write");
+  const auth = await authenticateApiRequest(request, "issues:write");
   if ("response" in auth) return auth.response;
 
   let payload: unknown;

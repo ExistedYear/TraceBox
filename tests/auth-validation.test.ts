@@ -28,28 +28,35 @@ describe("signupSchema", () => {
         displayName: "Ada Lovelace",
         email: "ada@example.com",
         password: "correct-horse-battery-staple",
+        confirmPassword: "correct-horse-battery-staple",
       }),
     ).toEqual({
       displayName: "Ada Lovelace",
       email: "ada@example.com",
       password: "correct-horse-battery-staple",
+      confirmPassword: "correct-horse-battery-staple",
     });
   });
 
   it("rejects a short display name", () => {
-    const result = signupSchema.safeParse({ displayName: "A", email: "ada@example.com", password: "correct-horse-battery-staple" });
+    const result = signupSchema.safeParse({ displayName: "A", email: "ada@example.com", password: "correct-horse-battery-staple", confirmPassword: "correct-horse-battery-staple" });
     expect(result.success).toBe(false);
   });
 
   it("rejects a short password", () => {
-    const result = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "short" });
+    const result = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "short", confirmPassword: "short" });
     expect(result.success).toBe(false);
   });
 
   it("rejects an oversized display name or password", () => {
-    const longName = signupSchema.safeParse({ displayName: "A".repeat(121), email: "ada@example.com", password: "correct-horse-battery-staple" });
+    const longName = signupSchema.safeParse({ displayName: "A".repeat(121), email: "ada@example.com", password: "correct-horse-battery-staple", confirmPassword: "correct-horse-battery-staple" });
     expect(longName.success).toBe(false);
-    const longPass = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "p".repeat(73) });
+    const longPass = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "p".repeat(73), confirmPassword: "p".repeat(73) });
     expect(longPass.success).toBe(false);
+  });
+
+  it("rejects mismatched passwords", () => {
+    const result = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "correct-horse-battery-staple", confirmPassword: "different-password" });
+    expect(result.success).toBe(false);
   });
 });

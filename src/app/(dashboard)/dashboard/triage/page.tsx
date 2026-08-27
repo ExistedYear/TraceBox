@@ -47,7 +47,7 @@ export default async function TriagePage() {
     { data: workflowStates },
     { data: memberRows },
     { data: componentRows },
-    { data: canManage },
+    { data: projectRole },
   ] = await Promise.all([
     supabase
       .from("workflow_states")
@@ -56,7 +56,7 @@ export default async function TriagePage() {
       .order("position"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
     supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
-    supabase.rpc("can_manage_project", { p_project_id: projectId }),
+    supabase.rpc("project_role", { p_project_id: projectId }),
   ]);
 
   const states = workflowStates ?? [];
@@ -125,7 +125,7 @@ export default async function TriagePage() {
       closedStateId={closedState?.id ?? null}
       components={(componentRows ?? []).map((component) => ({ id: component.id, name: component.name }))}
       members={members}
-      canManage={Boolean(canManage)}
+      canManage={projectRole === "DEVELOPER" || projectRole === "MAINTAINER"}
     />
   );
 }

@@ -41,16 +41,7 @@ export default async function ReadinessPage() {
   const projectName = context.activeProject.name;
   const projectKey = context.activeProject.key;
 
-  const [
-    { data: issueRows },
-    { data: milestoneRows },
-    { data: versionRows },
-  ] = await Promise.all([
-    supabase
-      .from("issues")
-      .select("id, issue_number, title, type, priority, severity, assignee_id, target_milestone_id, affected_version_id, status:workflow_states (name, category), component:components (name)")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false }),
+  const [{ data: milestoneRows }, { data: versionRows }] = await Promise.all([
     supabase
       .from("milestones")
       .select("id, name, status, due_at")
@@ -63,8 +54,15 @@ export default async function ReadinessPage() {
       .eq("is_archived", false)
       .order("name"),
   ]);
+  const issueRows: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, assignee_id, target_milestone_id, affected_version_id, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
+    if (error) break;
+    issueRows.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
 
-  const rawIssues = issueRows ?? [];
+  const rawIssues = issueRows;
   const assigneeIds = rawIssues.map((i) => i.assignee_id).filter(Boolean);
   const nameMap = await displayNameMap(assigneeIds);
 

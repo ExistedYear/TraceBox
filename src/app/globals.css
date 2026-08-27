@@ -44,6 +44,15 @@
     --ring: 218 91% 60%;
   }
 
+  :root[data-accent="neutral"] { --primary: 0 0% 9%; --primary-foreground: 0 0% 98%; --ring: 0 0% 9%; }
+  .dark[data-accent="neutral"] { --primary: 0 0% 98%; --primary-foreground: 0 0% 9%; --ring: 0 0% 83%; }
+  :root[data-accent="amber"] { --primary: 38 92% 45%; --primary-foreground: 0 0% 9%; --ring: 38 92% 45%; }
+  .dark[data-accent="amber"] { --primary: 38 92% 55%; --primary-foreground: 0 0% 9%; --ring: 38 92% 55%; }
+  :root[data-accent="purple"] { --primary: 263 70% 50%; --primary-foreground: 0 0% 100%; --ring: 263 70% 50%; }
+  .dark[data-accent="purple"] { --primary: 263 70% 64%; --primary-foreground: 0 0% 100%; --ring: 263 70% 64%; }
+  :root[data-accent="emerald"] { --primary: 160 84% 34%; --primary-foreground: 0 0% 100%; --ring: 160 84% 34%; }
+  .dark[data-accent="emerald"] { --primary: 160 84% 45%; --primary-foreground: 0 0% 9%; --ring: 160 84% 45%; }
+
   * {
     @apply border-border;
   }

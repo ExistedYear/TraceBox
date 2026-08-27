@@ -2819,7 +2819,7 @@ Phases 1–20 are implemented in the repository. The next work is production val
 
 ```text
 Phase 1–20: complete
-Database migrations: 001–038
-API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/projects, /api/webhooks/github
+Database migrations: 001–039
+API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/issues/[issueKey]/comments, /api/v1/projects, /api/v1/milestones, /api/v1/search, /api/webhooks/github
 Production deployment: requires Supabase migration application, Auth URL configuration, Storage bucket verification, Realtime publication verification, Vercel environment configuration, GitHub webhook configuration, and live end-to-end testing
 ```

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
 import { IssueAttachmentsSection } from "@/components/issues/issue-attachments-section";
 import { IssueCustomFieldsSection } from "@/components/issues/issue-custom-fields-section";
+import { MarkdownContent } from "@/components/tracebox/markdown-content";
 import { IssueGithubLinksSection } from "@/components/issues/issue-github-links-section";
 import { IssueLinksSection } from "@/components/issues/issue-links-section";
 import { IssueSecuritySection } from "@/components/issues/issue-security-section";
@@ -69,7 +70,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     { data: projectMemberRows },
     { data: accessRows },
   ] = await Promise.all([
-    supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
+    supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("components").select("id, name").eq("project_id", project.id),
     supabase.rpc("project_role", { p_project_id: project.id }),
@@ -157,15 +158,15 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
         <div className="space-y-4">
           <Surface className="p-4">
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</h2>
-            <p className="whitespace-pre-wrap text-sm leading-6">{issue.description ?? "No description provided."}</p>
+            <MarkdownContent body={issue.description ?? "No description provided."} />
           </Surface>
 
-          {sections.filter(([, value]) => Boolean(value)).map(([label, value]) => (
+          {sections.map(([label, value]) => value ? (
             <Surface key={label} className="p-4">
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h2>
-              <p className="whitespace-pre-wrap text-sm leading-6">{value}</p>
+              <MarkdownContent body={value} />
             </Surface>
-          ))}
+          ) : null)}
 
           <IssueAttachmentsSection key={`attachments-${issue.id}`}
             issueId={issue.id}
@@ -179,6 +180,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             fields={(customFieldRows ?? []) as any}
             initialValues={(customValueRows ?? []) as any}
             canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
+            members={(projectMemberRows ?? []).map((member) => ({ id: member.user_id, label: mergedNames.get(member.user_id) ?? member.user_id.slice(0, 8) }))}
           />
 
           <CommentsSection key={`comments-${issue.id}`}

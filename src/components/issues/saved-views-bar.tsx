@@ -11,11 +11,12 @@ type Props = {
   projectId: string;
   currentFilters: Record<string, string>;
   savedViews: SavedViewRow[];
+  currentUserId: string;
   onApply: (filters: Record<string, string>) => void;
   onViewsChange: (views: SavedViewRow[]) => void;
 };
 
-export function SavedViewsBar({ projectId, currentFilters, savedViews, onApply, onViewsChange }: Props) {
+export function SavedViewsBar({ projectId, currentFilters, savedViews, currentUserId, onApply, onViewsChange }: Props) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -42,7 +43,7 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, onApply, 
         name: name.trim(),
         filters: { ...currentFilters },
         is_shared: false,
-        created_by: "",
+        created_by: currentUserId,
       };
       onViewsChange([...savedViews, newView]);
       setName("");
@@ -71,10 +72,15 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, onApply, 
   async function handleShare(id: string) {
     const view = savedViews.find((v) => v.id === id);
     if (!view) return;
+    if (!view.is_shared && view.created_by === currentUserId) {
+      const { error } = await (createClient() as any).rpc("update_saved_view_sharing", { p_view_id: id, p_is_shared: true });
+      if (error) { toast.error("Could not share view with the project."); return; }
+      onViewsChange(savedViews.map((item) => item.id === id ? { ...item, is_shared: true } : item));
+    }
     const query = new URLSearchParams(view.filters).toString();
     const url = `${window.location.origin}${window.location.pathname}?${query}`;
     await navigator.clipboard.writeText(url);
-    toast.success("Link copied to clipboard.");
+    toast.success(view.is_shared ? "Shared-view link copied." : "View shared with the project and link copied.");
   }
 
   return (
@@ -100,18 +106,19 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, onApply, 
                 type="button"
                 onClick={() => void handleShare(view.id)}
                 className="p-0.5 text-muted-foreground hover:text-primary"
-                title="Copy shareable link"
+                title={view.is_shared ? "Copy shared-view link" : "Share with project and copy link"}
               >
                 <Share2 className="h-3 w-3" />
               </button>
-              <button
+              {view.created_by === currentUserId && <button
                 type="button"
                 onClick={() => void handleDelete(view.id)}
                 className="p-0.5 text-muted-foreground hover:text-destructive"
                 title="Delete view"
               >
                 <Trash2 className="h-3 w-3" />
-              </button>
+              </button>}
+              {view.is_shared && <span className="font-mono text-[9px] text-primary">shared</span>}
             </div>
           ))}
         </div>

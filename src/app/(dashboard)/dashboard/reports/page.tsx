@@ -39,22 +39,21 @@ export default async function ReportsPage() {
   const projectName = context.activeProject.name;
   const projectKey = context.activeProject.key;
 
-  const [{ data: issueRows }, { data: componentRows }] = await Promise.all([
-    supabase
-      .from("issues")
-      .select("id, issue_number, title, type, priority, severity, created_at, resolved_at, closed_at, status:workflow_states (name, category), component:components (name)")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
-      .limit(1000),
-    supabase
+  const { data: componentRows } = await supabase
       .from("components")
       .select("id, name")
       .eq("project_id", projectId)
       .eq("is_archived", false)
-      .order("name"),
-  ]);
+      .order("name");
+  const issueRows: any[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, created_at, resolved_at, closed_at, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
+    if (error) break;
+    issueRows.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
 
-  const issues: ReportIssueItem[] = (issueRows ?? []).map((row: any) => ({
+  const issues: ReportIssueItem[] = issueRows.map((row: any) => ({
     id: row.id,
     issueNumber: row.issue_number,
     title: row.title,

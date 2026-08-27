@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
-  const auth = await authenticateApiRequest(request, "read");
+  const auth = await authenticateApiRequest(request, "projects:read");
   if ("response" in auth) return auth.response;
 
   const organizationId = request.nextUrl.searchParams.get("organization_id");

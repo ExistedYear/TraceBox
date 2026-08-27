@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, Pencil, X } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -9,10 +8,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
+import { MarkdownContent } from "@/components/tracebox/markdown-content";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeComments } from "@/hooks/use-realtime";
-import { buildTimeline, eventSummary, personLabel, tokenizeCommentBody, type TimelineComment, type TimelineEventRow } from "@/lib/issues";
+import { buildTimeline, eventSummary, personLabel, type TimelineComment, type TimelineEventRow } from "@/lib/issues";
 import { commentSchema, type CommentValues } from "@/lib/validation/comment";
 type Props = {
   issueId: string;
@@ -34,16 +34,7 @@ function formatDate(iso: string) {
 }
 
 function CommentBody({ body }: { body: string }) {
-  const tokens = tokenizeCommentBody(body);
-  return (
-    <p className="whitespace-pre-wrap break-words text-sm leading-6">
-      {tokens.map((token, index) => {
-        if (token.kind === "mention") return <span key={index} className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">{token.text}</span>;
-        if (token.kind === "issue-ref") return <Link key={index} href={`/dashboard/issues/${token.text}`} className="font-mono text-xs font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">{token.text}</Link>;
-        return <span key={index}>{token.text}</span>;
-      })}
-    </p>
-  );
+  return <MarkdownContent body={body} />;
 }
 
 function Composer({ issueId, currentUserId, onAdded }: { issueId: string; currentUserId: string; onAdded: (comment: TimelineComment) => void }) {
@@ -103,7 +94,7 @@ function Composer({ issueId, currentUserId, onAdded }: { issueId: string; curren
       />
       {form.formState.errors.body && <p className="text-xs text-destructive">{form.formState.errors.body.message}</p>}
       <div className="flex items-center justify-between">
-        <p className="text-[11px] text-muted-foreground">Supports code blocks, mentions, and issue references.</p>
+        <p className="text-[11px] text-muted-foreground">Markdown, @mentions, and issue references are supported.</p>
         <Button type="submit" size="sm" className="h-8 gap-1.5" disabled={submitting}>
           {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Comment
         </Button>
@@ -231,6 +222,7 @@ export function CommentsSection({ issueId, projectKey: _projectKey, currentUserI
       const deleted = payload as TimelineComment;
       setComments((prev) => prev.filter((c) => c.id !== deleted.id));
     },
+    onError: () => toast.error("Live comment updates are unavailable. Refresh to see new activity."),
   });
 
   function handleAdded(comment: TimelineComment) {

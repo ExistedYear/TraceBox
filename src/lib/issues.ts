@@ -1,6 +1,24 @@
 export const ISSUE_TYPES = ["BUG", "ENHANCEMENT", "TASK", "SECURITY", "PERFORMANCE", "REGRESSION"] as const;
 export const PRIORITIES = ["P0", "P1", "P2", "P3", "P4"] as const;
 export const SEVERITIES = ["BLOCKER", "CRITICAL", "MAJOR", "MINOR", "TRIVIAL"] as const;
+const ISSUE_TYPE_LABELS: Record<string, string> = { BUG: "Bug", ENHANCEMENT: "Enhancement", TASK: "Task", SECURITY: "Security", PERFORMANCE: "Performance", REGRESSION: "Regression" };
+const PRIORITY_LABELS: Record<string, string> = { P0: "P0 · Urgent", P1: "P1 · High", P2: "P2 · Normal", P3: "P3 · Low", P4: "P4 · Lowest" };
+
+export function humanizeEnum(value: string): string {
+  return value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function issueTypeLabel(value: string): string {
+  return ISSUE_TYPE_LABELS[value] ?? humanizeEnum(value);
+}
+
+export function priorityLabel(value: string): string {
+  return PRIORITY_LABELS[value] ?? value;
+}
+
+export function severityLabel(value: string): string {
+  return humanizeEnum(value);
+}
 export const RESOLUTIONS = ["FIXED", "DUPLICATE", "WONT_FIX", "INVALID", "CANNOT_REPRODUCE", "WORKS_AS_EXPECTED"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
 

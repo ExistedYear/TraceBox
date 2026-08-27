@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/api-auth";
+import { extractClosingIssueKeys, extractIssueKeys, normalizeGithubRepository } from "@/lib/github";
 
 function isValidSignature(body: string, signature: string | null, secret: string) {
   if (!signature?.startsWith("sha256=")) return false;
@@ -9,10 +10,6 @@ function isValidSignature(body: string, signature: string | null, secret: string
   const provided = Buffer.from(signature.slice(7), "utf8");
   const expectedBuffer = Buffer.from(expected, "utf8");
   return provided.length === expectedBuffer.length && timingSafeEqual(provided, expectedBuffer);
-}
-
-function issueKeys(text: string) {
-  return [...new Set(text.match(/[A-Z][A-Z0-9]{1,9}-\d+/g) ?? [])];
 }
 
 export async function POST(request: NextRequest) {
@@ -30,22 +27,24 @@ export async function POST(request: NextRequest) {
 
   const event = request.headers.get("x-github-event");
   if (event !== "pull_request" && event !== "push") return NextResponse.json({ accepted: true, linked: 0 });
-  const repository = typeof payload.repository?.full_name === "string" ? payload.repository.full_name : null;
+  const repository = typeof payload.repository?.full_name === "string" ? normalizeGithubRepository(payload.repository.full_name) : null;
   if (!repository) return NextResponse.json({ accepted: true, linked: 0 });
 
   const commits = Array.isArray(payload.commits) ? payload.commits : [];
   const source = event === "pull_request"
     ? `${payload.pull_request?.title ?? ""} ${payload.pull_request?.body ?? ""}`
     : `${payload.head_commit?.message ?? ""} ${commits.map((commit: any) => typeof commit?.message === "string" ? commit.message : "").join(" ")}`;
-  const keys = issueKeys(source);
+  const keys = extractIssueKeys(source);
+  const closingKeys = new Set(extractClosingIssueKeys(source));
   const url = event === "pull_request" ? payload.pull_request?.html_url : payload.head_commit?.url;
   if (!keys.length || typeof url !== "string" || !/^https:\/\/github\.com\//i.test(url)) return NextResponse.json({ accepted: true, linked: 0 });
 
   const client = createAdminClient();
-  const { data: integrations, error: integrationError } = await client.from("project_integrations").select("project_id").eq("provider", "GITHUB").eq("repo_full_name", repository).eq("is_enabled", true);
+  const { data: integrations, error: integrationError } = await client.from("project_integrations").select("project_id, auto_resolve_enabled").eq("provider", "GITHUB").ilike("repo_full_name", repository).eq("is_enabled", true);
   if (integrationError) return NextResponse.json({ error: "Could not load GitHub integration." }, { status: 500 });
 
   let linked = 0;
+  let resolved = 0;
   for (const integration of integrations ?? []) {
     const { data: project } = await client.from("projects").select("id, key").eq("id", integration.project_id).maybeSingle();
     if (!project) continue;
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
       const { data: issue } = await client.from("issues").select("id").eq("project_id", project.id).eq("issue_number", issueNumber).maybeSingle();
       if (!issue) continue;
       try {
-        const { data: linkId } = await client.rpc("record_github_webhook", {
+        const { data: linkId, error: linkError } = await client.rpc("record_github_webhook", {
           p_project_id: project.id,
           p_issue_id: issue.id,
           p_repo_name: repository,
@@ -67,11 +66,20 @@ export async function POST(request: NextRequest) {
           p_status: event === "pull_request" ? (payload.pull_request?.merged ? "MERGED" : String(payload.pull_request?.state ?? "OPEN").toUpperCase()) : "OPEN",
           p_number: event === "pull_request" && Number.isSafeInteger(payload.pull_request?.number) ? payload.pull_request.number : null,
         });
+        if (linkError) continue;
         if (linkId) linked++;
+        if (event === "pull_request" && payload.pull_request?.merged === true && integration.auto_resolve_enabled && closingKeys.has(key)) {
+          const { data: didResolve, error: resolveError } = await (client as any).rpc("resolve_issue_from_github", {
+            p_project_id: project.id,
+            p_issue_id: issue.id,
+            p_repo_name: repository,
+          });
+          if (!resolveError && didResolve) resolved++;
+        }
       } catch {
         // Ignore one malformed reference while acknowledging the signed webhook.
       }
     }
   }
-  return NextResponse.json({ accepted: true, linked });
+  return NextResponse.json({ accepted: true, linked, resolved });
 }

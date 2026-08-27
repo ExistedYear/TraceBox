@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
-import { categoryClasses, formatIssueKey, parseIssueKey, personLabel } from "@/lib/issues";
+import { categoryClasses, formatIssueKey, issueTypeLabel, parseIssueKey, personLabel, priorityLabel, severityLabel } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 
 export type TriageIssue = {
@@ -226,9 +226,9 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
             <Surface className="p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Inline classification</p>
               <div className="grid gap-2 sm:grid-cols-4">
-                <select aria-label="Issue type" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.type} onChange={(event) => void classify("type", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_TYPES.map((value) => <option key={value}>{value}</option>)}</select>
-                <select aria-label="Issue priority" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.priority} onChange={(event) => void classify("priority", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_PRIORITIES.map((value) => <option key={value}>{value}</option>)}</select>
-                <select aria-label="Issue severity" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.severity} onChange={(event) => void classify("severity", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_SEVERITIES.map((value) => <option key={value}>{value}</option>)}</select>
+                <select aria-label="Issue type" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.type} onChange={(event) => void classify("type", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_TYPES.map((value) => <option key={value} value={value}>{issueTypeLabel(value)}</option>)}</select>
+                <select aria-label="Issue priority" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.priority} onChange={(event) => void classify("priority", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_PRIORITIES.map((value) => <option key={value} value={value}>{priorityLabel(value)}</option>)}</select>
+                <select aria-label="Issue severity" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.severity} onChange={(event) => void classify("severity", event.target.value)} disabled={!canManage || loadingAction !== null}>{TRIAGE_SEVERITIES.map((value) => <option key={value} value={value}>{severityLabel(value)}</option>)}</select>
                 <select aria-label="Issue component" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.componentId ?? ""} onChange={(event) => void classify("component_id", event.target.value)} disabled={!canManage || loadingAction !== null}><option value="">No component</option>{components.map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}</select>
               </div>
             </Surface>

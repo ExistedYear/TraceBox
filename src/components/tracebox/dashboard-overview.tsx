@@ -86,7 +86,7 @@ export function DashboardOverview({
           <p className="mt-1 text-sm text-muted-foreground">
             {activeProject
               ? `Active issue queue and metrics for ${activeProject.name} (${activeProject.key}).`
-              : `Overview of all projects in ${workspaceName}.`}
+              : `Select a project below to load its issue metrics and recent activity.`}
           </p>
         </div>
 
@@ -125,6 +125,7 @@ export function DashboardOverview({
         </Surface>
       ) : (
         <div className="space-y-8">
+          {!activeProject ? <Surface className="p-8 text-center"><FolderKanban className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 text-sm font-semibold">Choose an active project</h2><p className="mt-1 text-xs text-muted-foreground">Metrics are project-specific. Select a project from the list below to open its issue queue.</p></Surface> : <>
           {/* Metrics Grid */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-border bg-card p-4">
@@ -224,6 +225,7 @@ export function DashboardOverview({
               </ul>
             )}
           </Surface>
+          </>}
 
           {/* Projects Summary Section */}
           <div>

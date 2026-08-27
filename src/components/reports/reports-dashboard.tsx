@@ -75,7 +75,8 @@ export function ReportsDashboard({ projectName, projectKey, issues, components }
       : issues.filter((i) => Boolean(i.resolvedAt || i.closedAt || i.statusCategory === "RESOLVED" || i.statusCategory === "CLOSED"));
     const resolved = resolvedIssues.length;
 
-    const openIssues = filteredIssues.filter((i) => !i.resolvedAt && !i.closedAt && i.statusCategory !== "RESOLVED" && i.statusCategory !== "CLOSED");
+    // Active backlog is a current-state metric, so it must include older open issues.
+    const openIssues = issues.filter((i) => !i.resolvedAt && !i.closedAt && i.statusCategory !== "RESOLVED" && i.statusCategory !== "CLOSED");
     const open = openIssues.length;
     const total = filteredIssues.length;
 

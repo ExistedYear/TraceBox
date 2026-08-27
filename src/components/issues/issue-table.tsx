@@ -31,10 +31,13 @@ import {
   categoryClasses,
   encodeIssueFilters,
   formatIssueKey,
+  issueTypeLabel,
   ISSUE_TYPES,
   personLabel,
+  priorityLabel,
   PRIORITIES,
   SEVERITIES,
+  severityLabel,
   type IssueFilters,
 } from "@/lib/issues";
 import { cn } from "@/lib/utils";
@@ -286,13 +289,13 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         header: "Priority",
         cell: (info) =>
           canEdit ? (
-            <select aria-label="Priority" className={cn(selectClass, "w-16 font-mono")} value={info.getValue()} onChange={(event) => void updateField(info.row.original, "priority", event.target.value)} disabled={editingId === info.row.original.id}>
+            <select aria-label="Priority" className={cn(selectClass, "w-28")} value={info.getValue()} onChange={(event) => void updateField(info.row.original, "priority", event.target.value)} disabled={editingId === info.row.original.id}>
               {PRIORITIES.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{priorityLabel(value)}</option>
               ))}
             </select>
           ) : (
-            <span className="font-mono text-xs">{info.getValue()}</span>
+            <span className="text-xs">{priorityLabel(info.getValue())}</span>
           ),
       }),
       columnHelper.accessor("severity", {
@@ -302,11 +305,11 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           canEdit ? (
             <select aria-label="Severity" className={selectClass} value={info.getValue()} onChange={(event) => void updateField(info.row.original, "severity", event.target.value)} disabled={editingId === info.row.original.id}>
               {SEVERITIES.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{severityLabel(value)}</option>
               ))}
             </select>
           ) : (
-            <span className="text-xs">{info.getValue()}</span>
+            <span className="text-xs">{severityLabel(info.getValue())}</span>
           ),
       }),
       columnHelper.accessor("type", {
@@ -317,11 +320,11 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           canEdit ? (
             <select aria-label="Type" className={selectClass} value={info.getValue()} onChange={(event) => void updateField(info.row.original, "type", event.target.value)} disabled={editingId === info.row.original.id}>
               {ISSUE_TYPES.map((value) => (
-                <option key={value} value={value}>{value}</option>
+                <option key={value} value={value}>{issueTypeLabel(value)}</option>
               ))}
             </select>
           ) : (
-            <span className="text-xs">{info.getValue()}</span>
+            <span className="text-xs">{issueTypeLabel(info.getValue())}</span>
           ),
       }),
       columnHelper.accessor("componentName", {
@@ -392,6 +395,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         projectId={projectId}
         currentFilters={encodeIssueFilters(filters)}
         savedViews={savedViews}
+        currentUserId={currentUserId}
         onApply={(filters) => {
           const next: Record<string, string> = {};
           for (const [k, v] of Object.entries(filters)) next[k] = v as string;
@@ -416,19 +420,19 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         <select aria-label="Priority filter" className={selectClass} value={filters.priority ?? ""} onChange={(event) => setFilter("priority", event.target.value)}>
           <option value="">Any priority</option>
           {PRIORITIES.map((value) => (
-            <option key={value} value={value}>{value}</option>
+            <option key={value} value={value}>{priorityLabel(value)}</option>
           ))}
         </select>
         <select aria-label="Severity filter" className={selectClass} value={filters.severity ?? ""} onChange={(event) => setFilter("severity", event.target.value)}>
           <option value="">Any severity</option>
           {SEVERITIES.map((value) => (
-            <option key={value} value={value}>{value}</option>
+            <option key={value} value={value}>{severityLabel(value)}</option>
           ))}
         </select>
         <select aria-label="Type filter" className={selectClass} value={filters.type ?? ""} onChange={(event) => setFilter("type", event.target.value)}>
           <option value="">Any type</option>
           {ISSUE_TYPES.map((value) => (
-            <option key={value} value={value}>{value}</option>
+            <option key={value} value={value}>{issueTypeLabel(value)}</option>
           ))}
         </select>
         <select aria-label="Component filter" className={selectClass} value={filters.componentId ?? ""} onChange={(event) => setFilter("componentId", event.target.value)}>
@@ -463,7 +467,12 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       </div>
 
       <Surface>
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-border/70 sm:hidden">
+          {rows.map((issue) => <Link key={issue.id} href={`/dashboard/issues/${formatIssueKey(projectKey, issue.issue_number)}`} className="block space-y-2 p-3 hover:bg-accent/40"><div className="flex items-start justify-between gap-2"><span className="font-mono text-xs font-semibold text-primary">{formatIssueKey(projectKey, issue.issue_number)}</span><span className={cn("rounded-full border px-2 py-0.5 text-[9px] uppercase", categoryClasses(issue.statusCategory))}>{issue.statusName}</span></div><p className="line-clamp-2 text-sm font-medium">{issue.title}</p><div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground"><span>{issueTypeLabel(issue.type)}</span><span>{priorityLabel(issue.priority)}</span><span>{severityLabel(issue.severity)}</span><span>{issue.assigneeLabel}</span></div></Link>)}
+          {!loading && rows.length === 0 && <p className="p-8 text-center text-xs text-muted-foreground">No issues match these filters.</p>}
+          {loading && rows.length === 0 && <Loader2 className="mx-auto my-8 h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (

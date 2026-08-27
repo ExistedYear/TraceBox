@@ -92,71 +92,35 @@ export function IssueAttachmentsSection({
       const item = payload as AttachmentItem;
       setAttachments((prev) => prev.filter((a) => a.id !== item.id));
     },
+    onError: () => toast.error("Live attachment updates are unavailable. Refresh to see changes."),
     enabled: Boolean(issueId),
   });
 
   const handleUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-
-    // Max 50MB
-    if (file.size > 52428800) {
-      toast.error("File exceeds maximum allowed size (50MB).");
-      return;
-    }
-
+    if (!files?.length) return;
+    const selected = Array.from(files);
+    const oversized = selected.filter((file) => file.size > 52428800);
+    if (oversized.length) { toast.error(`${oversized.map((file) => file.name).join(", ")} exceeded the 50MB limit.`); return; }
     setUploading(true);
+    let uploaded = 0;
     try {
       const supabase = createClient();
-      const fileExt = file.name.split(".").pop();
-      const storagePath = `${issueId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
-
-      // Upload to Supabase Storage bucket 'issue-attachments'
-      const { error: uploadError } = await supabase.storage
-        .from("issue-attachments")
-        .upload(storagePath, file, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) {
-        toast.error("Could not upload file to storage.");
-        return;
+      for (const file of selected) {
+        const extension = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
+        const storagePath = `${issueId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}${extension}`;
+        const { error: uploadError } = await supabase.storage.from("issue-attachments").upload(storagePath, file, { cacheControl: "3600", upsert: false });
+        if (uploadError) { toast.error(`Could not upload ${file.name}.`); continue; }
+        const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", { p_issue_id: issueId, p_filename: file.name, p_storage_path: storagePath, p_mime_type: file.type || "application/octet-stream", p_size_bytes: file.size });
+        if (rpcError) { await supabase.storage.from("issue-attachments").remove([storagePath]); toast.error(`Could not register ${file.name}.`); continue; }
+        setAttachments((previous) => [...previous, { id: String(attachmentId), issue_id: issueId, uploader_id: currentUserId, filename: file.name, storage_path: storagePath, mime_type: file.type || null, size_bytes: file.size, created_at: new Date().toISOString() }]);
+        uploaded++;
       }
-
-      const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", {
-        p_issue_id: issueId,
-        p_filename: file.name,
-        p_storage_path: storagePath,
-        p_mime_type: file.type || "application/octet-stream",
-        p_size_bytes: file.size,
-      });
-
-      if (rpcError) {
-        await supabase.storage.from("issue-attachments").remove([storagePath]);
-        toast.error("Could not register attachment.");
-        return;
-      }
-
-      const newAtt: AttachmentItem = {
-        id: String(attachmentId),
-        issue_id: issueId,
-        uploader_id: currentUserId,
-        filename: file.name,
-        storage_path: storagePath,
-        mime_type: file.type || null,
-        size_bytes: file.size,
-        created_at: new Date().toISOString(),
-      };
-
-      setAttachments((prev) => [...prev, newAtt]);
-      toast.success("Attachment uploaded.");
-    } catch {
-      toast.error("Could not upload attachment. Please try again.");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+      if (uploaded) toast.success(`${uploaded} attachment${uploaded === 1 ? "" : "s"} uploaded.`);
+    } catch { toast.error("Could not upload attachments. Please try again."); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
   const handleDownload = async (attachment: AttachmentItem) => {
+    const downloadWindow = window.open("", "_blank");
     try {
       const supabase = createClient();
       const { data, error } = await supabase.storage
@@ -164,12 +128,14 @@ export function IssueAttachmentsSection({
         .createSignedUrl(attachment.storage_path, 300);
 
       if (error || !data?.signedUrl) {
-        toast.info(`Attachment ${attachment.filename} (${formatBytes(attachment.size_bytes)})`);
+        downloadWindow?.close();
+        toast.error("Could not generate download link.");
         return;
       }
-
-      window.open(data.signedUrl, "_blank");
+      if (downloadWindow) downloadWindow.location.href = data.signedUrl;
+      else window.location.href = data.signedUrl;
     } catch {
+      downloadWindow?.close();
       toast.error("Could not generate download link.");
     }
   };
@@ -230,6 +196,7 @@ export function IssueAttachmentsSection({
           <div>
             <input
               type="file"
+              multiple
               ref={fileInputRef}
               className="hidden"
               onChange={(e) => void handleUpload(e.target.files)}
@@ -242,7 +209,7 @@ export function IssueAttachmentsSection({
               disabled={uploading}
             >
               {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <UploadCloud className="h-3 w-3" />}
-              Upload file
+              Upload files
             </Button>
           </div>
         )}

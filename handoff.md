@@ -25,7 +25,7 @@ TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20
 19. GitHub repository configuration, PR/commit links, and signed webhooks
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260038`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
+Database state is represented by migrations `202608260001` through `202608260039`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
 
 ## Important runtime configuration
 
@@ -43,25 +43,28 @@ GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npx tsc --noEmit — passed
-Tests:       106/106 passed across 14 test files
+Tests:       110/110 passed across 15 test files
 Lint:        0 errors; 2 expected React Compiler compatibility warnings (TanStack/RHF)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 38 files contiguous and `supabase/full_schema.sql` synchronized
+Migration check: 39 files contiguous and `supabase/full_schema.sql` synchronized
 ```
 
-Static source audits found and fixed migration syntax, restricted issue leaks, API token authorization, webhook key association, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, theme provider mismatch, and responsive table layout issues. No live Supabase database or Vercel deployment is claimed until the external setup in `deployment.md` is completed.
+Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, and responsive table layout issues.
+
+The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. A pre-deployment probe against `https://trace-box.vercel.app` found that the existing production deployment predates this release: `/forgot-password`, `/api/v1/milestones`, and `/api/v1/search` returned `404`, while the existing API auth boundary returned `401` as expected.
 
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`038` in order from `supabase/full_schema.sql` or the individual files.
+2. Apply all migrations `001`–`039` in order from `supabase/full_schema.sql` or the individual files.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
 6. Configure Vercel public variables plus the server-only service-role and webhook variables.
 7. Configure the GitHub webhook at `/api/webhooks/github` with `GITHUB_WEBHOOK_SECRET`.
-8. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub link → reports/readiness → logout.
-9. Regenerate database types from the live schema if the deployed schema differs.
+8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
+9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub link → reports/readiness → logout.
+10. Regenerate database types from the live schema if the deployed schema differs.
 
 Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.
 

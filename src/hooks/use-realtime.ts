@@ -10,14 +10,16 @@ type RealtimeConfig = {
   onInsert?: (payload: unknown) => void;
   onUpdate?: (payload: unknown) => void;
   onDelete?: (payload: unknown) => void;
+  onError?: () => void;
   enabled?: boolean;
 };
 
 export function useRealtimeSubscription(config: RealtimeConfig) {
-  const { table, filter, onInsert, onUpdate, onDelete, enabled = true } = config;
+  const { table, filter, onInsert, onUpdate, onDelete, onError, enabled = true } = config;
   const onInsertRef = useRef(onInsert);
   const onUpdateRef = useRef(onUpdate);
   const onDeleteRef = useRef(onDelete);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
     onInsertRef.current = onInsert;
@@ -28,6 +30,9 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
   useEffect(() => {
     onDeleteRef.current = onDelete;
   }, [onDelete]);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useEffect(() => {
     if (!enabled || !table) return;
@@ -73,7 +78,9 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
           onDeleteRef.current?.(payload.old);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onErrorRef.current?.();
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -88,12 +95,14 @@ export function useRealtimeComments(
         onInsert?: (comment: unknown) => void;
         onUpdate?: (comment: unknown) => void;
         onDelete?: (comment: unknown) => void;
+        onError?: () => void;
       }
     | ((comment: unknown) => void),
 ) {
   const onInsert = typeof callbacks === "function" ? callbacks : callbacks.onInsert;
   const onUpdate = typeof callbacks === "function" ? undefined : callbacks.onUpdate;
   const onDelete = typeof callbacks === "function" ? undefined : callbacks.onDelete;
+  const onError = typeof callbacks === "function" ? undefined : callbacks.onError;
 
   useRealtimeSubscription({
     table: "comments",
@@ -101,6 +110,7 @@ export function useRealtimeComments(
     onInsert,
     onUpdate,
     onDelete,
+    onError,
     enabled: Boolean(issueId),
   });
 }
@@ -115,11 +125,12 @@ export function useRealtimeIssueUpdates(projectId: string, onUpdate: (issue: unk
   });
 }
 
-export function useRealtimeNotifications(userId: string, onNotification: (notification: unknown) => void) {
+export function useRealtimeNotifications(userId: string, onNotification: (notification: unknown) => void, onError?: () => void) {
   useRealtimeSubscription({
     table: "notifications",
     filter: `user_id=eq.${userId}`,
     onInsert: onNotification,
+    onError,
     enabled: Boolean(userId),
   });
 }

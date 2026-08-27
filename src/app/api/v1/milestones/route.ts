@@ -1,0 +1,17 @@
+import { NextRequest, NextResponse } from "next/server";
+
+import { authenticateApiRequest } from "@/lib/api-auth";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function GET(request: NextRequest) {
+  const auth = await authenticateApiRequest(request, "milestones:read");
+  if ("response" in auth) return auth.response;
+  const projectId = request.nextUrl.searchParams.get("project_id");
+  if (!projectId || !UUID_RE.test(projectId)) return NextResponse.json({ error: "Valid project_id is required." }, { status: 400 });
+  const { data: project } = await auth.client.from("projects").select("id").eq("id", projectId).eq("organization_id", auth.context.organizationId).eq("is_archived", false).maybeSingle();
+  if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  const { data, error } = await auth.client.from("milestones").select("id, project_id, name, description, status, due_at, created_at, updated_at").eq("project_id", project.id).order("due_at");
+  if (error) return NextResponse.json({ error: "Could not load milestones." }, { status: 500 });
+  return NextResponse.json({ data: data ?? [] });
+}

@@ -26,7 +26,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const searchParams = useSearchParams();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGithubLoading, setIsGithubLoading] = useState(false);
-  const form = useForm<LoginValues | SignupValues>({ resolver: zodResolver(isSignup ? signupSchema : loginSchema), defaultValues: isSignup ? { displayName: "", email: "", password: "" } : { email: "", password: "" } });
+  const form = useForm<LoginValues | SignupValues>({ resolver: zodResolver(isSignup ? signupSchema : loginSchema), defaultValues: isSignup ? { displayName: "", email: "", password: "", confirmPassword: "" } : { email: "", password: "" } });
   const displayNameError = (form.formState.errors as { displayName?: { message?: string } }).displayName;
 
   useEffect(() => {
@@ -87,11 +87,12 @@ export function AuthForm({ mode }: AuthFormProps) {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {isSignup && <div className="space-y-2"><Label htmlFor="displayName">Display name</Label><Input id="displayName" autoComplete="name" placeholder="your full name" {...form.register("displayName" as const)} />{displayNameError && <p className="text-xs text-destructive">{displayNameError.message}</p>}</div>}
           <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" autoComplete="email" placeholder="name@company.com" {...form.register("email")} />{form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}</div>
-          <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Password</Label>{!isSignup && <span className="text-xs text-muted-foreground">Minimum 8 characters</span>}</div><Input id="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder="enter password" {...form.register("password")} />{form.formState.errors.password && <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>}</div>
+          <div className="space-y-2"><div className="flex items-center justify-between"><Label htmlFor="password">Password</Label>{!isSignup && <Link href="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>}</div><Input id="password" type="password" autoComplete={isSignup ? "new-password" : "current-password"} placeholder="enter password" {...form.register("password")} />{form.formState.errors.password && <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>}</div>
+          {isSignup && <div className="space-y-2"><Label htmlFor="confirmPassword">Confirm password</Label><Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="enter password again" {...form.register("confirmPassword" as const)} />{(form.formState.errors as { confirmPassword?: { message?: string } }).confirmPassword && <p className="text-xs text-destructive">{(form.formState.errors as { confirmPassword?: { message?: string } }).confirmPassword?.message}</p>}</div>}
           <Button type="submit" className="w-full" disabled={isSubmitting || isGithubLoading}>{isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}{isSignup ? "Create account" : "Log in"}</Button>
         </form>
         <div className="relative my-6"><Separator /><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">or</span></div>
-        <Button type="button" variant="outline" className="w-full" onClick={continueWithGithub} disabled={isSubmitting || isGithubLoading}><Github className="h-4 w-4" />{isGithubLoading && <Loader2 className="h-4 w-4 animate-spin" />}Continue with GitHub</Button>
+        <Button type="button" variant="outline" className="w-full" onClick={continueWithGithub} disabled={isSubmitting || isGithubLoading}><Github className="h-4 w-4" />{isGithubLoading && <Loader2 className="h-4 w-4 animate-spin" />}Continue with GitHub</Button><p className="mt-2 text-center text-[11px] text-muted-foreground">GitHub sign-in requires the workspace deployment to enable the provider.</p>
         <p className="mt-6 text-center text-sm text-muted-foreground">{isSignup ? "Already have an account?" : "Need an account?"}{" "}<Link href={isSignup ? "/login" : "/signup"} className="font-medium text-primary hover:underline">{isSignup ? "Log in" : "Sign up"}</Link></p>
       </CardContent>
     </Card>

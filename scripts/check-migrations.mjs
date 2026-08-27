@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
@@ -12,5 +12,10 @@ if (actual.some((value, index) => value !== expected[index])) {
 }
 const consolidated = await readFile(new URL("supabase/full_schema.sql", root), "utf8");
 const source = (await Promise.all(files.map((file) => readFile(join(fileURLToPath(new URL("supabase/migrations/", root)), file), "utf8")))).join("");
+if (process.argv.includes("--write")) {
+  await writeFile(new URL("supabase/full_schema.sql", root), source);
+  console.log(`Consolidated ${files.length} migrations into supabase/full_schema.sql`);
+  process.exit(0);
+}
 if (consolidated !== source) throw new Error("supabase/full_schema.sql is stale; regenerate it from supabase/migrations/*.sql");
 console.log(`Migration chain valid: ${files.length} files`);
