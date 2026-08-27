@@ -217,7 +217,7 @@ The GitHub App connection starts at `/api/github/connect?project_id=<uuid>` and 
 
 The GitHub webhook accepts signed `pull_request`, `push`, installation lifecycle, repository, and repository-selection events at `/api/webhooks/github`. GitHub must send `X-Hub-Signature-256` and `X-GitHub-Delivery`; the signature is generated from the raw request body using `GITHUB_WEBHOOK_SECRET`. Delivery IDs are persisted for idempotency and processing is acknowledged before downstream work. A failed delivery may be safely retried by GitHub because failed rows are re-opened while processed rows remain idempotently ignored. Issue keys are read case-insensitively; merged pull requests can resolve linked issues only when the project binding enables it, the PR targets a configured branch, and the PR body/title uses a closing phrase such as `Fixes CORE-123`.
 
-`/api/github/reconcile` is protected by `CRON_SECRET` and refreshes App-visible repositories and previously linked pull-request artifacts every six hours. It also marks revoked installations and removed repositories unavailable without deleting historical issue links. The public GitHub-link API performs the same repository, pull-request, commit, or branch verification as the dashboard before creating a link.
+`/api/github/reconcile` is protected by `CRON_SECRET` and refreshes App-visible repositories and previously linked pull-request artifacts once daily at 03:00 UTC. It also marks revoked installations and removed repositories unavailable without deleting historical issue links. The public GitHub-link API performs the same repository, pull-request, commit, or branch verification as the dashboard before creating a link.
 
 ### 3.4 Deploy
 
