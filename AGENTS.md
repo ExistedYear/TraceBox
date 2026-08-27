@@ -205,7 +205,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - ESLint 9 flat config re-exporting `eslint-config-next/core-web-vitals` — no custom rules; keep it that way unless required.
 - Tailwind v3 (not v4): content globs cover `src/{app,components}`.
 - **TanStack Table is pinned to v8** (`^8.21.3`); v9 renamed the API (`ReactTable`, `createCoreRowModel`) and will not typecheck against `useReactTable`. Column defs must be *inferred* from `createColumnHelper` — explicit `ColumnDef<T>[]` annotations break variance.
-- Deploy: Vercel (`vercel.json` pins framework + `npm run build`); GitHub Actions runs the same four gates on PRs and pushes to `main` — keep them green before yielding.
+- Deploy: Vercel (`vercel.json` pins framework + `npm run build`); GitHub Actions runs the same four gates on PRs and pushes to `main` — keep them green before yielding. If a pushed commit has no Vercel deployment, verify the connected repository, Vercel GitHub App access, production branch, ignored build step, and verified-commit setting before debugging application code.
 - Root ESLint intentionally ignores the local-only `qa/live/**` directory; that suite has its own Playwright command and dependency lockfile.
 
 ## Testing & QA

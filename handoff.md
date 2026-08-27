@@ -76,6 +76,10 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 
 Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.
 
+### Vercel Git deployment troubleshooting
+
+The production URL may continue serving an older successful deployment even when GitHub shows a newer commit. Confirm the new commit appears on the connected GitHub repository, then check Vercel project Git settings for the exact repository `ExistedYear/TraceBox`, production branch `main`, Vercel GitHub App access to the repository, an empty ignored-build-step setting, and disabled verified-commit enforcement unless commits are signed. A GitHub Actions `Quality` success is independent of Vercel's deployment check. If no Vercel deployment row is created for a pushed commit, resolve the Git connection before investigating build logs.
+
 ## Migration discipline
 
 Never rewrite an applied migration. Add a new timestamped migration for every schema correction. Keep RLS enabled. Keep service-role access server-only. `supabase/full_schema.sql` must be regenerated whenever migration files change.
