@@ -28,7 +28,13 @@ export default async function DashboardPage() {
     const projectId = context.activeProject.id;
     const projectKey = context.activeProject.key;
 
-    const [{ data: issueRows }, { count: totalCount }, { count: criticalCount }, { count: openCount }, { count: inProgressCount }] = await Promise.all([
+    const [
+      { data: issueRows },
+      { count: totalCount },
+      { count: criticalCount },
+      { data: openStates },
+      { data: inProgressStates },
+    ] = await Promise.all([
       supabase
         .from("issues")
         .select("id, issue_number, title, type, priority, severity, status_id, assignee_id, updated_at, status:workflow_states (name, category)")
@@ -45,22 +51,34 @@ export default async function DashboardPage() {
         .eq("project_id", projectId)
         .in("severity", ["BLOCKER", "CRITICAL"]),
       supabase
-        .from("issues")
-        .select("id", { count: "exact", head: true })
+        .from("workflow_states")
+        .select("id")
         .eq("project_id", projectId)
-        .in("priority", ["P0", "P1"]),
+        .in("category", ["TRIAGE", "OPEN"]),
       supabase
-        .from("issues")
-        .select("id", { count: "exact", head: true })
+        .from("workflow_states")
+        .select("id")
         .eq("project_id", projectId)
-        .in("priority", ["P2", "P3"]),
+        .in("category", ["IN_PROGRESS", "REVIEW"]),
+    ]);
+
+    const openStateIds = (openStates ?? []).map((s) => s.id);
+    const inProgressStateIds = (inProgressStates ?? []).map((s) => s.id);
+
+    const [{ count: openCount }, { count: inProgressCount }] = await Promise.all([
+      openStateIds.length > 0
+        ? supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", openStateIds)
+        : { count: 0 },
+      inProgressStateIds.length > 0
+        ? supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", inProgressStateIds)
+        : { count: 0 },
     ]);
 
     const assigneeIds = (issueRows ?? []).map((r) => r.assignee_id);
     const names = await displayNameMap(assigneeIds);
 
     metrics = {
-      openCount: openCount ?? (issueRows?.length ?? 0),
+      openCount: openCount ?? 0,
       inProgressCount: inProgressCount ?? 0,
       criticalCount: criticalCount ?? 0,
       totalCount: totalCount ?? 0,

@@ -137,8 +137,13 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
     if (searchQuery.trim()) {
       const raw = searchQuery.trim();
+      const numMatch = /^([A-Za-z]+-)?(\d+)$/.exec(raw);
       const escaped = raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "\\,").replace(/"/g, '\\"');
-      query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+      if (numMatch) {
+        query = query.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+      } else {
+        query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+      }
     }
     if (filters.statusId) query = query.eq("status_id", filters.statusId);
     if (filters.priority) query = query.eq("priority", filters.priority);
@@ -446,7 +451,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border/80">
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-2.5 text-left">
+                  <th key={header.id} scope="col" aria-sort={header.column.getIsSorted() ? (header.column.getIsSorted() === "asc" ? "ascending" : "descending") : "none"} className="px-4 py-2.5 text-left">
                     {header.column.getCanSort() ? (
                       <button className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground" onClick={header.column.getToggleSortingHandler()}>
                         {flexRender(header.column.columnDef.header, header.getContext())}

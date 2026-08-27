@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (21 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (22 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -150,6 +150,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260019_phase11_issue_links.sql` | Phase 11: `issue_links` (BLOCKS/DEPENDS_ON/DUPLICATE_OF etc.), `add_issue_link`/`remove_issue_link`/`find_duplicate_candidates` |
 | `supabase/migrations/202608260020_security_audit_fixes.sql` | Deep audit fixes: `remove_issue_link` authz, `find_duplicate_candidates` isolation, `saved_views` RLS, project locks, duplicate handling |
 | `supabase/migrations/202608260021_label_realtime_fixes.sql` | Label hex constraint + `supabase_realtime` publication for comments/issues/notifications |
+| `supabase/migrations/202608260022_audit_refinements.sql` | `create_organization` input trimming/profile preflight, notification preferences check, VIEWER transition support, saved view search_path |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |

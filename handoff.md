@@ -49,7 +49,7 @@ Latest local commit:
 81de81e feat: implement phases 6-11 with deep audit hardening
 ```
 
-Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 21 migrations and 87 tests. Deep audit fixed 14+ findings via migrations 020-021.
+Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 22 migrations and 87 tests. Deep audit fixed findings across migrations 020-022.
 
 Commit and push when ready (see below).
 
@@ -65,7 +65,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 21 ordered migrations, `202608260001` through `202608260021`. Inspect the installed CLI options before applying migrations:
+The repository contains 22 ordered migrations, `202608260001` through `202608260022`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help

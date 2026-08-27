@@ -232,6 +232,7 @@ export function NotificationCenter() {
                       type="button"
                       onClick={() => void handleMarkRead(item.id)}
                       title="Mark as read"
+                      aria-label="Mark as read"
                       className="shrink-0 p-1 text-muted-foreground hover:text-primary"
                     >
                       <Check className="h-3 w-3" />
