@@ -10,6 +10,10 @@ export const metadata: Metadata = {
     template: "%s · TraceBox",
   },
   description: "Trace the work. Ship with confidence.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
