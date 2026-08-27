@@ -7040,23 +7040,27 @@ create trigger enforce_issue_visibility_on_custom_values
 before insert or update on public.issue_custom_values
 for each row execute procedure public.enforce_issue_visibility_access();
 
--- Correct the original policy names from migrations 004, 016, 017.
+-- Replace any prior policy versions with the restricted-aware definitions.
 drop policy if exists "Project members can read the audit trail" on public.issue_events;
+drop policy if exists "Project members and grantees can read issue events" on public.issue_events;
 create policy "Project members and grantees can read issue events"
   on public.issue_events for select to authenticated
   using (public.can_view_issue(issue_id));
 
 drop policy if exists "Project members can read issue watchers" on public.issue_watchers;
+drop policy if exists "Project members and grantees can read issue watchers" on public.issue_watchers;
 create policy "Project members and grantees can read issue watchers"
   on public.issue_watchers for select to authenticated
   using (public.can_view_issue(issue_id));
 
 drop policy if exists "Project members can read issue labels" on public.issue_labels;
+drop policy if exists "Project members and grantees can read issue labels" on public.issue_labels;
 create policy "Project members and grantees can read issue labels"
   on public.issue_labels for select to authenticated
   using (public.can_view_issue(issue_id));
 
 drop policy if exists "Project members can read issue links" on public.issue_links;
+drop policy if exists "Project members and grantees can read issue links" on public.issue_links;
 create policy "Project members and grantees can read issue links"
   on public.issue_links for select to authenticated
   using (public.can_view_issue(source_issue_id) and public.can_view_issue(target_issue_id));
