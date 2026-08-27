@@ -49,7 +49,7 @@ function selectOrganization(id: string) {
   document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
 }
 
-function selectProject(id: string) {
+export function selectProject(id: string) {
   document.cookie = `tb_project=${id}; path=/; max-age=31536000; samesite=lax`;
 }
 

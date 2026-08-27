@@ -1,138 +1,70 @@
 # TraceBox Handoff
 
-## Completed
+## Current implementation
 
-- Audited the codebase from scratch through Phase 11 covering:
-  - Phase 1–11 completeness (Organizations, Projects, Components/Workflow, Issue Creation, Issue Table/Editing, Comments/Activity, Assignment/Workflow, Labels/Versions/Milestones, Watchers/Notifications, Realtime, Search/Saved Views, Dependencies/Duplicates)
-  - SQL, RLS, lock ordering, realtime publication, and security (deep multi-agent audit with 2 waves, 31+ findings fixed)
-  - server data flow, auth, context caching, error mapping, realtime hooks
-  - client UI, accessibility, form validations, toast feedback, realtime, search escaping
-  - configuration, documentation, and unit tests (13 test suites)
-- Fixed all high/critical findings: remove_issue_link authz, find_duplicate_candidates isolation, saved_views RLS, ilike injection, realtime thrash, label XSS, composer stuck spinner, watch button sync, duplicate seq guard, etc.
-- Added focused unit tests without over-expanding the suite (87 tests)
-- Updated stale repository documentation and applied OLED pitch-black theme
-- Phases 1–11 are implemented and verified:
-  1. Organizations + Projects
-  2. Components + Default Workflow
-  3. Core Issue Creation
-  4. Issue List + Editing
-  5. Comments + Activity
-  6. Assignment + Workflow (transition_issue, assign_issue, reopen_issue, resolution)
-  7. Labels + Versions + Milestones (planning)
-  8. Watchers + Notifications (auto-watch, notification center)
-  9. Realtime (useRealtime hooks for comments/issues/notifications)
-  10. Search + Saved Views (pg_trgm + tsvector + saved_views)
-  11. Dependencies + Duplicates (issue_links + duplicate suggestions)
-- Ready for Phase 12 — Triage Inbox
+TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20:
 
-## Verification
+1. Organizations and projects
+2. Components and default workflow
+3. Atomic issue creation and audit history
+4. Issue table, filtering, sorting, pagination, and inline editing
+5. Comments and unified activity timeline
+6. Assignment, workflow transitions, resolutions, and reopen
+7. Labels, versions, milestones, and planning metadata
+8. Watchers and notifications
+9. Supabase Realtime subscriptions
+10. Search and saved views
+11. Issue links and duplicate detection
+12. Triage Inbox with inline classification and keyboard shortcuts
+13. Private Supabase Storage attachments with signed downloads and image previews
+14. Reports, MTTR, issue aging, and component/priority breakdowns
+15. Explainable release readiness scoring and risk lists
+16. Command palette, issue search, and global keyboard shortcuts
+17. Issue templates and template selection during issue creation
+18. Restricted security issues with explicit access grants and RLS
+19. GitHub repository configuration, PR/commit links, and signed webhooks
+20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-The final local gates passed:
+Database state is represented by migrations `202608260001` through `202608260038`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
+
+## Important runtime configuration
+
+Required local/Vercel variables:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-or-publishable-key>
+SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
+GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. Never expose it through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
+
+## Verification performed in this checkout
 
 ```text
-TypeScript       ✓ (0 errors)
-Tests            93/93 ✓ (13 test files)
-Lint             0 errors (2 TanStack/RHF warnings, expected)
-Production build ✓ (Compiled successfully in 14.4s)
-git diff --check ✓
+TypeScript:  npx tsc --noEmit — passed
+Tests:       npm test — passed before latest audit-only test additions; rerun before release
+Lint:        npm run lint — 0 errors; expected React Compiler compatibility warnings remain for TanStack/RHF
+Build:       npm run build with placeholder public Supabase variables — passed previously; rerun before release
 ```
 
-Lint reports non-blocking React Compiler warnings from TanStack Table's `useReactTable()` API (incompatible library). They are library warnings, not project errors.
+Static source audits found and fixed migration syntax, restricted issue leaks, API token authorization, webhook key association, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, theme provider mismatch, and responsive table layout issues. No live Supabase database or Vercel deployment is claimed until the external setup in `deployment.md` is completed.
 
-Live Supabase and Vercel runtime verification has not been performed from this checkout.
+## Deployment checklist
 
-## Commit state
+1. Create/link the intended Supabase project.
+2. Apply all migrations `001`–`037` in order from `supabase/full_schema.sql` or the individual files.
+3. Verify the private `issue-attachments` Storage bucket and policies.
+4. Verify `supabase_realtime` publication tables.
+5. Configure Supabase Auth Site URL and callback URLs.
+6. Configure Vercel public variables plus the server-only service-role and webhook variables.
+7. Configure the GitHub webhook at `/api/webhooks/github` with `GITHUB_WEBHOOK_SECRET`.
+8. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub link → reports/readiness → logout.
+9. Regenerate database types from the live schema if the deployed schema differs.
 
-Latest local commit:
+Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.
 
-```text
-81de81e feat: implement phases 6-11 with deep audit hardening
-```
+## Migration discipline
 
-Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 24 migrations and 93 tests. Deep audit fixed findings across migrations 020-024.
-
-Commit and push when ready (see below).
-
-## Supabase production migration
-
-Fill `.env.local` locally with real values. It is gitignored and must not contain committed secrets.
-
-```bash
-npx supabase login
-npx supabase link --project-ref <your-project-ref>
-npx supabase migration list
-npx supabase db push
-npx supabase migration list
-```
-
-The repository contains 24 ordered migrations, `202608260001` through `202608260024`. Inspect the installed CLI options before applying migrations:
-
-```bash
-npx supabase db push --help
-```
-
-Optional local database verification:
-
-```bash
-npm run db:start
-npm run db:reset
-npm run db:types
-npm run typecheck
-npm test
-npm run build
-```
-
-Configure Supabase Auth URL settings:
-
-- Site URL: `https://trace-box.vercel.app`
-- Redirect URLs:
-  - `https://trace-box.vercel.app/**`
-  - `http://localhost:3000/**`
-- GitHub callback, if enabled:
-
-```text
-https://<project-ref>.supabase.co/auth/v1/callback
-```
-
-Never rewrite an applied migration. Future schema corrections require a new versioned migration. Keep RLS enabled and never expose the service-role key to client code.
-
-## Vercel deployment
-
-1. Push the local commits when ready:
-
-   ```bash
-   git push origin main
-   ```
-
-2. Import the GitHub repository into Vercel.
-3. Use the Next.js preset and retain the build command from `vercel.json`:
-
-   ```bash
-   npm run build
-   ```
-
-4. Configure these variables for Production, Preview, and Development:
-
-   ```text
-   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-or-publishable-key>
-   ```
-
-5. Never add `SUPABASE_SERVICE_ROLE_KEY` to browser-exposed configuration.
-6. Deploy and run the live flow:
-
-   ```text
-   landing page
-   → signup
-   → workspace onboarding
-   → first project creation
-   → create KEY-1 issue
-   → issue filters/sorting/pagination
-   → inline field edit
-   → issue detail/audit timeline
-   → add comment with @mention and TRACE-123 ref
-   → edit own comment
-   → verify unified activity timeline ordering
-   → logout
-   → protected dashboard redirects to login
-   ```
+Never rewrite an applied migration. Add a new timestamped migration for every schema correction. Keep RLS enabled. Keep service-role access server-only. `supabase/full_schema.sql` must be regenerated whenever migration files change.

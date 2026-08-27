@@ -22,7 +22,7 @@ OAuth/email links ──► GET src/app/auth/callback/route.ts
                         (exchangeCodeForSession, then redirect to sanitized ?next)
 ```
 
-Three-tier Supabase client layer, all typed `<Database>` from `src/types/database.ts`. Server-side `setAll` failures are intentionally swallowed — the proxy refreshes cookies. No admin/service-role client exists (deliberate; keep it that way unless server-only).
+Three-tier Supabase client layer, all typed `<Database>` from `src/types/database.ts`. Server-side `setAll` failures are intentionally swallowed — the proxy refreshes cookies. Server-only `src/lib/api-auth.ts` uses the service-role key for bearer-token API/webhook routes; it is never imported by client code.
 
 State management: local `useState`/`useMemo` + react-hook-form with `zodResolver`. No Redux/Zustand/React Query. Navigation state travels via searchParams (`?next`).
 
@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (29 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (38 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -158,12 +158,28 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260027_phase18_restricted_issues.sql` | Phase 18: `issue_access` table, `can_view_issue` security definer helper, restricted visibility RLS across issues/comments/attachments |
 | `supabase/migrations/202608260028_phase19_github_integration.sql` | Phase 19: `issue_github_links`, `project_integrations`, PR/commit linking RPCs |
 | `supabase/migrations/202608260029_phase20_custom_fields_api.sql` | Phase 20: `custom_fields`, `issue_custom_values`, `api_tokens`, token management RPCs |
+| `supabase/migrations/202608260030_comprehensive_audit_fixes.sql` | Visibility normalization, custom-field project checks, restricted metadata RLS, realtime replica identity |
+| `supabase/migrations/202608260031_api_storage_hardening.sql` | Private attachment bucket/policies, API token wrappers, storage path validation |
+| `supabase/migrations/202608260032_restricted_access_audit.sql` | Issue-owned mutation triggers and exact restricted child-table policy replacements |
+| `supabase/migrations/202608260033_github_webhooks.sql` | Service-role-only GitHub webhook link recorder |
+| `supabase/migrations/202608260034_final_audit_hardening.sql` | Final audit hardening: restricted candidate search, access grant boundaries, storage policies, supporting indexes |
+| `supabase/migrations/202608260035_api_integration_corrections.sql` | Correct API wrapper ordering/org binding, template component trigger, GitHub integration management |
+| `supabase/migrations/202608260036_notification_lifecycle.sql` | Assignment/status/mention notification triggers with preference-aware dispatcher |
+| `supabase/migrations/202608260037_restricted_notification_guards.sql` | Restricted issue watcher and mention notification guards |
+| `supabase/migrations/202608260038_final_invariant_hardening.sql` | Archived-project watcher checks and API token hash constraints |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
+| `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
+| `src/components/issues/issue-attachments-section.tsx` | Phase 13 private attachment upload, signed preview/download, and cleanup |
+| `src/components/reports/reports-dashboard.tsx` | Phase 14 time-window metrics, MTTR, aging, component, and priority reports |
+| `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
+| `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
+| `src/app/api/v1/` | Scoped REST project/issue reads and writes |
+| `src/app/api/webhooks/github/` | HMAC-verified GitHub PR/commit issue-key webhook ingestion |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 
-Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, unused today). `.env*` is gitignored except `.env.example`.
+Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, required by `/api/v1/*` and `/api/webhooks/github`), `GITHUB_WEBHOOK_SECRET` (server-only webhook verification). `.env*` is gitignored except `.env.example`.
 
 ## Runtime/Tooling Preferences
 

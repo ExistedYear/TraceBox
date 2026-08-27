@@ -489,10 +489,17 @@ export function ProjectSettings({
 
   return (
     <div className="space-y-6">
-      <div className="mb-8">
-        <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">Project settings</p>
-        <h1 className="text-3xl font-semibold tracking-tight"><span className="font-mono text-primary">{project.key}</span> · {project.name}</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">{project.description ?? "Components, planning metadata, and workflow for this project."}</p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">Project settings</p>
+          <h1 className="text-3xl font-semibold tracking-tight"><span className="font-mono text-primary">{project.key}</span> · {project.name}</h1>
+          <p className="mt-2 max-w-2xl text-muted-foreground">{project.description ?? "Components, planning metadata, and workflow for this project."}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/templates">Issue templates</Link></Button>
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/custom-fields">Custom fields & API</Link></Button>
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/integrations">Integrations</Link></Button>
+        </div>
       </div>
 
       <div role="tablist" aria-label="Settings sections" className="flex flex-wrap gap-1 border-b border-border/80">
@@ -768,8 +775,8 @@ export function ProjectSettings({
             <div className="space-y-2">
               <Label htmlFor="label-color">Color</Label>
               <div className="flex items-center gap-2">
-                <input type="color" className="h-9 w-12 cursor-pointer rounded border border-input bg-background p-1" {...labelForm.register("color")} />
-                <Input placeholder="#hex" {...labelForm.register("color")} />
+                <input id="label-color-picker" type="color" aria-label="Label color picker" className="h-9 w-12 cursor-pointer rounded border border-input bg-background p-1" {...labelForm.register("color")} />
+                <Input id="label-color" placeholder="#hex" aria-label="Label hex color" {...labelForm.register("color")} />
               </div>
             </div>
             <div className="space-y-2">
@@ -797,6 +804,10 @@ export function ProjectSettings({
             <div className="space-y-2">
               <Label htmlFor="version-name">Version name</Label>
               <Input id="version-name" placeholder="version name (e.g. v1.0)" {...versionForm.register("name")} />
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" {...versionForm.register("is_released")} />
+              Mark version as released
+            </label>
               {versionForm.formState.errors.name && <p className="text-xs text-destructive">{versionForm.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">

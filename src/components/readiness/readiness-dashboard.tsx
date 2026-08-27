@@ -70,14 +70,17 @@ export function ReadinessDashboard({
   versions,
 }: Props) {
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string>("all");
+  const [selectedVersionId, setSelectedVersionId] = useState<string>("all");
 
-  // Filter issues for selected milestone or all
   const targetIssues = useMemo(() => {
-    if (selectedMilestoneId === "all") return issues;
-    return issues.filter((i) => i.targetMilestoneId === selectedMilestoneId);
-  }, [issues, selectedMilestoneId]);
+    return issues.filter((issue) =>
+      (selectedMilestoneId === "all" || issue.targetMilestoneId === selectedMilestoneId) &&
+      (selectedVersionId === "all" || issue.affectedVersionId === selectedVersionId),
+    );
+  }, [issues, selectedMilestoneId, selectedVersionId]);
 
   const selectedMilestone = milestones.find((m) => m.id === selectedMilestoneId);
+  const selectedVersion = versions.find((v) => v.id === selectedVersionId);
 
   // Calculate explainable release score and risk list
   const analysis = useMemo(() => {
@@ -131,6 +134,7 @@ export function ReadinessDashboard({
       status = "READY";
     }
 
+    const riskCount = new Set([...blockers, ...criticals, ...regressions, ...unassigned].map((issue) => issue.id)).size;
     return {
       total,
       resolvedCount: resolved.length,
@@ -139,6 +143,7 @@ export function ReadinessDashboard({
       criticals,
       regressions,
       unassigned,
+      riskCount,
       score,
       status,
     };
@@ -162,9 +167,7 @@ export function ReadinessDashboard({
             Automated, explainable release evaluation checking blockers, critical bugs, regressions, and unassigned work for {projectName}.
           </p>
         </div>
-
-        {/* Milestone selector */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Milestone className="h-4 w-4 text-muted-foreground" />
           <select
             aria-label="Filter by milestone"
@@ -172,10 +175,23 @@ export function ReadinessDashboard({
             onChange={(e) => setSelectedMilestoneId(e.target.value)}
             className="h-8 rounded-md border border-input bg-background px-3 font-mono text-xs"
           >
-            <option value="all">All project issues (Project Release)</option>
+            <option value="all">All milestones</option>
             {milestones.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name} ({m.status}) {m.dueAt ? `· Due ${new Date(m.dueAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="Filter by version"
+            value={selectedVersionId}
+            onChange={(e) => setSelectedVersionId(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-3 font-mono text-xs"
+          >
+            <option value="all">All versions</option>
+            {versions.map((version) => (
+              <option key={version.id} value={version.id}>
+                {version.name}{version.isReleased ? " (released)" : ""}
               </option>
             ))}
           </select>
@@ -228,7 +244,7 @@ export function ReadinessDashboard({
               </span>
 
               <p className="mt-2 text-xs text-muted-foreground">
-                {selectedMilestone ? `Targeting milestone: ${selectedMilestone.name}` : "Evaluating overall project queue"}
+                {selectedMilestone ? `Targeting milestone: ${selectedMilestone.name}` : selectedVersion ? `Targeting version: ${selectedVersion.name}` : "Evaluating overall project queue"}
               </p>
             </div>
 
@@ -288,9 +304,7 @@ export function ReadinessDashboard({
                   Items that must be resolved or triaged before proceeding with release
                 </p>
               </div>
-              <span className="font-mono text-xs text-muted-foreground">
-                {analysis.blockers.length + analysis.criticals.length + analysis.regressions.length + analysis.unassigned.length} risks
-              </span>
+              <span className="font-mono text-xs text-muted-foreground">{analysis.riskCount} risks</span>
             </div>
 
             {analysis.blockers.length === 0 && analysis.criticals.length === 0 && analysis.regressions.length === 0 && analysis.unassigned.length === 0 ? (

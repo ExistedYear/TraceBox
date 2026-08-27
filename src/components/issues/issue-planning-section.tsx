@@ -72,12 +72,14 @@ export function IssuePlanningSection({
   const activeLabels = allLabels.filter((l) => labelIds.includes(l.id));
 
   async function handleToggleLabel(labelId: string) {
-    if (!canEdit) return;
+    if (!canEdit || updating) return;
+    const previousIds = labelIds;
     const nextIds = labelIds.includes(labelId)
       ? labelIds.filter((id) => id !== labelId)
       : [...labelIds, labelId];
 
     setLabelIds(nextIds);
+    setUpdating(true);
     try {
       const { error } = await createClient().rpc("set_issue_labels", {
         p_issue_id: issueId,
@@ -85,19 +87,22 @@ export function IssuePlanningSection({
       });
       if (error) {
         toast.error("Could not update issue labels.");
-        setLabelIds(labelIds);
+        setLabelIds(previousIds);
         return;
       }
       toast.success("Labels updated.");
       router.refresh();
     } catch {
       toast.error("Could not reach the server.");
-      setLabelIds(labelIds);
+      setLabelIds(previousIds);
+    } finally {
+      setUpdating(false);
     }
   }
-
   async function handleUpdatePlanning(newVersionId?: string | null, newMilestoneId?: string | null) {
-    if (!canEdit) return;
+    if (!canEdit || updating) return;
+    const previousVersionId = versionId;
+    const previousMilestoneId = milestoneId;
     const vId = newVersionId !== undefined ? newVersionId : versionId;
     const mId = newMilestoneId !== undefined ? newMilestoneId : milestoneId;
 
@@ -114,12 +119,16 @@ export function IssuePlanningSection({
 
       if (error) {
         toast.error("Could not update planning metadata.");
+        setVersionId(previousVersionId);
+        setMilestoneId(previousMilestoneId);
         return;
       }
       toast.success("Planning updated.");
       router.refresh();
     } catch {
       toast.error("Could not reach the server.");
+      setVersionId(previousVersionId);
+      setMilestoneId(previousMilestoneId);
     } finally {
       setUpdating(false);
     }

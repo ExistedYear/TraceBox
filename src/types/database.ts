@@ -1412,6 +1412,34 @@ export type Database = {
         Args: { p_token_id: string };
         Returns: undefined;
       };
+      authenticate_api_token: {
+        Args: { p_token_hash: string };
+        Returns: { token_id: string; user_id: string; organization_id: string; scopes: string[] }[];
+      };
+      touch_api_token: {
+        Args: { p_token_hash: string };
+        Returns: undefined;
+      };
+      api_create_issue: {
+        Args: { p_payload: Json; p_token_hash: string };
+        Returns: number;
+      };
+      api_update_issue: {
+        Args: { p_issue_id: string; p_updates: Json; p_token_hash: string };
+        Returns: undefined;
+      };
+      record_github_webhook: {
+        Args: { p_link_type: string; p_issue_id: string; p_number?: number; p_project_id: string; p_repo_name: string; p_status?: string; p_title?: string; p_url: string };
+        Returns: string;
+      };
+      upsert_github_integration: {
+        Args: { p_auto_resolve_enabled?: boolean; p_project_id: string; p_repo_full_name: string };
+        Returns: string;
+      };
+      remove_github_integration: {
+        Args: { p_project_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

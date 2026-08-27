@@ -40,6 +40,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
   const filters = decodeIssueSearchParams(rawParams, {
     stateIds: new Set((states ?? []).map((state) => state.id)),
     componentIds: new Set((components ?? []).map((component) => component.id)),
+    memberIds: new Set(candidates.map((row) => row.user_id)),
   });
 
   return (

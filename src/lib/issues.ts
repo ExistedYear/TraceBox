@@ -9,9 +9,11 @@ export function formatIssueKey(projectKey: string, issueNumber: number) {
 }
 
 export function parseIssueKey(param: string): { projectKey: string; issueNumber: number } | null {
-  const match = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(param);
-  if (!match) return null;
-  return { projectKey: match[1].toUpperCase(), issueNumber: Number(match[2]) };
+  const match = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(param.trim());
+  if (!match || match[2].length > 15) return null;
+  const issueNumber = Number(match[2]);
+  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1) return null;
+  return { projectKey: match[1].toUpperCase(), issueNumber };
 }
 
 // Maps an immutable audit event to human timeline copy; never renders raw JSON.
@@ -169,6 +171,7 @@ export type IssueFilters = {
   severity?: string;
   type?: string;
   componentId?: string;
+  assigneeId?: string;
 };
 
 
@@ -176,6 +179,7 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
   const result: Record<string, string> = {};
   if (filters.statusId) result.status = filters.statusId;
   if (filters.componentId) result.component = filters.componentId;
+  if (filters.assigneeId) result.assignee = filters.assigneeId;
   if (filters.priority) result.priority = filters.priority;
   if (filters.severity) result.severity = filters.severity;
   if (filters.type) result.type = filters.type;
@@ -184,7 +188,7 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
 
 export function decodeIssueSearchParams(
   params: Record<string, string | string[] | undefined>,
-  valid: { stateIds: Set<string>; componentIds: Set<string> },
+  valid: { stateIds: Set<string>; componentIds: Set<string>; memberIds?: Set<string> },
 ): IssueFilters {
   const pick = (...names: string[]) => {
     for (const name of names) {
@@ -195,6 +199,7 @@ export function decodeIssueSearchParams(
   };
   const statusId = pick("status", "statusId");
   const componentId = pick("component", "componentId");
+  const assigneeId = pick("assignee", "assigneeId");
   const priority = PRIORITIES.find((value) => value === pick("priority"));
   const severity = SEVERITIES.find((value) => value === pick("severity"));
   const type = ISSUE_TYPES.find((value) => value === pick("type"));
@@ -204,6 +209,7 @@ export function decodeIssueSearchParams(
     severity,
     type,
     componentId: componentId && valid.componentIds.has(componentId) ? componentId : undefined,
+    assigneeId: assigneeId && (!valid.memberIds || valid.memberIds.has(assigneeId)) ? assigneeId : undefined,
   };
 }
 

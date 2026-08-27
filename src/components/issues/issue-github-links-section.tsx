@@ -1,0 +1,79 @@
+"use client";
+
+import { useState } from "react";
+import { ExternalLink, Github, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
+
+export type GithubLink = {
+  id: string;
+  repo_name: string;
+  link_type: string;
+  number: number | null;
+  url: string;
+  title: string | null;
+  status: string;
+};
+
+type Props = { issueId: string; canEdit: boolean; initialLinks: GithubLink[] };
+
+export function IssueGithubLinksSection({ issueId, canEdit, initialLinks }: Props) {
+  const [links, setLinks] = useState(initialLinks);
+  const [repo, setRepo] = useState("");
+  const [url, setUrl] = useState("");
+  const [type, setType] = useState("PULL_REQUEST");
+  const [saving, setSaving] = useState(false);
+
+  async function addLink() {
+    if (!repo.trim() || !/^https:\/\/github\.com\//i.test(url.trim())) {
+      toast.error("Enter a repository and GitHub URL.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error } = await createClient().rpc("add_github_link", {
+        p_issue_id: issueId,
+        p_repo_name: repo.trim(),
+        p_link_type: type,
+        p_url: url.trim(),
+      });
+      if (error) {
+        toast.error("Could not add GitHub link.");
+        return;
+      }
+      setLinks((current) => [...current, { id: String(data), repo_name: repo.trim(), link_type: type, number: null, url: url.trim(), title: null, status: "OPEN" }]);
+      setRepo("");
+      setUrl("");
+      toast.success("GitHub link added.");
+    } catch {
+      toast.error("Could not reach the server.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeLink(link: GithubLink) {
+    try {
+      const { error } = await createClient().rpc("remove_github_link", { p_link_id: link.id });
+      if (error) {
+        toast.error("Could not remove GitHub link.");
+        return;
+      }
+      setLinks((current) => current.filter((item) => item.id !== link.id));
+      toast.success("GitHub link removed.");
+    } catch {
+      toast.error("Could not reach the server.");
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Github className="h-3.5 w-3.5" /> GitHub links</div>
+      {links.length > 0 && <ul className="divide-y divide-border/60 rounded border border-border/70">{links.map((link) => <li key={link.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs"><a href={link.url} target="_blank" rel="noreferrer" className="min-w-0 truncate font-medium text-primary hover:underline">{link.title ?? link.url}</a><span className="flex shrink-0 items-center gap-1"><span className="font-mono text-[10px] text-muted-foreground">{link.link_type.replace("_", " ")}</span><ExternalLink className="h-3 w-3 text-muted-foreground" />{canEdit && <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground hover:text-destructive" onClick={() => void removeLink(link)} aria-label="Remove GitHub link"><Trash2 className="h-3 w-3" /></Button>}</span></li>)}</ul>}
+      {canEdit && <div className="grid gap-2 sm:grid-cols-[130px_1fr_1fr_auto]"><select aria-label="GitHub link type" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={type} onChange={(event) => setType(event.target.value)}><option value="PULL_REQUEST">Pull request</option><option value="COMMIT">Commit</option><option value="BRANCH">Branch</option></select><Input className="h-8 text-xs" placeholder="owner/repository" value={repo} onChange={(event) => setRepo(event.target.value)} /><Input className="h-8 text-xs" placeholder="https://github.com/..." value={url} onChange={(event) => setUrl(event.target.value)} /><Button size="sm" className="h-8 text-xs" onClick={() => void addLink()} disabled={saving}>{saving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Link"}</Button></div>}
+    </div>
+  );
+}

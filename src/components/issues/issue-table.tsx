@@ -139,7 +139,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
     if (debouncedQuery.trim()) {
       const raw = debouncedQuery.trim();
-      const numMatch = /^([A-Za-z]+-)?(\d+)$/.exec(raw);
+      const numMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(raw);
       const escaped = raw
         .replace(/\\/g, "\\\\")
         .replace(/%/g, "\\%")
@@ -148,7 +148,8 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         .replace(/"/g, '\\"')
         .replace(/\(/g, "\\(")
         .replace(/\)/g, "\\)");
-      if (numMatch) {
+      const keyPrefix = numMatch?.[1].toUpperCase();
+      if (numMatch && (!keyPrefix || keyPrefix === projectKey.toUpperCase())) {
         query = query.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
       } else {
         query = query.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
@@ -159,7 +160,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     if (filters.severity) query = query.eq("severity", filters.severity);
     if (filters.type) query = query.eq("type", filters.type);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
-    // Only real root columns may be ordered; display columns are unsortable.
+    if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
     if (sort && sortableIds.has(sort.id)) {
@@ -206,7 +207,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     );
     setTotal(count ?? 0);
     setLoading(false);
-  }, [projectId, filters, sorting, page, debouncedQuery]);
+  }, [projectKey, projectId, filters, sorting, page, debouncedQuery]);
 
   useEffect(() => {
     void fetchData();
@@ -436,6 +437,12 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <option key={component.value} value={component.value}>{component.label}</option>
           ))}
         </select>
+        <select aria-label="Assignee filter" className={selectClass} value={filters.assigneeId ?? ""} onChange={(event) => setFilter("assigneeId", event.target.value)}>
+          <option value="">All assignees</option>
+          {members.map((member) => (
+            <option key={member.value} value={member.value}>{member.label}</option>
+          ))}
+        </select>
         {Object.values(filters).some(Boolean) && (
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setFilters({})}>Clear</Button>
         )}
@@ -456,47 +463,39 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       </div>
 
       <Surface>
-        <table className="w-full text-sm">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border/80">
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} scope="col" aria-sort={header.column.getIsSorted() ? (header.column.getIsSorted() === "asc" ? "ascending" : "descending") : "none"} className="px-4 py-2.5 text-left">
-                    {header.column.getCanSort() ? (
-                      <button className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground" onClick={header.column.getToggleSortingHandler()}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        <span className="font-mono text-[9px]">{{ asc: "↑", desc: "↓" }[header.column.getIsSorted() as string] ?? ""}</span>
-                      </button>
-                    ) : (
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="divide-y divide-border/70">
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="hover:bg-accent/40">
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-2 align-middle">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center text-sm text-muted-foreground">No issues match these filters.</td>
-              </tr>
-            )}
-            {loading && rows.length === 0 && (
-              <tr>
-                <td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" /></td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="border-b border-border/80">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} scope="col" aria-sort={header.column.getIsSorted() ? (header.column.getIsSorted() === "asc" ? "ascending" : "descending") : "none"} className="px-4 py-2.5 text-left">
+                      {header.column.getCanSort() ? (
+                        <button className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground" onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <span className="font-mono text-[9px]">{{ asc: "↑", desc: "↓" }[header.column.getIsSorted() as string] ?? ""}</span>
+                        </button>
+                      ) : (
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody className="divide-y divide-border/70">
+              {table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="hover:bg-accent/40">
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-2 align-middle">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                  ))}
+                </tr>
+              ))}
+              {!loading && rows.length === 0 && <tr><td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center text-sm text-muted-foreground">No issues match these filters.</td></tr>}
+              {loading && rows.length === 0 && <tr><td colSpan={Math.max(1, table.getVisibleLeafColumns().length)} className="px-4 py-10 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-muted-foreground" /></td></tr>}
+            </tbody>
+          </table>
+        </div>
       </Surface>
 
       <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">

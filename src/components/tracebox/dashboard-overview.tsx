@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Activity,
@@ -16,7 +17,7 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { categoryClasses } from "@/lib/issues";
 import { cn } from "@/lib/utils";
-import { NewProjectButton, type ProjectSummary } from "@/components/layout/workspace-switcher";
+import { NewProjectButton, selectProject, type ProjectSummary } from "@/components/layout/workspace-switcher";
 
 export type OverviewIssue = {
   id: string;
@@ -66,6 +67,11 @@ export function DashboardOverview({
   metrics,
   recentIssues,
 }: DashboardOverviewProps) {
+  const router = useRouter();
+  function selectProjectAndOpen(projectId: string) {
+    selectProject(projectId);
+    router.push("/dashboard/issues");
+  }
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
       {/* Header / Command Center banner */}
@@ -231,11 +237,11 @@ export function DashboardOverview({
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {projects.map((project) => (
-                <Link
+                <button
                   key={project.id}
-                  href="/dashboard/issues"
+                  onClick={() => selectProjectAndOpen(project.id)}
                   className={cn(
-                    "block rounded-xl border p-4 transition-colors hover:border-primary/40",
+                    "block w-full rounded-xl border p-4 text-left transition-colors hover:border-primary/40",
                     activeProject?.id === project.id ? "border-primary/50 bg-primary/5" : "border-border bg-card",
                   )}
                 >
@@ -248,7 +254,7 @@ export function DashboardOverview({
                     )}
                   </div>
                   <p className="mt-1.5 truncate text-sm font-semibold">{project.name}</p>
-                </Link>
+                </button>
               ))}
             </div>
           </div>

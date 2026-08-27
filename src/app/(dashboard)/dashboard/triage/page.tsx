@@ -46,6 +46,7 @@ export default async function TriagePage() {
   const [
     { data: workflowStates },
     { data: memberRows },
+    { data: componentRows },
     { data: canManage },
   ] = await Promise.all([
     supabase
@@ -53,10 +54,8 @@ export default async function TriagePage() {
       .select("id, name, category, position")
       .eq("project_id", projectId)
       .order("position"),
-    supabase
-      .from("project_members")
-      .select("user_id")
-      .eq("project_id", projectId),
+    supabase.from("project_members").select("user_id").eq("project_id", projectId),
+    supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.rpc("can_manage_project", { p_project_id: projectId }),
   ]);
 
@@ -118,12 +117,13 @@ export default async function TriagePage() {
 
   return (
     <TriageInbox
+      key={projectId}
       projectId={projectId}
       projectKey={projectKey}
       issues={formattedIssues}
       openStateId={openState?.id ?? null}
       closedStateId={closedState?.id ?? null}
-      workflowStates={states.map((s) => ({ id: s.id, name: s.name, category: s.category }))}
+      components={(componentRows ?? []).map((component) => ({ id: component.id, name: component.name }))}
       members={members}
       canManage={Boolean(canManage)}
     />

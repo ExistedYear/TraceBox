@@ -16,8 +16,8 @@ describe("parseIssueKey", () => {
     expect(parseIssueKey("WEB-184")).toEqual({ projectKey: "WEB", issueNumber: 184 });
   });
 
-  it("rejects malformed params", () => {
-    for (const bad of ["auth", "auth-x", "-12", "AU TH-1", "", "auth--3"]) {
+  it("rejects malformed params and unsafe issue numbers", () => {
+    for (const bad of ["auth", "auth-x", "-12", "AU TH-1", "", "auth--3", "AUTH-0", `AUTH-${"9".repeat(16)}`]) {
       expect(parseIssueKey(bad)).toBeNull();
     }
   });

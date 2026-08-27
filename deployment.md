@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 29) via SQL Script
+### 1.3 Apply Database Migrations (1 through 38) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 29 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 38 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 29 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 38 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -68,8 +68,15 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 27. `202608260027_phase18_restricted_issues.sql`
 28. `202608260028_phase19_github_integration.sql`
 29. `202608260029_phase20_custom_fields_api.sql`
-
----
+30. `202608260030_comprehensive_audit_fixes.sql`
+31. `202608260031_api_storage_hardening.sql`
+32. `202608260032_restricted_access_audit.sql`
+33. `202608260033_github_webhooks.sql`
+34. `202608260034_final_audit_hardening.sql`
+35. `202608260035_api_integration_corrections.sql`
+36. `202608260036_notification_lifecycle.sql`
+37. `202608260037_restricted_notification_guards.sql`
+38. `202608260038_final_invariant_hardening.sql`
 
 ### 1.4 Configure Supabase Authentication
 
@@ -109,7 +116,6 @@ In your Supabase Dashboard:
    - `issue_links`
    - `issue_events`
    - `attachments`
-
 ---
 
 ## Step 2: Local Environment Setup
@@ -118,12 +124,15 @@ In your Supabase Dashboard:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-public-key>
+   SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+   GITHUB_WEBHOOK_SECRET=<random-webhook-secret>
    ```
-2. Start the local server:
+2. Keep `SUPABASE_SERVICE_ROLE_KEY` and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
+3. Start the local server:
    ```bash
    npm run dev
    ```
-3. Open `http://localhost:3000` in your browser.
+4. Open `http://localhost:3000` in your browser.
 
 ---
 
@@ -147,14 +156,16 @@ git push origin main
 
 ### 3.3 Add Environment Variables
 
-In the Vercel **Environment Variables** section, add the following (for Production, Preview, and Development):
+In Vercel **Settings → Environment Variables**, add these to the environments that need them:
 
-| Variable Name | Value | Description |
+| Variable | Value | Scope |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Your Supabase Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOi...` | Your Supabase Anon Public Key |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Browser + server |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key | Browser + server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret | Server-only API routes |
+| `GITHUB_WEBHOOK_SECRET` | Random webhook signing secret | Server-only webhook route |
 
-*(Never add `SUPABASE_SERVICE_ROLE_KEY` to Vercel client environment variables).*
+The service-role key is required by `/api/v1/*` and `/api/webhooks/github`. Vercel server functions may use it, but it must never be named `NEXT_PUBLIC_*`, exposed in client code, returned by an endpoint, logged, or committed.
 
 ### 3.4 Deploy
 
@@ -217,3 +228,6 @@ Once deployed (or running locally), verify the full user experience across all 2
 10. **Notification Center**: Trigger an event or mention and check the bell icon in the top header.
 11. **Settings**: Go to `/dashboard/settings` and test component creation, label management, version archival, milestone tracking, and workflow visualization.
 12. **Log Out**: Click your avatar menu in the top right → **Log out**. Verify protected routes redirect to `/login`.
+13. **GitHub integration**: In `/dashboard/settings/integrations`, connect `owner/repository`; configure the GitHub webhook URL as `https://<deployment>/api/webhooks/github`, select pull-request and push events, and use the exact `GITHUB_WEBHOOK_SECRET`.
+14. **Restricted issues**: Set an issue to restricted, grant only project members, verify an ungranted member cannot open/search/read its comments, attachments, labels, links, or notifications.
+15. **Custom fields and API**: Create a custom field, set its value on an issue, create a read-only token and a read/write token, verify scope enforcement, then revoke the token and verify 401 responses.

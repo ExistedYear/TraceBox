@@ -784,7 +784,7 @@ updated_at TIMESTAMPTZ
 
 ## 6.24 custom_fields
 
-Later feature.
+Implemented in migration `202608260029_phase20_custom_fields_api.sql`.
 
 ```text
 id UUID PRIMARY KEY
@@ -824,8 +824,7 @@ PRIMARY KEY(issue_id, custom_field_id)
 
 ## 6.26 integrations
 
-Later feature.
-
+Implemented for GitHub in migration `202608260028_phase19_github_integration.sql` and webhook migration `202608260033_github_webhooks.sql`.
 ```text
 id UUID PRIMARY KEY
 project_id UUID NOT NULL
@@ -840,6 +839,24 @@ updated_at TIMESTAMPTZ
 Do not store plaintext secrets in frontend-readable configuration.
 
 ---
+## 6.27 api_tokens
+
+Implemented in migration `202608260029_phase20_custom_fields_api.sql`.
+
+```text
+id UUID PRIMARY KEY
+user_id UUID NOT NULL
+organization_id UUID NOT NULL
+name TEXT NOT NULL
+token_hash TEXT NOT NULL
+scopes TEXT[] NOT NULL
+last_used_at TIMESTAMPTZ
+expires_at TIMESTAMPTZ
+created_at TIMESTAMPTZ
+```
+
+Plaintext tokens are shown only at creation and are never stored.
+
 
 # 7. Authorization Model
 
@@ -2781,8 +2798,6 @@ external search cluster
 
 The issue tracker itself must be excellent first.
 
----
-
 # 58. Agent Execution Rules
 
 1. Do not implement later phases prematurely.
@@ -2798,47 +2813,13 @@ The issue tracker itself must be excellent first.
 
 ---
 
-# 59. Immediate Next Task
+# 59. Current Completion Status
 
-Begin with:
-
-```text
-Organizations + Projects
-```
-
-Implement:
+Phases 1–20 are implemented in the repository. The next work is production validation and continued hardening; do not add roadmap features without a new phase specification.
 
 ```text
-organizations table
-organization_members table
-projects table
-project_members table
-RLS policies
-workspace onboarding
-workspace switcher
-project creation
-project switcher
+Phase 1–20: complete
+Database migrations: 001–037
+API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/projects, /api/webhooks/github
+Production deployment: requires Supabase migration application, Auth URL configuration, Storage bucket verification, Realtime publication verification, Vercel environment configuration, GitHub webhook configuration, and live end-to-end testing
 ```
-
-Acceptance criteria:
-
-```text
-✓ authenticated user can create a workspace
-✓ creator becomes OWNER
-✓ owner can create a project
-✓ creator becomes project MAINTAINER
-✓ project keys are unique within workspace
-✓ unauthorized users cannot access workspace/project data
-✓ navigation reflects current workspace/project
-✓ migration is committed
-✓ local build passes
-✓ production deploy succeeds
-```
-
-Once this is deployed, continue immediately with:
-
-```text
-Components + Default Workflow
-```
-
-and then proceed through the roadmap phase by phase.

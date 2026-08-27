@@ -58,6 +58,7 @@ export default async function MilestoneDetailPage({ params }: { params: Params }
     .from("issues")
     .select("id, issue_number, title, type, priority, severity, assignee_id, updated_at, status:workflow_states (name, category)")
     .eq("target_milestone_id", milestoneId)
+    .eq("project_id", milestone.project.id)
     .order("updated_at", { ascending: false });
 
   const totalCount = issues?.length ?? 0;

@@ -6610,3 +6610,848 @@ $$;
 
 revoke execute on function public.revoke_api_token(uuid) from anon, public;
 grant execute on function public.revoke_api_token(uuid) to authenticated;
+-- Migration 030: Comprehensive Audit Fixes
+-- 1. Normalize visibility check constraint and can_view_issue
+-- 2. Project boundary and lock check on set_issue_custom_value
+-- 3. can_view_issue enforcement across mutating RPCs
+-- 4. RLS child metadata policy alignment
+-- 5. REPLICA IDENTITY FULL for realtime tables
+
+-- 1. Visibility check constraint & can_view_issue normalization
+alter table public.issues drop constraint if exists issues_visibility_check;
+alter table public.issues add constraint issues_visibility_check
+  check (visibility in ('PUBLIC', 'PROJECT', 'RESTRICTED'));
+
+create or replace function public.can_view_issue(p_issue_id uuid)
+returns boolean
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+begin
+  if v_user is null then
+    return false;
+  end if;
+
+  select i.id, i.project_id, i.reporter_id, i.assignee_id, coalesce(i.visibility, 'PROJECT') as visibility
+  into v_issue
+  from public.issues i
+  where i.id = p_issue_id;
+
+  if not found then
+    return false;
+  end if;
+
+  -- Maintainer / org admin always has access to all project issues
+  v_role := public.project_role(v_issue.project_id);
+  if v_role = 'MAINTAINER' or public.can_manage_project(v_issue.project_id) then
+    return true;
+  end if;
+
+  -- Project / Public issues are viewable by all active project members
+  if v_issue.visibility in ('PUBLIC', 'PROJECT') and public.is_project_member(v_issue.project_id) then
+    return true;
+  end if;
+
+  -- Restricted issues: reporter, assignee, or explicit access grantee
+  if v_issue.reporter_id = v_user or v_issue.assignee_id = v_user then
+    return true;
+  end if;
+
+  if exists (
+    select 1 from public.issue_access ia
+    where ia.issue_id = p_issue_id and ia.user_id = v_user
+  ) then
+    return true;
+  end if;
+
+  return false;
+end;
+$$;
+
+revoke execute on function public.can_view_issue(uuid) from anon, public;
+grant execute on function public.can_view_issue(uuid) to authenticated;
+
+-- 2. Custom Field Validation & Locking
+create or replace function public.set_issue_custom_value(
+  p_issue_id uuid,
+  p_custom_field_id uuid,
+  p_value jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_archived boolean;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select project_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_issue.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  if not public.can_view_issue(p_issue_id) then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  -- Ensure custom field belongs to the same project
+  if not exists (
+    select 1 from public.custom_fields cf
+    where cf.id = p_custom_field_id and cf.project_id = v_issue.project_id
+  ) then
+    raise exception 'VALIDATION: Custom field does not belong to this project' using errcode = '23503';
+  end if;
+
+  insert into public.issue_custom_values (issue_id, custom_field_id, value)
+  values (p_issue_id, p_custom_field_id, p_value)
+  on conflict (issue_id, custom_field_id)
+  do update set value = excluded.value;
+end;
+$$;
+
+revoke execute on function public.set_issue_custom_value(uuid, uuid, jsonb) from anon, public;
+grant execute on function public.set_issue_custom_value(uuid, uuid, jsonb) to authenticated;
+
+-- 3. RLS child metadata policies checking can_view_issue
+drop policy if exists "Project members can read issue events" on public.issue_events;
+create policy "Project members and grantees can read issue events"
+  on public.issue_events
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+drop policy if exists "Project members can read watchers" on public.issue_watchers;
+create policy "Project members and grantees can read watchers"
+  on public.issue_watchers
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+drop policy if exists "Project members can read issue labels" on public.issue_labels;
+create policy "Project members and grantees can read issue labels"
+  on public.issue_labels
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+-- 4. REPLICA IDENTITY FULL for realtime update target tables
+alter table public.issues replica identity full;
+alter table public.comments replica identity full;
+alter table public.notifications replica identity full;
+alter table public.issue_watchers replica identity full;
+alter table public.issue_links replica identity full;
+alter table public.issue_events replica identity full;
+alter table public.attachments replica identity full;
+-- Migration 031: API token authentication and private attachment storage hardening
+
+-- Private bucket. Storage object policies below enforce issue-level access.
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('issue-attachments', 'issue-attachments', false, 52428800)
+on conflict (id) do update set public = false, file_size_limit = 52428800;
+
+-- Attachment storage paths must be issue-id prefixed.
+create policy "Members can upload issue attachments"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'issue-attachments'
+    and (storage.foldername(name))[1] is not null
+    and public.can_comment_on_issue((storage.foldername(name))[1]::uuid)
+  );
+
+create policy "Issue viewers can download attachments"
+  on storage.objects
+  for select
+  to authenticated
+  using (
+    bucket_id = 'issue-attachments'
+    and (storage.foldername(name))[1] is not null
+    and public.can_view_issue((storage.foldername(name))[1]::uuid)
+  );
+
+create policy "Owners and maintainers can delete attachments"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'issue-attachments'
+    and (
+      owner_id = (select auth.uid()::text)
+      or public.can_manage_project((select i.project_id from public.issues i where i.id = (storage.foldername(name))[1]::uuid))
+    )
+  );
+
+-- Enforce storage path ownership at the metadata boundary.
+create or replace function public.add_attachment(
+  p_issue_id uuid,
+  p_filename text,
+  p_storage_path text,
+  p_mime_type text default null,
+  p_size_bytes bigint default 0
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_project_id uuid;
+  v_archived boolean;
+  v_role text;
+  v_filename text;
+  v_storage_path text;
+  v_attachment_id uuid;
+  v_now timestamptz := timezone('utc'::text, now());
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+  v_filename := nullif(trim(p_filename), '');
+  v_storage_path := nullif(trim(p_storage_path), '');
+  if v_filename is null or char_length(v_filename) > 255 then
+    raise exception 'VALIDATION: Filename is required and must be <= 255 characters' using errcode = '22023';
+  end if;
+  if v_storage_path is null or v_storage_path !~ ('^' || p_issue_id::text || '/[^/]+$') then
+    raise exception 'VALIDATION: Storage path must be scoped to the issue' using errcode = '22023';
+  end if;
+  if p_size_bytes < 0 or p_size_bytes > 52428800 then
+    raise exception 'VALIDATION: File size must be between 0 and 50MB' using errcode = '22023';
+  end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  v_role := public.project_role(v_project_id);
+  if v_role not in ('REPORTER', 'DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+  insert into public.attachments (issue_id, uploader_id, filename, storage_path, mime_type, size_bytes, created_at)
+  values (p_issue_id, v_user, v_filename, v_storage_path, nullif(trim(p_mime_type), ''), p_size_bytes, v_now)
+  returning id into v_attachment_id;
+  update public.issues set updated_at = v_now where id = p_issue_id;
+  insert into public.issue_events (issue_id, actor_id, event_type, field_name, new_value, metadata)
+  values (p_issue_id, v_user, 'ATTACHMENT_ADDED', 'attachment', to_jsonb(v_filename), jsonb_build_object('attachment_id', v_attachment_id, 'filename', v_filename, 'mime_type', p_mime_type, 'size_bytes', p_size_bytes));
+  return v_attachment_id;
+end;
+$$;
+
+revoke execute on function public.add_attachment(uuid, text, text, text, bigint) from anon, public;
+grant execute on function public.add_attachment(uuid, text, text, text, bigint) to authenticated;
+
+-- Token lookup for API routes. Only a SHA-256 hash is accepted; plaintext tokens are never stored.
+create or replace function public.authenticate_api_token(p_token_hash text)
+returns table (token_id uuid, user_id uuid, organization_id uuid, scopes text[])
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select t.id, t.user_id, t.organization_id, t.scopes
+  from public.api_tokens t
+  where t.token_hash = p_token_hash
+    and (t.expires_at is null or t.expires_at > timezone('utc'::text, now()))
+$$;
+
+revoke execute on function public.authenticate_api_token(text) from public;
+grant execute on function public.authenticate_api_token(text) to anon, authenticated;
+
+create or replace function public.touch_api_token(p_token_hash text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.api_tokens
+  set last_used_at = timezone('utc'::text, now())
+  where token_hash = p_token_hash
+    and (expires_at is null or expires_at > timezone('utc'::text, now()));
+$$;
+
+revoke execute on function public.touch_api_token(text) from public;
+grant execute on function public.touch_api_token(text) to anon, authenticated;
+
+-- API mutation wrappers establish the token owner as the transaction-local auth subject,
+-- then reuse the existing RPC authorization and audit logic.
+create or replace function public.api_create_issue(p_token_hash text, p_payload jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_token record;
+  v_issue_number integer;
+begin
+  select * into v_token from public.authenticate_api_token(p_token_hash) limit 1;
+  if not found or not ('write' = any(v_token.scopes)) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  perform set_config('request.jwt.claim.sub', v_token.user_id::text, true);
+  v_issue_number := public.create_issue(
+    (p_payload->>'project_id')::uuid,
+    p_payload->>'title', p_payload->>'type', p_payload->>'description',
+    p_payload->>'priority', p_payload->>'severity', nullif(p_payload->>'component_id','')::uuid,
+    nullif(p_payload->>'assignee_id','')::uuid, p_payload->>'environment',
+    p_payload->>'steps_to_reproduce', p_payload->>'expected_behavior', p_payload->>'actual_behavior'
+  );
+  perform public.touch_api_token(p_token_hash);
+  return v_issue_number;
+end;
+$$;
+
+revoke execute on function public.api_create_issue(text, jsonb) from anon, public;
+grant execute on function public.api_create_issue(text, jsonb) to authenticated;
+
+create or replace function public.api_update_issue(p_token_hash text, p_issue_id uuid, p_updates jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_token record;
+begin
+  select * into v_token from public.authenticate_api_token(p_token_hash) limit 1;
+  if not found or not ('write' = any(v_token.scopes)) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  perform set_config('request.jwt.claim.sub', v_token.user_id::text, true);
+  perform public.update_issue_fields(p_issue_id, p_updates);
+  perform public.touch_api_token(p_token_hash);
+end;
+$$;
+
+revoke execute on function public.api_update_issue(text, uuid, jsonb) from anon, public;
+grant execute on function public.api_update_issue(text, uuid, jsonb) to authenticated;
+-- Migration 032: enforce restricted issue access on every issue-owned mutation
+
+create or replace function public.enforce_issue_visibility_access()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_issue_id uuid;
+  v_target_issue_id uuid;
+  v_service_role boolean := coalesce(current_setting('request.jwt.claim.role', true), '') = 'service_role';
+begin
+  if v_service_role then
+    return new;
+  end if;
+  if tg_table_name = 'issues' then
+    v_issue_id := coalesce(new.id, old.id);
+    if not public.can_view_issue(v_issue_id) then
+      raise exception 'NOT_ALLOWED' using errcode = '42501';
+    end if;
+  elsif tg_table_name = 'issue_links' then
+    v_issue_id := coalesce(new.source_issue_id, old.source_issue_id);
+    v_target_issue_id := coalesce(new.target_issue_id, old.target_issue_id);
+    if not public.can_view_issue(v_issue_id) or not public.can_view_issue(v_target_issue_id) then
+      raise exception 'NOT_ALLOWED' using errcode = '42501';
+    end if;
+  else
+    v_issue_id := coalesce(new.issue_id, old.issue_id);
+    if not public.can_view_issue(v_issue_id) then
+      raise exception 'NOT_ALLOWED' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+-- These triggers protect privileged RPCs as well as any future write path.
+drop trigger if exists enforce_issue_visibility_on_issues on public.issues;
+create trigger enforce_issue_visibility_on_issues
+before update on public.issues
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_issue_events on public.issue_events;
+create trigger enforce_issue_visibility_on_issue_events
+before insert on public.issue_events
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_issue_labels on public.issue_labels;
+create trigger enforce_issue_visibility_on_issue_labels
+before insert or update on public.issue_labels
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_issue_watchers on public.issue_watchers;
+create trigger enforce_issue_visibility_on_issue_watchers
+before insert or update on public.issue_watchers
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_issue_links on public.issue_links;
+create trigger enforce_issue_visibility_on_issue_links
+before insert or update on public.issue_links
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_comments on public.comments;
+create trigger enforce_issue_visibility_on_comments
+before insert or update on public.comments
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_attachments on public.attachments;
+create trigger enforce_issue_visibility_on_attachments
+before insert or update on public.attachments
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_github_links on public.issue_github_links;
+create trigger enforce_issue_visibility_on_github_links
+before insert or update on public.issue_github_links
+for each row execute procedure public.enforce_issue_visibility_access();
+
+drop trigger if exists enforce_issue_visibility_on_custom_values on public.issue_custom_values;
+create trigger enforce_issue_visibility_on_custom_values
+before insert or update on public.issue_custom_values
+for each row execute procedure public.enforce_issue_visibility_access();
+
+-- Correct the original policy names from migrations 004, 016, 017.
+drop policy if exists "Project members can read the audit trail" on public.issue_events;
+create policy "Project members and grantees can read issue events"
+  on public.issue_events for select to authenticated
+  using (public.can_view_issue(issue_id));
+
+drop policy if exists "Project members can read issue watchers" on public.issue_watchers;
+create policy "Project members and grantees can read issue watchers"
+  on public.issue_watchers for select to authenticated
+  using (public.can_view_issue(issue_id));
+
+drop policy if exists "Project members can read issue labels" on public.issue_labels;
+create policy "Project members and grantees can read issue labels"
+  on public.issue_labels for select to authenticated
+  using (public.can_view_issue(issue_id));
+
+drop policy if exists "Project members can read issue links" on public.issue_links;
+create policy "Project members and grantees can read issue links"
+  on public.issue_links for select to authenticated
+  using (public.can_view_issue(source_issue_id) and public.can_view_issue(target_issue_id));
+
+-- Permit only safe token scopes and cap their number.
+alter table public.api_tokens drop constraint if exists api_tokens_scopes_check;
+alter table public.api_tokens add constraint api_tokens_scopes_check
+  check (cardinality(scopes) between 1 and 2 and scopes <@ array['read', 'write']::text[]);
+-- Migration 033: GitHub webhook ingestion and safe server-side link recording
+
+create or replace function public.record_github_webhook(
+  p_project_id uuid,
+  p_issue_id uuid,
+  p_repo_name text,
+  p_link_type text,
+  p_url text,
+  p_title text default null,
+  p_status text default 'OPEN',
+  p_number integer default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_link_id uuid;
+begin
+  -- This function is intentionally callable only by the server-side service role.
+  if coalesce(current_setting('request.jwt.claim.role', true), '') <> 'service_role' then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  if not exists (select 1 from public.projects where id = p_project_id and not is_archived) then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if not exists (select 1 from public.issues where id = p_issue_id and project_id = p_project_id) then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  -- The webhook has no authenticated TraceBox actor; audit actor_id remains null.
+  insert into public.issue_github_links (issue_id, repo_name, link_type, number, url, title, status, created_by)
+  values (p_issue_id, trim(p_repo_name), p_link_type, p_number, trim(p_url), nullif(trim(p_title), ''), coalesce(p_status, 'OPEN'), null)
+  on conflict do nothing
+  returning id into v_link_id;
+
+  if v_link_id is not null then
+    insert into public.issue_events (issue_id, actor_id, event_type, field_name, new_value, metadata)
+    values (p_issue_id, null, 'GITHUB_LINKED', 'github_link', to_jsonb(trim(p_url)), jsonb_build_object('repo', trim(p_repo_name), 'type', p_link_type, 'number', p_number, 'source', 'github_webhook'));
+  end if;
+  return v_link_id;
+end;
+$$;
+
+revoke execute on function public.record_github_webhook(uuid, uuid, text, text, text, text, text, integer) from anon, authenticated, public;
+grant execute on function public.record_github_webhook(uuid, uuid, text, text, text, text, text, integer) to service_role;
+-- Migration 034: final security, storage, integrity, and index hardening
+
+-- Candidate search must not disclose restricted issue titles or IDs.
+create or replace function public.find_duplicate_candidates(p_project_id uuid, p_title text, p_limit integer default 5)
+returns table (issue_id uuid, issue_number bigint, title text, similarity double precision)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_title text := nullif(trim(coalesce(p_title, '')), '');
+  v_limit integer := least(greatest(coalesce(p_limit, 5), 1), 20);
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if not public.is_project_member(p_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if v_title is null or char_length(v_title) < 3 then raise exception 'VALIDATION: Title must be at least 3 characters' using errcode = '22023'; end if;
+  return query
+    select i.id, i.issue_number, i.title, similarity(i.title, v_title)
+    from public.issues i
+    where i.project_id = p_project_id
+      and public.can_view_issue(i.id)
+      and i.title % v_title
+      and similarity(i.title, v_title) > 0.2
+    order by similarity(i.title, v_title) desc
+    limit v_limit;
+end;
+$$;
+
+-- Restricted access grants are only meaningful for restricted issues and same-project members.
+create or replace function public.grant_issue_access(p_issue_id uuid, p_user_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_issue record; v_archived boolean; v_role text;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select id, project_id, reporter_id, visibility into v_issue from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_issue.project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if v_issue.visibility <> 'RESTRICTED' then raise exception 'VALIDATION: Access grants require restricted visibility' using errcode = '22023'; end if;
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if not exists (select 1 from public.project_members pm where pm.project_id = v_issue.project_id and pm.user_id = p_user_id) then raise exception 'VALIDATION: Grantee must be a project member' using errcode = '22023'; end if;
+  insert into public.issue_access(issue_id, user_id, granted_by) values (p_issue_id, p_user_id, v_user) on conflict do nothing;
+  insert into public.issue_events(issue_id, actor_id, event_type, field_name, new_value) values (p_issue_id, v_user, 'ACCESS_GRANTED', 'issue_access', to_jsonb(p_user_id::text));
+end; $$;
+
+create or replace function public.revoke_issue_access(p_issue_id uuid, p_user_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_issue record; v_archived boolean; v_role text;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id, reporter_id into v_issue from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_issue.project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  delete from public.issue_access where issue_id = p_issue_id and user_id = p_user_id;
+  insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value) values (p_issue_id, v_user, 'ACCESS_REVOKED', 'issue_access', to_jsonb(p_user_id::text));
+end; $$;
+
+create or replace function public.set_issue_visibility(p_issue_id uuid, p_visibility text)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_issue record; v_archived boolean; v_role text; v_visibility text;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  v_visibility := upper(trim(coalesce(p_visibility, 'PROJECT')));
+  if v_visibility not in ('PUBLIC', 'PROJECT', 'RESTRICTED') then raise exception 'VALIDATION: Invalid visibility' using errcode = '22023'; end if;
+  select id, project_id, visibility, reporter_id into v_issue from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_issue.project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  update public.issues set visibility = v_visibility, updated_at = timezone('utc'::text, now()) where id = p_issue_id;
+  insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value) values (p_issue_id, v_user, 'VISIBILITY_CHANGED', 'visibility', to_jsonb(v_issue.visibility), to_jsonb(v_visibility));
+end; $$;
+
+revoke execute on function public.grant_issue_access(uuid, uuid), public.revoke_issue_access(uuid, uuid), public.set_issue_visibility(uuid, text) from anon, public;
+grant execute on function public.grant_issue_access(uuid, uuid), public.revoke_issue_access(uuid, uuid), public.set_issue_visibility(uuid, text) to authenticated;
+
+-- Storage policies must enforce issue visibility, membership, and active projects.
+drop policy if exists "Members can upload issue attachments" on storage.objects;
+create policy "Members can upload issue attachments" on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'issue-attachments'
+  and (storage.foldername(name))[1] is not null
+  and public.can_view_issue(((storage.foldername(name))[1])::uuid)
+  and public.can_comment_on_issue(((storage.foldername(name))[1])::uuid)
+);
+drop policy if exists "Owners and maintainers can delete attachments" on storage.objects;
+create policy "Owners and maintainers can delete attachments" on storage.objects for delete to authenticated
+using (
+  bucket_id = 'issue-attachments'
+  and public.can_view_issue(((storage.foldername(name))[1])::uuid)
+  and exists (select 1 from public.issues i join public.projects p on p.id = i.project_id where i.id = ((storage.foldername(name))[1])::uuid and not p.is_archived)
+  and (owner_id = (select auth.uid()::text) or public.can_manage_project((select i.project_id from public.issues i where i.id = ((storage.foldername(name))[1])::uuid)))
+);
+
+-- Supporting indexes for foreign-key deletes and webhook lookups.
+create index if not exists idx_components_default_assignee_id on public.components(default_assignee_id);
+create index if not exists idx_workflow_transitions_from_state_id on public.workflow_transitions(from_state_id);
+create index if not exists idx_workflow_transitions_to_state_id on public.workflow_transitions(to_state_id);
+create index if not exists idx_issue_templates_default_component_id on public.issue_templates(default_component_id);
+create index if not exists idx_issue_access_granted_by on public.issue_access(granted_by);
+create index if not exists idx_issue_github_links_created_by on public.issue_github_links(created_by);
+create index if not exists idx_project_integrations_lookup on public.project_integrations(provider, repo_full_name, is_enabled);
+create index if not exists idx_issue_custom_values_field_id on public.issue_custom_values(custom_field_id);
+-- Migration 035: API wrapper correctness, integration management, and metadata integrity
+
+-- Correct API create argument order and bind token to its organization.
+create or replace function public.api_create_issue(p_token_hash text, p_payload jsonb)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_token record; v_org uuid; v_project_org uuid; v_issue_number integer;
+begin
+  select * into v_token from public.authenticate_api_token(p_token_hash) limit 1;
+  if not found or not ('write' = any(v_token.scopes)) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  v_org := nullif(p_payload->>'project_id', '')::uuid;
+  select organization_id into v_project_org from public.projects where id = v_org and not is_archived;
+  if v_project_org is null or v_project_org <> v_token.organization_id then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  perform set_config('request.jwt.claim.sub', v_token.user_id::text, true);
+  v_issue_number := public.create_issue(
+    v_org,
+    p_payload->>'title',
+    coalesce(p_payload->>'type', 'BUG'),
+    p_payload->>'description',
+    coalesce(p_payload->>'priority', 'P2'),
+    coalesce(p_payload->>'severity', 'MAJOR'),
+    nullif(p_payload->>'component_id', '')::uuid,
+    nullif(p_payload->>'assignee_id', '')::uuid,
+    p_payload->>'environment',
+    p_payload->>'steps_to_reproduce',
+    p_payload->>'expected_behavior',
+    p_payload->>'actual_behavior'
+  );
+  perform public.touch_api_token(p_token_hash);
+  return v_issue_number;
+end; $$;
+
+create or replace function public.api_update_issue(p_token_hash text, p_issue_id uuid, p_updates jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_token record; v_project_org uuid;
+begin
+  select * into v_token from public.authenticate_api_token(p_token_hash) limit 1;
+  if not found or not ('write' = any(v_token.scopes)) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  select p.organization_id into v_project_org from public.issues i join public.projects p on p.id = i.project_id where i.id = p_issue_id and not p.is_archived;
+  if v_project_org is null or v_project_org <> v_token.organization_id then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  perform set_config('request.jwt.claim.sub', v_token.user_id::text, true);
+  perform public.update_issue_fields(p_issue_id, p_updates);
+  perform public.touch_api_token(p_token_hash);
+end; $$;
+
+revoke execute on function public.api_create_issue(text, jsonb), public.api_update_issue(text, uuid, jsonb) from anon, public;
+grant execute on function public.api_create_issue(text, jsonb), public.api_update_issue(text, uuid, jsonb) to authenticated, service_role;
+
+-- Prevent cross-project default components in templates.
+create or replace function public.validate_issue_template_component()
+returns trigger language plpgsql security invoker set search_path = public as $$
+begin
+  if new.default_component_id is not null and not exists (
+    select 1 from public.components c where c.id = new.default_component_id and c.project_id = new.project_id
+  ) then
+    raise exception 'VALIDATION: Template component must belong to the template project' using errcode = '22023';
+  end if;
+  return new;
+end; $$;
+drop trigger if exists issue_template_component_project on public.issue_templates;
+create trigger issue_template_component_project before insert or update on public.issue_templates for each row execute procedure public.validate_issue_template_component();
+
+-- Make GitHub webhook retries idempotent for the same issue/link URL.
+create unique index if not exists issue_github_links_natural_idx
+  on public.issue_github_links(issue_id, repo_name, link_type, (coalesce(number, -1)), url);
+
+-- Authenticated project managers can configure GitHub repository integrations.
+create or replace function public.upsert_github_integration(p_project_id uuid, p_repo_full_name text, p_auto_resolve_enabled boolean default true)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_archived boolean; v_role text; v_id uuid;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select is_archived into v_archived from public.projects where id = p_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_role := public.project_role(p_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  insert into public.project_integrations(provider, project_id, repo_full_name, auto_resolve_enabled, is_enabled)
+  values ('GITHUB', p_project_id, trim(p_repo_full_name), coalesce(p_auto_resolve_enabled, true), true)
+  on conflict (project_id, provider) do update set repo_full_name = excluded.repo_full_name, auto_resolve_enabled = excluded.auto_resolve_enabled, is_enabled = true, updated_at = timezone('utc'::text, now())
+  returning id into v_id;
+  return v_id;
+end; $$;
+
+create or replace function public.remove_github_integration(p_project_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_role text; v_archived boolean;
+begin
+  select is_archived into v_archived from public.projects where id = p_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_role := public.project_role(p_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  delete from public.project_integrations where project_id = p_project_id and provider = 'GITHUB';
+end; $$;
+revoke execute on function public.upsert_github_integration(uuid, text, boolean), public.remove_github_integration(uuid) from anon, public;
+grant execute on function public.upsert_github_integration(uuid, text, boolean), public.remove_github_integration(uuid) to authenticated;
+-- Migration 036: assignment/status/mention notification coverage
+
+create or replace function public.on_issue_updated_notifications()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_watcher record; v_actor uuid := auth.uid(); v_type text; v_data jsonb;
+begin
+  if new.assignee_id is distinct from old.assignee_id and new.assignee_id is not null then
+    perform public.dispatch_issue_notification(new.assignee_id, v_actor, new.id, 'ASSIGNED', jsonb_build_object('issue_number', new.issue_number, 'title', new.title));
+  end if;
+  if new.status_id is distinct from old.status_id then
+    for v_watcher in select user_id from public.issue_watchers where issue_id = new.id and user_id <> coalesce(v_actor, '00000000-0000-0000-0000-000000000000'::uuid) loop
+      perform public.dispatch_issue_notification(v_watcher.user_id, v_actor, new.id, 'STATUS_CHANGED', jsonb_build_object('issue_number', new.issue_number, 'title', new.title));
+    end loop;
+  end if;
+  return new;
+end; $$;
+
+drop trigger if exists trg_issue_updated_notifications on public.issues;
+create trigger trg_issue_updated_notifications after update of assignee_id, status_id on public.issues for each row execute procedure public.on_issue_updated_notifications();
+
+create or replace function public.on_comment_mentions_notifications()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_match text[]; v_profile record; v_issue record; v_actor uuid := auth.uid();
+begin
+  select issue_number, title into v_issue from public.issues where id = new.issue_id;
+  for v_match in select regexp_matches(new.body, '@([A-Za-z0-9_.-]+)', 'g') loop
+    select p.id into v_profile from public.profiles p where lower(p.display_name) = lower(v_match[1]) limit 1;
+    if found then
+      perform public.dispatch_issue_notification(v_profile.id, v_actor, new.issue_id, 'MENTION', jsonb_build_object('issue_number', v_issue.issue_number, 'title', v_issue.title, 'excerpt', left(new.body, 140)));
+    end if;
+  end loop;
+  return new;
+end; $$;
+
+drop trigger if exists trg_comment_mentions_notifications on public.comments;
+create trigger trg_comment_mentions_notifications after insert on public.comments for each row execute procedure public.on_comment_mentions_notifications();
+-- Migration 037: prevent restricted issue watcher/mention notification leaks
+
+create or replace function public.toggle_watch_issue(p_issue_id uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_project_id uuid; v_watching boolean;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  select exists(select 1 from public.issue_watchers where issue_id = p_issue_id and user_id = v_user) into v_watching;
+  if v_watching then delete from public.issue_watchers where issue_id = p_issue_id and user_id = v_user; return false; end if;
+  insert into public.issue_watchers(issue_id, user_id) values (p_issue_id, v_user) on conflict do nothing;
+  return true;
+end; $$;
+
+create or replace function public.watch_issue(p_issue_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid();
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  insert into public.issue_watchers(issue_id, user_id) values (p_issue_id, v_user) on conflict do nothing;
+end; $$;
+
+create or replace function public.unwatch_issue(p_issue_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid();
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  delete from public.issue_watchers where issue_id = p_issue_id and user_id = v_user;
+end; $$;
+
+revoke execute on function public.toggle_watch_issue(uuid), public.watch_issue(uuid), public.unwatch_issue(uuid) from anon, public;
+grant execute on function public.toggle_watch_issue(uuid), public.watch_issue(uuid), public.unwatch_issue(uuid) to authenticated;
+
+-- Replace mention notifications with access-aware recipient checks.
+create or replace function public.on_comment_mentions_notifications()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_match text[]; v_profile record; v_issue record; v_actor uuid := auth.uid();
+begin
+  select i.issue_number, i.title, i.visibility, i.reporter_id, i.assignee_id, i.project_id into v_issue from public.issues i where i.id = new.issue_id;
+  for v_match in select regexp_matches(new.body, '@([A-Za-z0-9_.-]+)', 'g') loop
+    select p.id into v_profile from public.profiles p where lower(p.display_name) = lower(v_match[1]) limit 1;
+    if found and (v_issue.visibility <> 'RESTRICTED' or v_profile.id = v_issue.reporter_id or v_profile.id = v_issue.assignee_id or exists(select 1 from public.issue_access ia where ia.issue_id = new.issue_id and ia.user_id = v_profile.id) or exists(select 1 from public.project_members pm where pm.project_id = v_issue.project_id and pm.user_id = v_profile.id and pm.role = 'MAINTAINER')) then
+      perform public.dispatch_issue_notification(v_profile.id, v_actor, new.issue_id, 'MENTION', jsonb_build_object('issue_number', v_issue.issue_number, 'title', v_issue.title, 'excerpt', left(new.body, 140)));
+    end if;
+  end loop;
+  return new;
+end; $$;
+-- Migration 038: final archived-project and token invariant hardening
+
+create or replace function public.toggle_watch_issue(p_issue_id uuid)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_project_id uuid; v_archived boolean; v_watching boolean;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  select exists(select 1 from public.issue_watchers where issue_id = p_issue_id and user_id = v_user) into v_watching;
+  if v_watching then delete from public.issue_watchers where issue_id = p_issue_id and user_id = v_user; return false; end if;
+  insert into public.issue_watchers(issue_id, user_id) values (p_issue_id, v_user) on conflict do nothing;
+  return true;
+end; $$;
+
+create or replace function public.watch_issue(p_issue_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_project_id uuid; v_archived boolean;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  insert into public.issue_watchers(issue_id, user_id) values (p_issue_id, v_user) on conflict do nothing;
+end; $$;
+
+create or replace function public.unwatch_issue(p_issue_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_project_id uuid; v_archived boolean;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  delete from public.issue_watchers where issue_id = p_issue_id and user_id = v_user;
+end; $$;
+
+revoke execute on function public.toggle_watch_issue(uuid), public.watch_issue(uuid), public.unwatch_issue(uuid) from anon, public;
+grant execute on function public.toggle_watch_issue(uuid), public.watch_issue(uuid), public.unwatch_issue(uuid) to authenticated;
+
+alter table public.api_tokens drop constraint if exists api_tokens_token_hash_check;
+alter table public.api_tokens add constraint api_tokens_token_hash_check
+  check (token_hash ~ '^[0-9a-f]{64}$');

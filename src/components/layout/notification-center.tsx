@@ -109,17 +109,24 @@ export function NotificationCenter() {
       read_at: payload.read_at,
       created_at: payload.created_at,
     };
-    setNotifications((prev) => [newItem, ...prev].slice(0, 20));
-    if (!newItem.read_at) setUnreadCount((c) => c + 1);
+    setNotifications((prev) => {
+      if (prev.some((item) => item.id === newItem.id)) return prev;
+      if (!newItem.read_at) setUnreadCount((count) => count + 1);
+      return [newItem, ...prev].slice(0, 20);
+    });
   });
 
   async function handleMarkRead(id: string) {
     try {
-      await createClient().rpc("mark_notification_read", { p_notification_id: id });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      const { error } = await createClient().rpc("mark_notification_read", { p_notification_id: id });
+      if (error) {
+        toast.error("Could not update notification.");
+        return;
+      }
+      const notification = notifications.find((item) => item.id === id);
+      if (!notification || notification.read_at) return;
+      setNotifications((prev) => prev.map((item) => item.id === id ? { ...item, read_at: new Date().toISOString() } : item));
+      setUnreadCount((count) => Math.max(0, count - 1));
     } catch {
       toast.error("Could not update notification.");
     }
@@ -128,10 +135,13 @@ export function NotificationCenter() {
   async function handleMarkAllRead() {
     setLoading(true);
     try {
-      await createClient().rpc("mark_all_notifications_read");
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })),
-      );
+      const { error } = await createClient().rpc("mark_all_notifications_read");
+      if (error) {
+        toast.error("Could not mark all as read.");
+        return;
+      }
+      const now = new Date().toISOString();
+      setNotifications((prev) => prev.map((item) => ({ ...item, read_at: item.read_at || now })));
       setUnreadCount(0);
       toast.success("All notifications marked as read.");
     } catch {

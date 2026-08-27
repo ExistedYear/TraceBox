@@ -1,82 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+
+import { authenticateApiRequest, filterApiVisibleIssues } from "@/lib/api-auth";
+import { ISSUE_TYPES, PRIORITIES } from "@/lib/issues";
+import { issueCreateSchema } from "@/lib/validation/issue";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseBoundedInteger(value: string | null, fallback: number, minimum: number, maximum: number) {
+  if (value === null || value.trim() === "") return fallback;
+  if (!/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+}
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const searchParams = request.nextUrl.searchParams;
-  const projectId = searchParams.get("project_id");
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10)));
-  const offset = Math.max(0, parseInt(searchParams.get("offset") || "0", 10));
+  const auth = await authenticateApiRequest(request, "read");
+  if ("response" in auth) return auth.response;
 
-  if (!projectId) {
-    return NextResponse.json({ error: "project_id query parameter is required" }, { status: 400 });
-  }
+  const projectId = request.nextUrl.searchParams.get("project_id");
+  if (!projectId || !UUID_RE.test(projectId)) return NextResponse.json({ error: "Valid project_id is required." }, { status: 400 });
+  const limit = parseBoundedInteger(request.nextUrl.searchParams.get("limit"), 25, 1, 100);
+  const offset = parseBoundedInteger(request.nextUrl.searchParams.get("offset"), 0, 0, 1000000);
+  if (limit === null || offset === null) return NextResponse.json({ error: "limit must be 1-100 and offset must be a non-negative integer." }, { status: 400 });
+  const { data: project } = await auth.client.from("projects").select("id, organization_id").eq("id", projectId).eq("is_archived", false).maybeSingle();
+  if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
 
-  let query = supabase
+  let query = auth.client
     .from("issues")
-    .select("id, issue_number, title, type, priority, severity, status:workflow_states(name, category), component:components(name), created_at, updated_at", { count: "exact" })
+    .select("id, project_id, visibility, reporter_id, assignee_id, issue_number, title, type, priority, severity, status:workflow_states(name, category), component:components(name), created_at, updated_at")
     .eq("project_id", projectId)
-    .range(offset, offset + limit - 1)
+    .limit(1000)
     .order("created_at", { ascending: false });
 
-  const status = searchParams.get("status");
-  if (status) query = query.eq("status_id", status);
-
-  const type = searchParams.get("type");
-  if (type) query = query.eq("type", type);
-
-  const priority = searchParams.get("priority");
-  if (priority) query = query.eq("priority", priority);
-
-  const { data, count, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const status = request.nextUrl.searchParams.get("status");
+  const type = request.nextUrl.searchParams.get("type");
+  const priority = request.nextUrl.searchParams.get("priority");
+  if (status) {
+    if (!UUID_RE.test(status)) return NextResponse.json({ error: "status must be a valid UUID." }, { status: 400 });
+    query = query.eq("status_id", status);
+  }
+  if (type) {
+    if (!(ISSUE_TYPES as readonly string[]).includes(type)) return NextResponse.json({ error: "Invalid issue type." }, { status: 400 });
+    query = query.eq("type", type);
+  }
+  if (priority) {
+    if (!(PRIORITIES as readonly string[]).includes(priority)) return NextResponse.json({ error: "Invalid priority." }, { status: 400 });
+    query = query.eq("priority", priority);
   }
 
-  return NextResponse.json({
-    data: data ?? [],
-    total: count ?? 0,
-    limit,
-    offset,
-  });
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: "Could not load issues." }, { status: 500 });
+  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, (data ?? []) as any));
+  const visible = (data ?? []).filter((issue: any) => visibleIds.has(issue.id));
+  return NextResponse.json({ data: visible.slice(offset, offset + limit), total: visible.length, limit, offset });
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const auth = await authenticateApiRequest(request, "write");
+  if ("response" in auth) return auth.response;
 
-  let body: any;
+  let payload: unknown;
   try {
-    body = await request.json();
+    payload = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
+  const parsed = issueCreateSchema.safeParse(payload);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid issue payload.", details: parsed.error.flatten().fieldErrors }, { status: 422 });
 
-  if (!body.project_id || !body.title) {
-    return NextResponse.json({ error: "project_id and title are required" }, { status: 400 });
-  }
+  const projectId = (payload as Record<string, unknown>).project_id;
+  if (typeof projectId !== "string" || !UUID_RE.test(projectId)) return NextResponse.json({ error: "Valid project_id is required." }, { status: 400 });
+  const { data: project } = await auth.client.from("projects").select("organization_id").eq("id", projectId).eq("is_archived", false).maybeSingle();
+  if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
 
-  const { data: issueNumber, error } = await supabase.rpc("create_issue", {
-    p_project_id: body.project_id,
-    p_title: body.title,
-    p_description: body.description || undefined,
-    p_type: body.type || "BUG",
-    p_priority: body.priority || "P2",
-    p_severity: body.severity || "MAJOR",
-    p_component_id: body.component_id || undefined,
-    p_assignee_id: body.assignee_id || undefined,
-    p_environment: body.environment || undefined,
-    p_steps_to_reproduce: body.steps_to_reproduce || undefined,
-    p_expected_behavior: body.expected_behavior || undefined,
-    p_actual_behavior: body.actual_behavior || undefined,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  return NextResponse.json({
-    success: true,
-    issue_number: issueNumber,
-  }, { status: 201 });
+  const { data: issueNumber, error } = await auth.client.rpc("api_create_issue", { p_token_hash: auth.context.tokenHash, p_payload: { ...parsed.data, project_id: projectId } });
+  if (error) return NextResponse.json({ error: "Could not create issue." }, { status: 400 });
+  return NextResponse.json({ success: true, issue_number: issueNumber }, { status: 201 });
 }

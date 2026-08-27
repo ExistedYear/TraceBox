@@ -62,23 +62,33 @@ export function ReportsDashboard({ projectName, projectKey, issues, components }
 
   // Velocity & Resolution metrics
   const stats = useMemo(() => {
+    const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : timeRange === "90d" ? 90 : null;
+    const cutoff = days ? now - days * 24 * 60 * 60 * 1000 : 0;
+
+    const created = filteredIssues.length;
+
+    const resolvedIssues = cutoff > 0
+      ? issues.filter((i) => {
+          const resTime = i.resolvedAt ? new Date(i.resolvedAt).getTime() : i.closedAt ? new Date(i.closedAt).getTime() : 0;
+          return resTime >= cutoff;
+        })
+      : issues.filter((i) => Boolean(i.resolvedAt || i.closedAt || i.statusCategory === "RESOLVED" || i.statusCategory === "CLOSED"));
+    const resolved = resolvedIssues.length;
+
+    const openIssues = filteredIssues.filter((i) => !i.resolvedAt && !i.closedAt && i.statusCategory !== "RESOLVED" && i.statusCategory !== "CLOSED");
+    const open = openIssues.length;
     const total = filteredIssues.length;
-    const created = total;
-    const resolved = filteredIssues.filter((i) => Boolean(i.resolvedAt || i.closedAt || i.statusCategory === "RESOLVED" || i.statusCategory === "CLOSED")).length;
-    const open = total - resolved;
 
     // MTTR calculation
-    const resolvedWithTimes = filteredIssues.filter((i) => i.resolvedAt || i.closedAt);
     let totalResolutionHours = 0;
-    for (const item of resolvedWithTimes) {
-      const start = new Date(item.createdAt).getTime();
-      const end = new Date(item.resolvedAt || item.closedAt || item.createdAt).getTime();
-      totalResolutionHours += Math.max(0, (end - start) / (1000 * 60 * 60));
+    for (const item of resolvedIssues) {
+      if (item.resolvedAt || item.closedAt) {
+        const start = new Date(item.createdAt).getTime();
+        const end = new Date(item.resolvedAt || item.closedAt || item.createdAt).getTime();
+        totalResolutionHours += Math.max(0, (end - start) / (1000 * 60 * 60));
+      }
     }
-    const avgResolutionDays = resolvedWithTimes.length > 0 ? (totalResolutionHours / resolvedWithTimes.length / 24).toFixed(1) : "—";
-
-    // Age distribution for currently open issues
-    const openIssues = filteredIssues.filter((i) => !i.resolvedAt && !i.closedAt && i.statusCategory !== "RESOLVED" && i.statusCategory !== "CLOSED");
+    const avgResolutionDays = resolvedIssues.length > 0 ? (totalResolutionHours / resolvedIssues.length / 24).toFixed(1) : "—";
     let ageUnder7 = 0;
     let age7to30 = 0;
     let age30to90 = 0;
@@ -132,7 +142,7 @@ export function ReportsDashboard({ projectName, projectKey, issues, components }
       priorityCounts,
       compCounts,
     };
-  }, [filteredIssues, now]);
+  }, [issues, timeRange, filteredIssues, now]);
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
@@ -190,7 +200,7 @@ export function ReportsDashboard({ projectName, projectKey, issues, components }
           </div>
           <p className="mt-3 font-mono text-2xl font-semibold">{stats.resolved}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {stats.created > 0 ? `${Math.round((stats.resolved / stats.created) * 100)}% resolution rate` : "No issues"}
+            {stats.resolved} resolved in selected window
           </p>
         </div>
 

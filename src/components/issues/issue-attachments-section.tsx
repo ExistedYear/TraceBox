@@ -74,13 +74,7 @@ export function IssueAttachmentsSection({
   isMaintainerOrDev,
   initialAttachments,
 }: Props) {
-  const [prevInitial, setPrevInitial] = useState(initialAttachments);
   const [attachments, setAttachments] = useState<AttachmentItem[]>(initialAttachments);
-
-  if (initialAttachments !== prevInitial) {
-    setPrevInitial(initialAttachments);
-    setAttachments(initialAttachments);
-  }
   const [uploading, setUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
@@ -123,11 +117,10 @@ export function IssueAttachmentsSection({
         .upload(storagePath, file, { cacheControl: "3600", upsert: false });
 
       if (uploadError) {
-        // If storage bucket isn't provisioned yet, still register record safely or toast
-        console.warn("Storage upload warning:", uploadError);
+        toast.error("Could not upload file to storage.");
+        return;
       }
 
-      // Call add_attachment RPC
       const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", {
         p_issue_id: issueId,
         p_filename: file.name,
@@ -137,7 +130,8 @@ export function IssueAttachmentsSection({
       });
 
       if (rpcError) {
-        toast.error("Could not register attachment: " + rpcError.message);
+        await supabase.storage.from("issue-attachments").remove([storagePath]);
+        toast.error("Could not register attachment.");
         return;
       }
 
@@ -198,16 +192,20 @@ export function IssueAttachmentsSection({
 
   const handleDelete = async (attachmentId: string) => {
     if (!window.confirm("Remove this attachment?")) return;
+    const attachment = attachments.find((item) => item.id === attachmentId);
     try {
       const { error } = await createClient().rpc("delete_attachment", {
         p_attachment_id: attachmentId,
       });
 
       if (error) {
-        toast.error("Could not delete attachment: " + error.message);
+        toast.error("Could not delete attachment.");
         return;
       }
 
+      if (attachment) {
+        await createClient().storage.from("issue-attachments").remove([attachment.storage_path]);
+      }
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
       toast.success("Attachment deleted.");
     } catch {

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -89,6 +88,8 @@ function CommandPalette({
     Array<{ id: string; issueNumber: number; title: string; key: string }>
   >([]);
   const [searchingIssues, setSearchingIssues] = useState(false);
+  const [matchingQuery, setMatchingQuery] = useState("");
+  const searchSequence = useRef(0);
 
   // Default system commands
   const baseCommands: CommandItem[] = useMemo(
@@ -108,9 +109,8 @@ function CommandPalette({
   // Debounced issue search when typing in palette
   useEffect(() => {
     const trimmed = query.trim();
-    if (!trimmed || !activeProjectId) {
-      return;
-    }
+    const sequence = ++searchSequence.current;
+    if (!trimmed || !activeProjectId) return;
 
     const timer = setTimeout(async () => {
       setSearchingIssues(true);
@@ -118,38 +118,24 @@ function CommandPalette({
         const supabase = createClient();
         const activeProj = projects.find((p) => p.id === activeProjectId);
         const projectKey = activeProj?.key || "ISSUE";
-
-        const numMatch = /^([A-Za-z]+-)?(\d+)$/.exec(trimmed);
+        const numMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(trimmed);
         const escaped = trimmed.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-
-        let q = supabase
-          .from("issues")
-          .select("id, issue_number, title")
-          .eq("project_id", activeProjectId)
-          .limit(5);
-
-        if (numMatch) {
-          q = q.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%`);
-        } else {
-          q = q.ilike("title", `%${escaped}%`);
-        }
-
+        let q = supabase.from("issues").select("id, issue_number, title").eq("project_id", activeProjectId).limit(5);
+        if (numMatch && numMatch[1].toUpperCase() === projectKey.toUpperCase()) q = q.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%`);
+        else q = q.ilike("title", `%${escaped}%`);
         const { data } = await q;
-        setMatchingIssues(
-          (data ?? []).map((i) => ({
-            id: i.id,
-            issueNumber: i.issue_number,
-            title: i.title,
-            key: formatIssueKey(projectKey, i.issue_number),
-          })),
-        );
+        if (sequence !== searchSequence.current) return;
+        setMatchingQuery(trimmed);
+        setMatchingIssues((data ?? []).map((i) => ({ id: i.id, issueNumber: i.issue_number, title: i.title, key: formatIssueKey(projectKey, i.issue_number) })));
       } catch {
-        // Ignore error
+        if (sequence === searchSequence.current) {
+          setMatchingQuery("");
+          setMatchingIssues([]);
+        }
       } finally {
-        setSearchingIssues(false);
+        if (sequence === searchSequence.current) setSearchingIssues(false);
       }
     }, 200);
-
     return () => clearTimeout(timer);
   }, [query, activeProjectId, projects]);
 
@@ -163,19 +149,21 @@ function CommandPalette({
     items.push(...filteredBase);
 
     // Matching issues
-    for (const issue of matchingIssues) {
-      items.push({
-        id: `issue-${issue.id}`,
-        label: `${issue.key} · ${issue.title}`,
-        hint: "Jump to issue detail",
-        href: `/dashboard/issues/${issue.key}`,
-        icon: CircleDot,
-        category: "Issue",
-      });
+    if (matchingQuery === query.trim()) {
+      for (const issue of matchingIssues) {
+        items.push({
+          id: `issue-${issue.id}`,
+          label: `${issue.key} · ${issue.title}`,
+          hint: "Jump to issue detail",
+          href: `/dashboard/issues/${issue.key}`,
+          icon: CircleDot,
+          category: "Issue",
+        });
+      }
     }
 
     return items;
-  }, [baseCommands, query, matchingIssues]);
+  }, [baseCommands, query, matchingQuery, matchingIssues]);
 
   function go(href: string) {
     onClose();
@@ -296,7 +284,7 @@ export function AppHeader({
         return;
       }
 
-      if (isInput) return;
+      if (isInput || pathname.startsWith("/dashboard/triage")) return;
 
       if (event.key === "?") {
         event.preventDefault();
@@ -348,7 +336,7 @@ export function AppHeader({
       window.removeEventListener("keydown", onKeyDown);
       clearTimeout(gTimer);
     };
-  }, [router]);
+  }, [pathname, router]);
 
   return (
     <>
