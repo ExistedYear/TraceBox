@@ -14,6 +14,10 @@ Create the smallest production-ready foundation for the project so that:
 
 This phase is intentionally limited to infrastructure and boilerplate.
 
+## Current repository status
+
+This foundation plan is complete. The implementation now continues through Phase 20 in `docs/tracebox-main-plan.md`; the current deployment and external-service checklist is maintained in `deployment.md`.
+
 ---
 
 # 1. Stack

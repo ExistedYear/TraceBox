@@ -81,11 +81,12 @@ npm start            # serves production build
 npm run lint         # eslint .
 npm run typecheck    # tsc --noEmit
 npm test             # vitest run (no watch script)
+npm run check:migrations # contiguous chain + full_schema sync
 
 # Local Supabase (requires Supabase CLI)
 npm run db:start / db:stop / db:reset      # reset applies migrations + seed
 npm run db:types          # regenerate src/types/database.ts from local DB
-npm run db:types:linked   # …from linked hosted project
+npm run db:types:linked   # regenerate from linked hosted project
 ```
 
 Builds work without real credentials; CI sets placeholder env vars. Runtime throws only when Supabase clients are actually invoked without them.

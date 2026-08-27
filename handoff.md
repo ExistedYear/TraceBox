@@ -42,11 +42,11 @@ GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
 
 ## Verification performed in this checkout
 
-```text
 TypeScript:  npx tsc --noEmit — passed
-Tests:       npm test — passed before latest audit-only test additions; rerun before release
-Lint:        npm run lint — 0 errors; expected React Compiler compatibility warnings remain for TanStack/RHF
-Build:       npm run build with placeholder public Supabase variables — passed previously; rerun before release
+Tests:       106/106 passed across 14 test files
+Lint:        0 errors; 2 expected React Compiler compatibility warnings (TanStack/RHF)
+Build:       npm run build with placeholder public Supabase variables — passed
+Migration check: 38 files contiguous and `supabase/full_schema.sql` synchronized
 ```
 
 Static source audits found and fixed migration syntax, restricted issue leaks, API token authorization, webhook key association, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, theme provider mismatch, and responsive table layout issues. No live Supabase database or Vercel deployment is claimed until the external setup in `deployment.md` is completed.
@@ -54,7 +54,7 @@ Static source audits found and fixed migration syntax, restricted issue leaks, A
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`037` in order from `supabase/full_schema.sql` or the individual files.
+2. Apply all migrations `001`–`038` in order from `supabase/full_schema.sql` or the individual files.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.

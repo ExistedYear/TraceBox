@@ -30,3 +30,15 @@
   3. Add `/reset-password` page with `ResetPasswordForm` calling `supabase.auth.updateUser({ password: newPassword })`.
 
 ## 3. Confirm Password during SignUp does not exist.
+
+## 4. External deployment validation
+
+- **Status**: Pending external setup, not a source-code defect.
+- Apply migrations `202608260001` through `202608260038` to the intended Supabase project.
+- Verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, Vercel server-only variables, and GitHub webhook.
+- Run the full live flow documented in `deployment.md`, including restricted issue isolation, attachment lifecycle, API-token scopes, and webhook linking.
+
+## 5. Current product limitation
+
+- Password recovery is not implemented yet. The login screen does not provide a forgot-password or reset-password flow.
+- GitHub OAuth login remains disabled until provider credentials are configured in Supabase.

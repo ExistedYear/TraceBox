@@ -1,6 +1,6 @@
 # TraceBox
 
-TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping Phases 1–11: workspaces/projects, project workflow, issue creation, issue list/editing, comments + activity timeline, workflow transitions & assignment, planning metadata (labels/versions/milestones), watchers & notifications, realtime subscriptions, full-text search & saved views, and issue links & dependencies.
+TraceBox is a modern, database-backed developer workspace for structured issue tracking. It now covers Phases 1–20: workspaces/projects, workflow, issue lifecycle, collaboration, planning, notifications, realtime, search, dependencies, triage, attachments, analytics, readiness, templates, restricted security issues, GitHub integration, custom fields, and scoped API access.
 
 ## Stack
 
