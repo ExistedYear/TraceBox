@@ -10,7 +10,7 @@ export type ApiTokenContext = {
   organizationId: string;
   scopes: string[];
 };
-export type ApiScope = "projects:read" | "issues:read" | "issues:write" | "comments:write" | "milestones:read" | "search:read";
+export type ApiScope = "projects:read" | "issues:read" | "issues:write" | "comments:write" | "milestones:read" | "search:read" | "integrations:read" | "github_links:read" | "github_links:write";
 
 function hasScope(scopes: string[], requiredScope: ApiScope) {
   if (scopes.includes(requiredScope)) return true;
@@ -89,5 +89,5 @@ export async function filterApiVisibleIssues(
   const restrictedIds = issues.filter((issue) => issue.visibility === "RESTRICTED").map((issue) => issue.id);
   const { data: grants } = restrictedIds.length ? await client.from("issue_access").select("issue_id").eq("user_id", context.userId).in("issue_id", restrictedIds) : { data: [] as Array<{ issue_id: string }> };
   const granted = new Set((grants ?? []).map((grant) => grant.issue_id));
-  return issues.filter((issue) => organizationProjects.has(issue.project_id) && (issue.visibility !== "RESTRICTED" ? true : isOrgAdmin || maintainerProjects.has(issue.project_id) || issue.reporter_id === context.userId || issue.assignee_id === context.userId || granted.has(issue.id))).map((issue) => issue.id);
+  return issues.filter((issue) => organizationProjects.has(issue.project_id) && (isOrgAdmin || memberProjects.has(issue.project_id)) && (issue.visibility !== "RESTRICTED" ? true : isOrgAdmin || maintainerProjects.has(issue.project_id) || issue.reporter_id === context.userId || issue.assignee_id === context.userId || granted.has(issue.id))).map((issue) => issue.id);
 }

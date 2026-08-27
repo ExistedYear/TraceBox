@@ -22,10 +22,10 @@ TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20
 16. Command palette, issue search, and global keyboard shortcuts
 17. Issue templates and template selection during issue creation
 18. Restricted security issues with explicit access grants and RLS
-19. GitHub repository configuration, PR/commit links, and signed webhooks
+19. GitHub App installation verification, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260039`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
+Database state is represented by migrations `202608260001` through `202608260040`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
 
 ## Important runtime configuration
 
@@ -36,6 +36,14 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-or-publishable-key>
 SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
 GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
+GITHUB_APP_ID=<github-app-id>
+GITHUB_APP_SLUG=<github-app-slug>
+GITHUB_APP_CLIENT_ID=<github-app-client-id>
+GITHUB_APP_CLIENT_SECRET=<server-only-github-app-client-secret>
+GITHUB_APP_PRIVATE_KEY=<server-only-github-app-private-key>
+GITHUB_APP_CALLBACK_URL=<exact-github-app-callback-url>
+GITHUB_API_VERSION=2022-11-28
+CRON_SECRET=<server-only-vercel-cron-secret>
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. Never expose it through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
@@ -43,10 +51,10 @@ GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npx tsc --noEmit — passed
-Tests:       110/110 passed across 15 test files
-Lint:        0 errors; 2 expected React Compiler compatibility warnings (TanStack/RHF)
+Tests:       112/112 passed across 15 test files
+Lint:        0 errors; 3 existing warnings (ESLint export, TanStack Table, and React Hook Form compatibility)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 39 files contiguous and `supabase/full_schema.sql` synchronized
+Migration check: 40 files contiguous and `supabase/full_schema.sql` synchronized
 ```
 
 Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, and responsive table layout issues.
@@ -56,15 +64,15 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`039` in order from `supabase/full_schema.sql` or the individual files.
+2. Apply all migrations `001`–`040` in order from `supabase/full_schema.sql` or the individual files.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
-6. Configure Vercel public variables plus the server-only service-role and webhook variables.
-7. Configure the GitHub webhook at `/api/webhooks/github` with `GITHUB_WEBHOOK_SECRET`.
+6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables.
+7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions, and App webhook at `/api/webhooks/github`.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
-9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub link → reports/readiness → logout.
-10. Regenerate database types from the live schema if the deployed schema differs.
+9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout.
+10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile`, and regenerate database types from the live schema if the deployed schema differs.
 
 Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.
 

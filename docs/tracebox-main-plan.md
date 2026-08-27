@@ -824,7 +824,7 @@ PRIMARY KEY(issue_id, custom_field_id)
 
 ## 6.26 integrations
 
-Implemented for GitHub in migration `202608260028_phase19_github_integration.sql` and webhook migration `202608260033_github_webhooks.sql`.
+Implemented for GitHub in migrations `202608260028_phase19_github_integration.sql`, `202608260033_github_webhooks.sql`, and `202608260040_github_app_integration.sql`. The App flow verifies installation ownership, supports multiple repository bindings, validates manual links through GitHub's API, records durable webhook deliveries, handles lifecycle changes, and reconciles repository access on a schedule.
 ```text
 id UUID PRIMARY KEY
 project_id UUID NOT NULL
@@ -2024,6 +2024,10 @@ POST   /api/v1/issues/:issueKey/comments
 GET    /api/v1/projects
 GET    /api/v1/milestones
 GET    /api/v1/search
+GET    /api/v1/projects/:projectId/github/repositories
+GET    /api/v1/issues/:issueKey/github-links
+POST   /api/v1/issues/:issueKey/github-links
+DELETE /api/v1/issues/:issueKey/github-links/:linkId
 ```
 
 Token scopes:
@@ -2033,6 +2037,9 @@ issues:read
 issues:write
 comments:write
 projects:read
+integrations:read
+github_links:read
+github_links:write
 ```
 
 Store hashed tokens only.
@@ -2819,7 +2826,7 @@ Phases 1–20 are implemented in the repository. The next work is production val
 
 ```text
 Phase 1–20: complete
-Database migrations: 001–039
-API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/issues/[issueKey]/comments, /api/v1/projects, /api/v1/milestones, /api/v1/search, /api/webhooks/github
+Database migrations: 001–040
+API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/issues/[issueKey]/comments, /api/v1/projects, /api/v1/milestones, /api/v1/search, /api/v1/projects/[projectId]/github/repositories, /api/v1/issues/[issueKey]/github-links, /api/v1/issues/[issueKey]/github-links/[linkId], /api/github/connect, /api/github/callback, /api/github/repositories, /api/github/bind, /api/github/validate-link, /api/github/sync, /api/github/reconcile, /api/webhooks/github
 Production deployment: requires Supabase migration application, Auth URL configuration, Storage bucket verification, Realtime publication verification, Vercel environment configuration, GitHub webhook configuration, and live end-to-end testing
 ```

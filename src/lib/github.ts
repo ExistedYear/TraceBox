@@ -15,3 +15,10 @@ export function extractClosingIssueKeys(text: string): string[] {
   for (const match of text.matchAll(CLOSING_KEY_RE)) keys.push(match[1].toUpperCase());
   return [...new Set(keys)];
 }
+
+export function githubBranchMatches(branch: string, patterns: string[]) {
+  return patterns.some((pattern) => {
+    const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+    return new RegExp(`^${escaped}$`).test(branch);
+  });
+}

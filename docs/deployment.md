@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 39) via SQL Script
+### 1.3 Apply Database Migrations (1 through 40) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 39 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 40 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 39 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 40 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -78,6 +78,7 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 37. `202608260037_restricted_notification_guards.sql`
 38. `202608260038_final_invariant_hardening.sql`
 39. `202608260039_release_validation_fixes.sql`
+40. `202608260040_github_app_integration.sql`
 
 ### 1.4 Configure Supabase Authentication
 
@@ -103,6 +104,15 @@ In your Supabase Dashboard:
    - Authorization callback URL: `https://<your-supabase-project-ref>.supabase.co/auth/v1/callback`
    - Copy Client ID and Client Secret into Supabase **Authentication** → **Providers** → **GitHub**.
 
+3. **GitHub App repository access**:
+   - Create a GitHub App for TraceBox. This is separate from the Supabase GitHub provider used for login.
+   - Enable **Request user authorization (OAuth) during installation** so the callback can verify that the installer owns the installation.
+   - Set the callback URL to `https://<your-vercel-domain>/api/github/callback` (and the localhost equivalent when testing locally).
+   - Request read-only repository permissions: **Metadata**, **Pull requests**, **Contents**, **Checks**, and **Commit statuses**. Add **Actions: Read** only if workflow-run data is later required.
+   - Enable App webhooks for `pull_request`, `push`, `installation`, `installation_repositories`, and `repository` events.
+   - Set the App webhook URL to `https://<your-vercel-domain>/api/webhooks/github` and use the same random secret as `GITHUB_WEBHOOK_SECRET`.
+   - Record the App ID, App slug, Client ID, Client Secret, and downloaded private key for Vercel. The private key and client secret remain server-only.
+
 ---
 
 ### 1.5 Verify Realtime Publication
@@ -127,6 +137,14 @@ In your Supabase Dashboard:
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-public-key>
    SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
    GITHUB_WEBHOOK_SECRET=<random-webhook-secret>
+   GITHUB_APP_ID=<github-app-id>
+   GITHUB_APP_SLUG=<github-app-slug>
+   GITHUB_APP_CLIENT_ID=<github-app-client-id>
+   GITHUB_APP_CLIENT_SECRET=<github-app-client-secret>
+   GITHUB_APP_PRIVATE_KEY=<github-app-private-key-with-escaped-newlines>
+   GITHUB_APP_CALLBACK_URL=http://localhost:3000/api/github/callback
+   GITHUB_API_VERSION=2022-11-28
+   CRON_SECRET=<random-vercel-cron-secret>
    ```
 2. Keep `SUPABASE_SERVICE_ROLE_KEY` and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
 3. Start the local server:
@@ -165,6 +183,14 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key | Browser + server |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret | Server-only API routes |
 | `GITHUB_WEBHOOK_SECRET` | Random webhook signing secret | Server-only webhook route |
+| `GITHUB_APP_ID` | GitHub App numeric ID | Server-only JWT signing |
+| `GITHUB_APP_SLUG` | GitHub App URL slug | Installation redirect |
+| `GITHUB_APP_CLIENT_ID` | GitHub App OAuth client ID | Server-only installation verification |
+| `GITHUB_APP_CLIENT_SECRET` | GitHub App OAuth client secret | Server-only code exchange and state signing |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App PEM private key | Server-only installation tokens |
+| `GITHUB_APP_CALLBACK_URL` | Exact App OAuth callback URL | Server-only code exchange |
+| `GITHUB_API_VERSION` | GitHub REST API version | Server-side GitHub API requests |
+| `CRON_SECRET` | Vercel Cron bearer secret | Server-only reconciliation route |
 
 The service-role key is required by `/api/v1/*` and `/api/webhooks/github`. Vercel server functions may use it, but it must never be named `NEXT_PUBLIC_*`, exposed in client code, returned by an endpoint, logged, or committed.
 
@@ -178,17 +204,20 @@ The deployed API routes are:
 - `POST /api/v1/issues/:issueKey/comments` — `comments:write`
 - `GET /api/v1/milestones` — `milestones:read`
 - `GET /api/v1/search` — `search:read`
+- `GET /api/v1/projects/:projectId/github/repositories` — `integrations:read`
+- `GET /api/v1/issues/:issueKey/github-links` — `github_links:read`
+- `POST /api/v1/issues/:issueKey/github-links` — `github_links:write`
+- `DELETE /api/v1/issues/:issueKey/github-links/:linkId` — `github_links:write`
 
 Legacy `read` and `write` token scopes remain accepted for compatibility. New
 tokens should use the narrow resource scopes above. Every API request must use
 `Authorization: Bearer <token>`; never put a token in a URL or browser bundle.
 
-The GitHub webhook accepts signed `pull_request` and `push` events at
-`/api/webhooks/github`. GitHub must send `X-Hub-Signature-256`, and the value
-must be generated from the raw request body using the same secret as
-`GITHUB_WEBHOOK_SECRET`. Issue keys are read case-insensitively; merged pull
-requests can resolve linked issues only when the project integration toggle is
-enabled and the PR body/title uses a closing phrase such as `Fixes CORE-123`.
+The GitHub App connection starts at `/api/github/connect?project_id=<uuid>` and returns through `/api/github/callback`. The callback validates the signed TraceBox state and verifies the installation through GitHub user authorization before persisting it. The settings page then lists repositories returned by the App, and a project binding can select multiple repositories.
+
+The GitHub webhook accepts signed `pull_request`, `push`, installation lifecycle, repository, and repository-selection events at `/api/webhooks/github`. GitHub must send `X-Hub-Signature-256` and `X-GitHub-Delivery`; the signature is generated from the raw request body using `GITHUB_WEBHOOK_SECRET`. Delivery IDs are persisted for idempotency and processing is acknowledged before downstream work. A failed delivery may be safely retried by GitHub because failed rows are re-opened while processed rows remain idempotently ignored. Issue keys are read case-insensitively; merged pull requests can resolve linked issues only when the project binding enables it, the PR targets a configured branch, and the PR body/title uses a closing phrase such as `Fixes CORE-123`.
+
+`/api/github/reconcile` is protected by `CRON_SECRET` and refreshes App-visible repositories and previously linked pull-request artifacts every six hours. It also marks revoked installations and removed repositories unavailable without deleting historical issue links. The public GitHub-link API performs the same repository, pull-request, commit, or branch verification as the dashboard before creating a link.
 
 ### 3.4 Deploy
 
@@ -252,6 +281,6 @@ Once deployed (or running locally), verify the full user experience across all 2
 11. **Settings**: Go to `/dashboard/settings` and test component creation, label management, version archival, milestone tracking, and workflow visualization.
 12. **Log Out**: Click your avatar menu in the top right → **Log out**. Verify protected routes redirect to `/login`.
 13. **GitHub OAuth**: On `/login`, click **Continue with GitHub** and verify the browser reaches GitHub’s authorization page, then complete the flow with a disposable GitHub account and confirm the callback returns to TraceBox.
-14. **GitHub integration**: In `/dashboard/settings/integrations`, connect `owner/repository`; configure the GitHub webhook URL as `https://<deployment>/api/webhooks/github`, select pull-request and push events, and use the exact `GITHUB_WEBHOOK_SECRET`. Deliver a test PR or push containing an issue key and verify the link/status update.
+14. **GitHub integration**: In `/dashboard/settings/integrations`, click **Connect GitHub**, complete the GitHub App installation, select an accessible repository, and configure target branches such as `main` or `release/*`. Deliver a signed test PR or push containing an issue key and verify the normalized link/status update. Test a repository that is not selected and confirm it cannot be chosen or queried.
 15. **Restricted issues**: Set an issue to restricted, grant only project members, verify an ungranted member cannot open/search/read its comments, attachments, labels, links, or notifications.
 16. **Custom fields and API**: Create a custom field, set its value on an issue, create narrow read/write tokens, verify allowed and denied scopes, test pagination and search/milestones/comments, then revoke a token and verify `401` responses.

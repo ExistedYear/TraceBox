@@ -214,6 +214,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
           <Surface className="p-4">
             <IssueGithubLinksSection key={`github-${issue.id}`}
               issueId={issue.id}
+              projectId={project.id}
               canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
               initialLinks={(githubLinkRows ?? []) as any}
             />

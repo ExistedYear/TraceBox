@@ -16,7 +16,14 @@
      - **Site URL**: `https://<your-vercel-domain>.vercel.app` (or `http://localhost:3000`)
      - **Redirect URLs**:
        - `https://<your-vercel-domain>.vercel.app/**`
-       - `http://localhost:3000/**`
+      - `http://localhost:3000/**`
+
+## 1.1 GitHub App repository connection
+- **Status**: Implemented in source; requires a GitHub App installation and Vercel server variables.
+- GitHub login and repository access are intentionally separate. Login creates the TraceBox session; **Connect GitHub** in project settings performs an explicit App installation.
+- The callback verifies the signed TraceBox state and checks the installation through GitHub user authorization before persisting it.
+- Repository access is read-only and selected per GitHub account/organization. The project can bind multiple verified repositories.
+- Verify App webhook events, delivery idempotency, lifecycle status changes, branch-aware auto-resolution, and six-hour reconciliation after deployment.
 
 ---
 
@@ -30,7 +37,7 @@
 ## 3. External deployment validation
 
 - **Status**: Pending external setup, not a source-code defect.
-- Apply migrations `202608260001` through `202608260039` to the intended Supabase project.
+- Apply migrations `202608260001` through `202608260040` to the intended Supabase project.
 - Verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, Vercel server-only variables, and GitHub webhook.
 - Run the full live flow documented in `deployment.md`, including restricted issue isolation, attachment lifecycle, API-token scopes, and webhook linking.
 

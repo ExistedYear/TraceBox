@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub integration & PR links**, and **custom fields + public REST API** with scoped tokens.
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub App integration & PR links**, and **custom fields + public REST API** with scoped tokens.
 
 ## Architecture & Data Flow
 
@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (39 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (40 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -122,6 +122,9 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
+- **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
+- **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
+- **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` for idempotency, process lifecycle events, and retain historical TraceBox links when GitHub access is removed. Never send restricted issue metadata back to GitHub.
 
 ## Important Files
 
@@ -173,6 +176,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260037_restricted_notification_guards.sql` | Restricted issue watcher and mention notification guards |
 | `supabase/migrations/202608260038_final_invariant_hardening.sql` | Archived-project watcher checks and API token hash constraints |
 | `supabase/migrations/202608260039_release_validation_fixes.sql` | Release validation fixes: API issue argument ordering and granular scopes/comments, GitHub webhook upserts + optional merge resolution, issue-link authorization, typed custom-field validation, and saved-view sharing |
+| `supabase/migrations/202608260040_github_app_integration.sql` | Verified GitHub App installations, repository catalog/bindings, normalized artifacts, durable webhook deliveries, lifecycle RPCs, and branch-aware resolution |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -180,14 +184,19 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/reports/reports-dashboard.tsx` | Phase 14 time-window metrics, MTTR, aging, component, and priority reports |
 | `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
 | `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
-| `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, and search |
-| `src/app/api/webhooks/github/` | HMAC-verified GitHub PR/commit issue-key webhook ingestion |
+| `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, search, and verified GitHub resources |
+| `src/app/api/webhooks/github/` | HMAC-verified, idempotent GitHub App webhook ingestion with lifecycle handling and legacy fallback |
 | `src/components/tracebox/markdown-content.tsx` | Safe GFM renderer for issue descriptions and comments; raw HTML remains disabled |
 | `src/lib/github.ts` | Repository normalization and case-insensitive issue/closing-key extraction |
+| `src/lib/github-app.ts` | Server-side GitHub App JWT, user-code exchange, installation tokens, repository/API helpers with bounded requests |
+| `src/lib/github-connect-state.ts` | Signed, expiring TraceBox user/workspace/project state for GitHub App installation callbacks |
+| `src/lib/github-repository-sync.ts` | Installation repository reconciliation and access lifecycle updates |
+| `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding, link verification, sync, and cron reconciliation routes |
+| `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 
-Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, required by `/api/v1/*` and `/api/webhooks/github`), `GITHUB_WEBHOOK_SECRET` (server-only webhook verification). `.env*` is gitignored except `.env.example`.
+Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, required by `/api/v1/*` and server GitHub routes), `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CALLBACK_URL`, `GITHUB_API_VERSION`, and `CRON_SECRET` (all GitHub/cron secrets server-only). `.env*` is gitignored except `.env.example`.
 
 ## Runtime/Tooling Preferences
 
@@ -203,6 +212,6 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 
 - **Vitest 4**, run-only: `npm test` (equivalent to `vitest run`).
 - Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
-- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`, `comment`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`), comment helpers (`tokenizeCommentBody`, `buildTimeline`, `excerptBody`, `COMMENT_ADDED/EDITED` summaries).
+- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`, `comment`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`), comment helpers (`tokenizeCommentBody`, `buildTimeline`, `excerptBody`, `COMMENT_ADDED/EDITED` summaries), GitHub repository/key extraction, branch matching, and signed connection-state helpers.
 - Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build`.
 - The tracked unit suite remains Vitest-only. A separate ignored black-box Playwright suite exists under `qa/live/`; it is installed and run independently with deployment credentials and must not be added to CI or committed with secrets.
