@@ -97,7 +97,7 @@ function Composer({ issueId, currentUserId, onAdded }: { issueId: string; curren
       <textarea
         id="comment-body"
         rows={3}
-        placeholder="Markdown supported · @mention · TRACE-123 refs are styled"
+        placeholder="leave a comment... (@mention, KEY-123 supported)"
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         {...form.register("body")}
       />

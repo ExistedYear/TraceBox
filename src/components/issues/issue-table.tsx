@@ -400,7 +400,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       />
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Search by title, description, or KEY-123..."
+          placeholder="search title, description, or KEY-123..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="h-7 w-48 text-xs sm:w-64"

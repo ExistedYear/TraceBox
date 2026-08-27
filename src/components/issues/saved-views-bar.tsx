@@ -119,7 +119,7 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, onApply, 
 
       <div className="ml-auto flex items-center gap-1.5">
         <Input
-          placeholder="View name"
+          placeholder="saved view name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="h-7 w-32 text-xs"

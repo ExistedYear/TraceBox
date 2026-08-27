@@ -91,7 +91,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
               setHighlighted(0);
             }}
             onKeyDown={onKeyDown}
-            placeholder="Search workspace..."
+            placeholder="type a command or search..."
             className="h-8 border-0 px-0 shadow-none focus-visible:ring-0"
           />
         </div>

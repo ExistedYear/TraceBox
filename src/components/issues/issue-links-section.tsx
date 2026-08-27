@@ -159,7 +159,7 @@ export function IssueLinksSection({ issueId, projectId, projectKey, canEdit }: P
               <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
             ))}
           </select>
-          <Input placeholder="TARGET-42" value={targetKey} onChange={(e) => setTargetKey(e.target.value.toUpperCase())} className="h-8 flex-1 font-mono text-xs" />
+          <Input placeholder="issue key (e.g. KEY-42)" value={targetKey} onChange={(e) => setTargetKey(e.target.value.toUpperCase())} className="h-8 flex-1 font-mono text-xs" />
           <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => void handleAdd()} disabled={adding}>
             {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Link
           </Button>

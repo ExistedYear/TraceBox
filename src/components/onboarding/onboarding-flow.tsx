@@ -123,14 +123,14 @@ export function OnboardingFlow() {
               <form onSubmit={workspaceForm.handleSubmit(submitWorkspace)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="workspace-name">Workspace name</Label>
-                  <Input id="workspace-name" autoComplete="organization" placeholder="Acme Engineering" {...workspaceNameField} onChange={(event) => { workspaceNameField.onChange(event); setWorkspaceName(event.target.value); }} />
+                  <Input id="workspace-name" autoComplete="organization" placeholder="workspace name" {...workspaceNameField} onChange={(event) => { workspaceNameField.onChange(event); setWorkspaceName(event.target.value); }} />
                   {workspaceForm.formState.errors.name && <p className="text-xs text-destructive">{workspaceForm.formState.errors.name.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="workspace-slug">Workspace URL</Label>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground">/</span>
-                    <Input id="workspace-slug" className="font-mono" placeholder="acme-engineering" {...workspaceForm.register("slug")} onChange={(event) => { workspaceForm.setValue("slug", event.target.value.toLowerCase(), { shouldValidate: true, shouldDirty: true }); }} onBlur={() => { if (!workspaceForm.getValues("slug") && suggestedSlug) workspaceForm.setValue("slug", suggestedSlug, { shouldValidate: true, shouldDirty: true }); }} />
+                    <Input id="workspace-slug" className="font-mono" placeholder="workspace-slug" {...workspaceForm.register("slug")} onChange={(event) => { workspaceForm.setValue("slug", event.target.value.toLowerCase(), { shouldValidate: true, shouldDirty: true }); }} onBlur={() => { if (!workspaceForm.getValues("slug") && suggestedSlug) workspaceForm.setValue("slug", suggestedSlug, { shouldValidate: true, shouldDirty: true }); }} />
                   </div>
                   {!workspaceForm.formState.errors.slug && suggestedSlug && <p className="text-xs text-muted-foreground">Suggested: <span className="font-mono">{suggestedSlug}</span></p>}
                   {workspaceForm.formState.errors.slug && <p className="text-xs text-destructive">{workspaceForm.formState.errors.slug.message}</p>}
@@ -153,18 +153,18 @@ export function OnboardingFlow() {
                 <div className="grid grid-cols-[1fr_96px] gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="project-name">Project name</Label>
-                    <Input id="project-name" placeholder="Authentication Service" {...projectForm.register("name")} />
+                    <Input id="project-name" placeholder="project name" {...projectForm.register("name")} />
                     {projectForm.formState.errors.name && <p className="text-xs text-destructive">{projectForm.formState.errors.name.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="project-key">Key</Label>
-                    <Input id="project-key" className="font-mono uppercase" placeholder="AUTH" {...projectForm.register("key")} onChange={(event) => { projectForm.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
+                    <Input id="project-key" className="font-mono uppercase" placeholder="CORE" {...projectForm.register("key")} onChange={(event) => { projectForm.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
                     {projectForm.formState.errors.key && <p className="text-xs text-destructive">{projectForm.formState.errors.key.message}</p>}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="project-description">Description <span className="text-muted-foreground">(optional)</span></Label>
-                  <Input id="project-description" placeholder="What this project covers" {...projectForm.register("description")} />
+                  <Input id="project-description" placeholder="project scope or description" {...projectForm.register("description")} />
                   {projectForm.formState.errors.description && <p className="text-xs text-destructive">{projectForm.formState.errors.description.message}</p>}
                 </div>
                 <Separator />

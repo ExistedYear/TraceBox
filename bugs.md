@@ -28,3 +28,5 @@
   1. Add a "Forgot password?" link on `/login` routing to `/forgot-password`.
   2. Create `ForgotPasswordForm` calling `supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback?next=/reset-password` })`.
   3. Add `/reset-password` page with `ResetPasswordForm` calling `supabase.auth.updateUser({ password: newPassword })`.
+
+## 3. Confirm Password during SignUp does not exist.

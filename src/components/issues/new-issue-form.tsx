@@ -127,7 +127,7 @@ export function NewIssueForm({
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="issue-title">Title</Label>
-        <Input id="issue-title" placeholder="Short, specific summary" {...form.register("title")} />
+        <Input id="issue-title" placeholder="summary of the issue" {...form.register("title")} />
         {form.formState.errors.title && <p className={errorClass}>{form.formState.errors.title.message}</p>}
         {duplicateCandidates.length > 0 && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
@@ -175,7 +175,7 @@ export function NewIssueForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="issue-description">Description</Label>
-        <textarea id="issue-description" rows={6} placeholder="What happened? What should happen instead?" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register("description")} />
+        <textarea id="issue-description" rows={6} placeholder="details, reproduction steps, or expected behavior" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...form.register("description")} />
         {form.formState.errors.description && <p className={errorClass}>{form.formState.errors.description.message}</p>}
       </div>
 
@@ -214,10 +214,10 @@ export function NewIssueForm({
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Environment" id="issue-environment" register={form.register("environment")} error={form.formState.errors.environment?.message} />
-            <Field label="Steps to reproduce" id="issue-steps" register={form.register("steps_to_reproduce")} error={form.formState.errors.steps_to_reproduce?.message} />
-            <Field label="Expected behaviour" id="issue-expected" register={form.register("expected_behavior")} error={form.formState.errors.expected_behavior?.message} />
-            <Field label="Actual behaviour" id="issue-actual" register={form.register("actual_behavior")} error={form.formState.errors.actual_behavior?.message} />
+            <Field label="Environment" id="issue-environment" placeholder="browser, OS, or runtime version" register={form.register("environment")} error={form.formState.errors.environment?.message} />
+            <Field label="Steps to reproduce" id="issue-steps" placeholder="1. step one, 2. step two" register={form.register("steps_to_reproduce")} error={form.formState.errors.steps_to_reproduce?.message} />
+            <Field label="Expected behaviour" id="issue-expected" placeholder="what should happen" register={form.register("expected_behavior")} error={form.formState.errors.expected_behavior?.message} />
+            <Field label="Actual behaviour" id="issue-actual" placeholder="what actually happened" register={form.register("actual_behavior")} error={form.formState.errors.actual_behavior?.message} />
           </div>
         </div>
       )}
@@ -233,11 +233,11 @@ export function NewIssueForm({
   );
 }
 
-function Field({ label, id, register, error }: { label: string; id: string; register: Record<string, unknown>; error?: string }) {
+function Field({ label, id, placeholder, register, error }: { label: string; id: string; placeholder?: string; register: Record<string, unknown>; error?: string }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <textarea id={id} rows={2} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...register} />
+      <textarea id={id} rows={2} placeholder={placeholder} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" {...register} />
       {error && <p className={errorClass}>{error}</p>}
     </div>
   );

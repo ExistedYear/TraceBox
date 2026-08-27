@@ -726,12 +726,12 @@ export function ProjectSettings({
           <form onSubmit={compForm.handleSubmit(saveComponent)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="component-name">Name</Label>
-              <Input id="component-name" placeholder="Authentication" {...compForm.register("name")} />
+              <Input id="component-name" placeholder="component name" {...compForm.register("name")} />
               {compForm.formState.errors.name && <p className="text-xs text-destructive">{compForm.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="component-description">Description <span className="text-muted-foreground">(optional)</span></Label>
-              <Input id="component-description" placeholder="What this component covers" {...compForm.register("description")} />
+              <Input id="component-description" placeholder="component scope or description" {...compForm.register("description")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="component-assignee">Default assignee</Label>
@@ -762,19 +762,19 @@ export function ProjectSettings({
           <form onSubmit={labelForm.handleSubmit(saveLabel)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="label-name">Name</Label>
-              <Input id="label-name" placeholder="security, bug, frontend" {...labelForm.register("name")} />
+              <Input id="label-name" placeholder="label name" {...labelForm.register("name")} />
               {labelForm.formState.errors.name && <p className="text-xs text-destructive">{labelForm.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="label-color">Color</Label>
               <div className="flex items-center gap-2">
                 <input type="color" className="h-9 w-12 cursor-pointer rounded border border-input bg-background p-1" {...labelForm.register("color")} />
-                <Input placeholder="#6366f1" {...labelForm.register("color")} />
+                <Input placeholder="#hex" {...labelForm.register("color")} />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="label-description">Description <span className="text-muted-foreground">(optional)</span></Label>
-              <Input id="label-description" placeholder="Brief description of label usage" {...labelForm.register("description")} />
+              <Input id="label-description" placeholder="label purpose or usage" {...labelForm.register("description")} />
             </div>
             <DialogFooter>
               <Button type="submit" disabled={labelForm.formState.isSubmitting}>
@@ -796,7 +796,7 @@ export function ProjectSettings({
           <form onSubmit={versionForm.handleSubmit(saveVersion)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="version-name">Version name</Label>
-              <Input id="version-name" placeholder="v1.0.0, 2026.1" {...versionForm.register("name")} />
+              <Input id="version-name" placeholder="version name (e.g. v1.0)" {...versionForm.register("name")} />
               {versionForm.formState.errors.name && <p className="text-xs text-destructive">{versionForm.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
@@ -805,7 +805,7 @@ export function ProjectSettings({
             </div>
             <div className="space-y-2">
               <Label htmlFor="version-desc">Description <span className="text-muted-foreground">(optional)</span></Label>
-              <Input id="version-desc" placeholder="Scope of this version" {...versionForm.register("description")} />
+              <Input id="version-desc" placeholder="version release notes or scope" {...versionForm.register("description")} />
             </div>
             <DialogFooter>
               <Button type="submit" disabled={versionForm.formState.isSubmitting}>
@@ -827,7 +827,7 @@ export function ProjectSettings({
           <form onSubmit={milestoneForm.handleSubmit(saveMilestone)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="milestone-name">Milestone title</Label>
-              <Input id="milestone-name" placeholder="Sprint 24, Q3 Release" {...milestoneForm.register("name")} />
+              <Input id="milestone-name" placeholder="milestone title" {...milestoneForm.register("name")} />
               {milestoneForm.formState.errors.name && <p className="text-xs text-destructive">{milestoneForm.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
@@ -844,7 +844,7 @@ export function ProjectSettings({
             </div>
             <div className="space-y-2">
               <Label htmlFor="milestone-desc">Description <span className="text-muted-foreground">(optional)</span></Label>
-              <Input id="milestone-desc" placeholder="Goal and deliverables" {...milestoneForm.register("description")} />
+              <Input id="milestone-desc" placeholder="milestone goals or deliverables" {...milestoneForm.register("description")} />
             </div>
             <DialogFooter>
               <Button type="submit" disabled={milestoneForm.formState.isSubmitting}>

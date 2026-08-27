@@ -202,18 +202,18 @@ function NewProjectDialog({ open, onOpenChange, organizationId, onCreated }: { o
           <div className="grid grid-cols-[1fr_96px] gap-3">
             <div className="space-y-2">
               <Label htmlFor="dialog-project-name">Name</Label>
-              <Input id="dialog-project-name" placeholder="Authentication Service" {...form.register("name")} />
+              <Input id="dialog-project-name" placeholder="project name" {...form.register("name")} />
               {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="dialog-project-key">Key</Label>
-              <Input id="dialog-project-key" className="font-mono uppercase" placeholder="AUTH" {...form.register("key")} onChange={(event) => { form.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
+              <Input id="dialog-project-key" className="font-mono uppercase" placeholder="CORE" {...form.register("key")} onChange={(event) => { form.setValue("key", event.target.value.toUpperCase(), { shouldValidate: true, shouldDirty: true }); }} />
               {form.formState.errors.key && <p className="text-xs text-destructive">{form.formState.errors.key.message}</p>}
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="dialog-project-description">Description <span className="text-muted-foreground">(optional)</span></Label>
-            <Input id="dialog-project-description" placeholder="What this project covers" {...form.register("description")} />
+            <Input id="dialog-project-description" placeholder="project scope or description" {...form.register("description")} />
           </div>
           <DialogFooter>
             <Button type="submit" disabled={form.formState.isSubmitting}>
