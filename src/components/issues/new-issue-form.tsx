@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -134,7 +135,14 @@ export function NewIssueForm({
             <ul className="mt-1 space-y-1">
               {duplicateCandidates.map((c) => (
                 <li key={c.issue_number} className="text-xs text-muted-foreground">
-                  <span className="font-mono text-primary">{formatIssueKey(projectKey, c.issue_number)}</span> · {c.title}
+                  <Link
+                    href={`/dashboard/issues/${formatIssueKey(projectKey, c.issue_number)}`}
+                    target="_blank"
+                    className="font-mono text-primary hover:underline"
+                  >
+                    {formatIssueKey(projectKey, c.issue_number)}
+                  </Link>{" "}
+                  · {c.title}
                 </li>
               ))}
             </ul>

@@ -323,6 +323,9 @@ export function ProjectSettings({
   }
 
   async function deleteLabel(id: string) {
+    if (!window.confirm("Are you sure you want to delete this label? It will be removed from all issues.")) {
+      return;
+    }
     try {
       const { error } = await createClient().rpc("delete_label", { p_label_id: id });
       if (error) {
@@ -398,6 +401,28 @@ export function ProjectSettings({
     setEditingVersion(null);
   }
 
+  async function toggleArchiveVersion(version: VersionRow) {
+    try {
+      const { error } = await createClient().rpc("update_version", {
+        p_version_id: version.id,
+        p_name: version.name,
+        p_description: version.description || undefined,
+        p_released_at: version.released_at ? new Date(version.released_at).toISOString() : undefined,
+        p_is_released: version.is_released,
+        p_is_archived: !version.is_archived,
+      });
+      if (error) {
+        toast.error("Could not update version archive status.");
+        return;
+      }
+      setVersions((prev) =>
+        prev.map((v) => (v.id === version.id ? { ...v, is_archived: !v.is_archived } : v)),
+      );
+      toast.success(version.is_archived ? "Version restored." : "Version archived.");
+    } catch {
+      toast.error("Could not reach the server.");
+    }
+  }
   // Milestone Actions
   function openAddMilestone() {
     setEditingMilestone(null);
@@ -574,26 +599,34 @@ export function ProjectSettings({
                 <p className="mt-0.5 text-xs text-muted-foreground">Target software releases and affected version milestones.</p>
               </div>
               {canManage && (
-                <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={openAddVersion}><Plus className="h-3.5 w-3.5" /> Add version</Button>
+                <Button size="sm" className="h-7 gap-1 text-xs" onClick={openAddVersion}>
+                  <Plus className="h-3.5 w-3.5" /> Add Version
+                </Button>
               )}
             </div>
             {versions.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No versions tracked yet.</p>
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">No versions defined.</p>
             ) : (
-              <ul className="divide-y divide-border/70">
+              <ul className="divide-y divide-border/60">
                 {versions.map((v) => (
-                  <li key={v.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <li key={v.id} className={cn("flex items-center justify-between gap-3 px-4 py-3", v.is_archived && "opacity-55")}>
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-semibold">{v.name}</span>
                         {v.is_released && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-emerald-400">released</span>}
+                        {v.is_archived && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted-foreground">archived</span>}
                       </div>
                       {v.description && <p className="text-xs text-muted-foreground">{v.description}</p>}
                     </div>
                     {canManage && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => openEditVersion(v)}>
-                        <Pencil className="h-3 w-3" /> Edit
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => openEditVersion(v)}>
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground" onClick={() => void toggleArchiveVersion(v)}>
+                          <Archive className="h-3 w-3" /> {v.is_archived ? "Restore" : "Archive"}
+                        </Button>
+                      </div>
                     )}
                   </li>
                 ))}

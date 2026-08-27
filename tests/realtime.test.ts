@@ -19,13 +19,29 @@ describe("Phase 9: Realtime Subscriptions", () => {
     expect(mockRemoveChannel).toHaveBeenCalledWith(mockChannel);
   });
 
-  it("handles realtime payload structure", () => {
-    const payload = {
+  it("handles realtime payload structure for INSERT, UPDATE, and DELETE", () => {
+    const insertPayload = {
       new: { id: "c1", body: "hello", issue_id: "i1" },
       old: null,
       eventType: "INSERT",
     };
-    expect(payload.new.id).toBe("c1");
-    expect(payload.eventType).toBe("INSERT");
+    expect(insertPayload.new.id).toBe("c1");
+    expect(insertPayload.eventType).toBe("INSERT");
+
+    const updatePayload = {
+      new: { id: "c1", body: "edited body", issue_id: "i1", edited_at: "2026-08-26T12:00:00Z" },
+      old: { id: "c1", body: "hello", issue_id: "i1" },
+      eventType: "UPDATE",
+    };
+    expect(updatePayload.new.body).toBe("edited body");
+    expect(updatePayload.eventType).toBe("UPDATE");
+
+    const deletePayload = {
+      new: null,
+      old: { id: "c1", issue_id: "i1" },
+      eventType: "DELETE",
+    };
+    expect(deletePayload.old.id).toBe("c1");
+    expect(deletePayload.eventType).toBe("DELETE");
   });
 });

@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -101,7 +100,6 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   // Monotonic request id: stale responses never overwrite newer results.
   const requestSeq = useRef(0);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     void (async () => {
       const supabase = createClient();
@@ -110,12 +108,10 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     })();
   }, [projectId]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setPage(0);
   }, [filters, sorting, searchQuery]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const url = new URL(window.location.href);
     url.search = new URLSearchParams(encodeIssueFilters(filters)).toString();
@@ -398,6 +394,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           aria-label="Search issues"
         />
         <select aria-label="Status filter" className={selectClass} value={filters.statusId ?? ""} onChange={(event) => setFilter("statusId", event.target.value)}>
+          <option value="">All statuses</option>
           {states.map((state) => (
             <option key={state.value} value={state.value}>{state.label}</option>
           ))}

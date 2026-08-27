@@ -184,6 +184,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "issues_affected_version_id_fkey";
+            columns: ["affected_version_id"];
+            isOneToOne: false;
+            referencedRelation: "versions";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "issues_assignee_id_fkey";
             columns: ["assignee_id"];
             isOneToOne: false;
@@ -216,6 +223,13 @@ export type Database = {
             columns: ["status_id"];
             isOneToOne: false;
             referencedRelation: "workflow_states";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_target_milestone_id_fkey";
+            columns: ["target_milestone_id"];
+            isOneToOne: false;
+            referencedRelation: "milestones";
             referencedColumns: ["id"];
           },
         ];
@@ -749,10 +763,24 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "notifications_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "notifications_issue_id_fkey";
             columns: ["issue_id"];
             isOneToOne: false;
             referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -820,6 +848,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "saved_views_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "saved_views_project_id_fkey";
             columns: ["project_id"];
             isOneToOne: false;
@@ -854,6 +889,13 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "issue_links_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "issue_links_source_issue_id_fkey";
             columns: ["source_issue_id"];

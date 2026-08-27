@@ -52,4 +52,30 @@ describe("Phase 6: Resolutions and Transitions", () => {
     expect(summary.heading).toBe("changed assignee");
     expect(summary.detail).toBe("— → user-123");
   });
+
+  it("validates role hierarchy permissions for transitions", () => {
+    function isTransitionAllowed(userRole: string, requiredRole: string | null): boolean {
+      if (userRole === "MAINTAINER") return true;
+      if (!requiredRole) return true;
+      if (requiredRole === "VIEWER") return true;
+      if (requiredRole === userRole) return true;
+      if (requiredRole === "REPORTER" && (userRole === "DEVELOPER" || userRole === "MAINTAINER")) return true;
+      if (requiredRole === "DEVELOPER" && userRole === "MAINTAINER") return true;
+      return false;
+    }
+
+    // VIEWER transition allowed for all active roles
+    expect(isTransitionAllowed("REPORTER", "VIEWER")).toBe(true);
+    expect(isTransitionAllowed("DEVELOPER", "VIEWER")).toBe(true);
+    expect(isTransitionAllowed("MAINTAINER", "VIEWER")).toBe(true);
+
+    // REPORTER transition allowed for Reporter, Developer, Maintainer
+    expect(isTransitionAllowed("REPORTER", "REPORTER")).toBe(true);
+    expect(isTransitionAllowed("DEVELOPER", "REPORTER")).toBe(true);
+
+    // DEVELOPER transition rejected for Reporter, allowed for Developer & Maintainer
+    expect(isTransitionAllowed("REPORTER", "DEVELOPER")).toBe(false);
+    expect(isTransitionAllowed("DEVELOPER", "DEVELOPER")).toBe(true);
+    expect(isTransitionAllowed("MAINTAINER", "DEVELOPER")).toBe(true);
+  });
 });

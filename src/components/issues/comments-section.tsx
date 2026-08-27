@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, Pencil, X } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -38,7 +39,7 @@ function CommentBody({ body }: { body: string }) {
     <p className="whitespace-pre-wrap break-words text-sm leading-6">
       {tokens.map((token, index) => {
         if (token.kind === "mention") return <span key={index} className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">{token.text}</span>;
-        if (token.kind === "issue-ref") return <span key={index} className="font-mono text-xs font-medium text-primary underline decoration-primary/30 underline-offset-2">{token.text}</span>;
+        if (token.kind === "issue-ref") return <Link key={index} href={`/dashboard/issues/${token.text}`} className="font-mono text-xs font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary">{token.text}</Link>;
         return <span key={index}>{token.text}</span>;
       })}
     </p>
@@ -217,10 +218,19 @@ export function CommentsSection({ issueId, projectKey: _projectKey, currentUserI
   }
   const timeline = useMemo(() => buildTimeline(events, comments), [events, comments]);
 
-  useRealtimeComments(issueId, (payload) => {
-    const newComment = payload as TimelineComment;
-    // Avoid duplicate if already added optimistically
-    setComments((prev) => (prev.some((c) => c.id === newComment.id) ? prev : [...prev, newComment]));
+  useRealtimeComments(issueId, {
+    onInsert: (payload) => {
+      const newComment = payload as TimelineComment;
+      setComments((prev) => (prev.some((c) => c.id === newComment.id) ? prev : [...prev, newComment]));
+    },
+    onUpdate: (payload) => {
+      const updated = payload as TimelineComment;
+      setComments((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+    },
+    onDelete: (payload) => {
+      const deleted = payload as TimelineComment;
+      setComments((prev) => prev.filter((c) => c.id !== deleted.id));
+    },
   });
 
   function handleAdded(comment: TimelineComment) {

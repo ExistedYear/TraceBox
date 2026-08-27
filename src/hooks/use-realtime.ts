@@ -81,11 +81,26 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
   }, [table, filter, enabled]);
 }
 
-export function useRealtimeComments(issueId: string, onNewComment: (comment: unknown) => void) {
+export function useRealtimeComments(
+  issueId: string,
+  callbacks:
+    | {
+        onInsert?: (comment: unknown) => void;
+        onUpdate?: (comment: unknown) => void;
+        onDelete?: (comment: unknown) => void;
+      }
+    | ((comment: unknown) => void),
+) {
+  const onInsert = typeof callbacks === "function" ? callbacks : callbacks.onInsert;
+  const onUpdate = typeof callbacks === "function" ? undefined : callbacks.onUpdate;
+  const onDelete = typeof callbacks === "function" ? undefined : callbacks.onDelete;
+
   useRealtimeSubscription({
     table: "comments",
     filter: `issue_id=eq.${issueId}`,
-    onInsert: onNewComment,
+    onInsert,
+    onUpdate,
+    onDelete,
     enabled: Boolean(issueId),
   });
 }
