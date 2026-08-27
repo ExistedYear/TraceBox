@@ -28,10 +28,10 @@ function SidebarLink({ href, label, icon: Icon, collapsed, onNavigate }: { href:
 }
 
 function SidebarContent({ mobile = false, collapsed = false, onCollapse, onNavigate, switcher }: { mobile?: boolean; collapsed?: boolean; onCollapse?: () => void; onNavigate?: () => void; switcher?: React.ReactNode }) {
-  return <div className={cn("flex h-full flex-col", mobile ? "p-4" : "p-3")}>
-    <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between px-1")}>
-      <Link href="/dashboard" onClick={onNavigate} aria-label="TraceBox dashboard"><TraceLogo /></Link>
-      {!mobile && onCollapse && <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={onCollapse} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}</Button>}
+  return <div className={cn("flex h-full min-w-0 flex-col overflow-x-hidden", mobile ? "p-4" : collapsed ? "p-2" : "p-3")}>
+    <div className={cn("flex items-center", collapsed ? "justify-between" : "justify-between px-1")}>
+      <Link href="/dashboard" onClick={onNavigate} aria-label="TraceBox dashboard"><TraceLogo compact={collapsed} /></Link>
+      {!mobile && onCollapse && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" onClick={onCollapse} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}</Button>}
     </div>
     {!collapsed && switcher && <div className="mt-4">{switcher}</div>}
     <nav aria-label="Workspace navigation" className={cn("mt-6 space-y-1", collapsed && "mt-8")}>
