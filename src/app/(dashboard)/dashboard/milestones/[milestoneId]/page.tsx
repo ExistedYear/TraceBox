@@ -21,9 +21,13 @@ import { cn } from "@/lib/utils";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 type Params = Promise<{ milestoneId: string }>;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { milestoneId } = await params;
+  if (!UUID_REGEX.test(milestoneId)) {
+    return { title: "Milestone" };
+  }
   const supabase = await createClient();
   const { data: milestone } = await supabase
     .from("milestones")
@@ -35,9 +39,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function MilestoneDetailPage({ params }: { params: Params }) {
   const { milestoneId } = await params;
+  if (!UUID_REGEX.test(milestoneId)) {
+    notFound();
+  }
   const context = await getWorkspaceContext();
   const supabase = await createClient();
-
   const { data: milestone } = await supabase
     .from("milestones")
     .select("*, project:projects (id, key, name, organization_id)")

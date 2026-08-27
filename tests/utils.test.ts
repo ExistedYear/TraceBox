@@ -45,6 +45,10 @@ describe("getSafeWorkspaceErrorMessage", () => {
 
   it("maps the NOT_ORG_ADMIN rpc failure and falls back generically", () => {
     expect(getSafeWorkspaceErrorMessage({ message: "NOT_ORG_ADMIN" })).toBe("Only workspace owners and admins can create projects.");
+    expect(getSafeWorkspaceErrorMessage({ message: "PROJECT_ARCHIVED" })).toBe("This project is archived and cannot be modified.");
+    expect(getSafeWorkspaceErrorMessage({ message: "INVALID_ASSIGNEE" })).toBe("Selected assignee is not an eligible member of this project.");
+    expect(getSafeWorkspaceErrorMessage({ message: "INVALID_COMPONENT" })).toBe("Selected component is invalid or archived.");
+    expect(getSafeWorkspaceErrorMessage({ message: "NOT_ALLOWED" })).toBe("You do not have permission to perform this action.");
     expect(getSafeWorkspaceErrorMessage({})).toBe("Something went wrong. Please try again.");
   });
 });

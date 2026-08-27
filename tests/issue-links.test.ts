@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-
+import { eventSummary } from "../src/lib/issues";
 const VALID_RELATIONSHIPS = ["BLOCKS", "DEPENDS_ON", "DUPLICATE_OF", "RELATES_TO", "CAUSED_BY", "REGRESSION_OF"] as const;
 
 function isValidRelationship(rel: string): boolean {
@@ -66,5 +66,27 @@ describe("Phase 11: Dependencies & Duplicates", () => {
   it("handles duplicate resolution mapping", () => {
     const resolutionForDuplicate = "DUPLICATE";
     expect(["FIXED", "DUPLICATE", "WONT_FIX", "INVALID", "CANNOT_REPRODUCE", "WORKS_AS_EXPECTED"]).toContain(resolutionForDuplicate);
+  });
+
+  it("formats ISSUE_LINKED and ISSUE_UNLINKED timeline event summaries", () => {
+    const linkedEvent = {
+      event_type: "ISSUE_LINKED",
+      field_name: "issue_link",
+      new_value: "AUTH-42",
+      metadata: { relationship: "BLOCKS" },
+    };
+    const linkedSummary = eventSummary(linkedEvent);
+    expect(linkedSummary.heading).toBe("linked issue");
+    expect(linkedSummary.detail).toBe("blocks AUTH-42");
+
+    const unlinkedEvent = {
+      event_type: "ISSUE_UNLINKED",
+      field_name: "issue_link",
+      old_value: "AUTH-42",
+      metadata: { relationship: "BLOCKS" },
+    };
+    const unlinkedSummary = eventSummary(unlinkedEvent);
+    expect(unlinkedSummary.heading).toBe("unlinked issue");
+    expect(unlinkedSummary.detail).toBe("blocks AUTH-42");
   });
 });

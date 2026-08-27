@@ -17,4 +17,10 @@ describe("componentSchema", () => {
     expect(componentSchema.safeParse({ name: "Auth", description: "x".repeat(281) }).success).toBe(false);
     expect(componentSchema.safeParse({ name: "Auth", description: "Login flows" }).success).toBe(true);
   });
+
+  it("validates default_assignee_id as uuid or empty", () => {
+    expect(componentSchema.safeParse({ name: "Auth", default_assignee_id: "11111111-1111-4111-8111-111111111111" }).success).toBe(true);
+    expect(componentSchema.safeParse({ name: "Auth", default_assignee_id: "" }).success).toBe(true);
+    expect(componentSchema.safeParse({ name: "Auth", default_assignee_id: "not-a-uuid" }).success).toBe(false);
+  });
 });

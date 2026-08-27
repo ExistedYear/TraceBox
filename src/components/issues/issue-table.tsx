@@ -95,8 +95,15 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [editingId, setEditingId] = useState<string | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [savedViews, setSavedViews] = useState<Array<{ id: string; project_id: string; name: string; filters: Record<string, string>; is_shared: boolean; created_by: string }>>([]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   // Monotonic request id: stale responses never overwrite newer results.
   const requestSeq = useRef(0);
 
@@ -110,8 +117,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
   useEffect(() => {
     setPage(0);
-  }, [filters, sorting, searchQuery]);
-
+  }, [filters, sorting, debouncedQuery]);
   useEffect(() => {
     const url = new URL(window.location.href);
     url.search = new URLSearchParams(encodeIssueFilters(filters)).toString();
@@ -131,10 +137,17 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
-    if (searchQuery.trim()) {
-      const raw = searchQuery.trim();
+    if (debouncedQuery.trim()) {
+      const raw = debouncedQuery.trim();
       const numMatch = /^([A-Za-z]+-)?(\d+)$/.exec(raw);
-      const escaped = raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "\\,").replace(/"/g, '\\"');
+      const escaped = raw
+        .replace(/\\/g, "\\\\")
+        .replace(/%/g, "\\%")
+        .replace(/_/g, "\\_")
+        .replace(/,/g, "\\,")
+        .replace(/"/g, '\\"')
+        .replace(/\(/g, "\\(")
+        .replace(/\)/g, "\\)");
       if (numMatch) {
         query = query.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
       } else {
@@ -193,7 +206,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     );
     setTotal(count ?? 0);
     setLoading(false);
-  }, [projectId, filters, sorting, page, searchQuery]);
+  }, [projectId, filters, sorting, page, debouncedQuery]);
 
   useEffect(() => {
     void fetchData();

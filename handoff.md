@@ -31,9 +31,9 @@ The final local gates passed:
 
 ```text
 TypeScript       ✓ (0 errors)
-Tests            88/88 ✓ (13 test files)
+Tests            91/91 ✓ (13 test files)
 Lint             0 errors (2 TanStack/RHF warnings, expected)
-Production build ✓ (Compiled successfully)
+Production build ✓ (Compiled successfully in 14.4s)
 git diff --check ✓
 ```
 
@@ -49,7 +49,7 @@ Latest local commit:
 81de81e feat: implement phases 6-11 with deep audit hardening
 ```
 
-Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 23 migrations and 88 tests. Deep audit fixed findings across migrations 020-023.
+Includes OLED pitch-black theme, skip project button, realtime hooks, search/saved views, issue links, plus 24 migrations and 91 tests. Deep audit fixed findings across migrations 020-024.
 
 Commit and push when ready (see below).
 
@@ -65,7 +65,7 @@ npx supabase db push
 npx supabase migration list
 ```
 
-The repository contains 23 ordered migrations, `202608260001` through `202608260023`. Inspect the installed CLI options before applying migrations:
+The repository contains 24 ordered migrations, `202608260001` through `202608260024`. Inspect the installed CLI options before applying migrations:
 
 ```bash
 npx supabase db push --help

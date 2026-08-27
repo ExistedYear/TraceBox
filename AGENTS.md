@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 5 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), and **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling). Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed. Product roadmap lives in `docs/tracebox-main-plan.md` (Phase 6 = Workflow Transitions is next).
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 11 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views**, and **issue links & dependencies**. Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed.
 
 ## Architecture & Data Flow
 
@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (23 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (24 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -152,6 +152,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260021_label_realtime_fixes.sql` | Label hex constraint + `supabase_realtime` publication for comments/issues/notifications |
 | `supabase/migrations/202608260022_audit_refinements.sql` | `create_organization` input trimming/profile preflight, notification preferences check, VIEWER transition support, saved view search_path |
 | `supabase/migrations/202608260023_transition_viewer_role_fix.sql` | `transition_issue` role check alignment supporting `VIEWER` required roles |
+| `supabase/migrations/202608260024_deep_audit_hardening.sql` | Full audit hardening: revoke dispatcher execute, foreign key indexes, unwatch authz, unlink audit logging |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |

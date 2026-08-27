@@ -45,4 +45,11 @@ describe("signupSchema", () => {
     const result = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "short" });
     expect(result.success).toBe(false);
   });
+
+  it("rejects an oversized display name or password", () => {
+    const longName = signupSchema.safeParse({ displayName: "A".repeat(121), email: "ada@example.com", password: "correct-horse-battery-staple" });
+    expect(longName.success).toBe(false);
+    const longPass = signupSchema.safeParse({ displayName: "Ada Lovelace", email: "ada@example.com", password: "p".repeat(73) });
+    expect(longPass.success).toBe(false);
+  });
 });

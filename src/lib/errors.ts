@@ -34,6 +34,22 @@ export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: s
     return "That name or key is already taken.";
   }
 
+  if (/PROJECT_ARCHIVED/i.test(msg)) {
+    return "This project is archived and cannot be modified.";
+  }
+
+  if (/INVALID_ASSIGNEE/i.test(msg)) {
+    return "Selected assignee is not an eligible member of this project.";
+  }
+
+  if (/INVALID_COMPONENT/i.test(msg)) {
+    return "Selected component is invalid or archived.";
+  }
+
+  if (/NOT_ALLOWED/i.test(msg)) {
+    return "You do not have permission to perform this action.";
+  }
+
   if (/NOT_ORG_ADMIN/i.test(msg)) {
     return "Only workspace owners and admins can create projects.";
   }
@@ -41,7 +57,6 @@ export function getSafeWorkspaceErrorMessage(error: { code?: string; message?: s
   if (/AUTH_REQUIRED/i.test(msg)) {
     return "You must be signed in to perform this action.";
   }
-
   if (code === "23503" || /foreign key/i.test(msg)) {
     return "Referenced workspace or profile not found.";
   }

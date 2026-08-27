@@ -1,6 +1,6 @@
 # TraceBox
 
-TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping the first five product phases: workspaces/projects, project workflow, issue creation, issue list/editing, and comments + activity timeline.
+TraceBox is a modern, database-backed developer workspace for structured issue tracking. It proves the Vercel + Supabase path while shipping Phases 1–11: workspaces/projects, project workflow, issue creation, issue list/editing, comments + activity timeline, workflow transitions & assignment, planning metadata (labels/versions/milestones), watchers & notifications, realtime subscriptions, full-text search & saved views, and issue links & dependencies.
 
 ## Stack
 
@@ -17,13 +17,13 @@ TraceBox is a modern, database-backed developer workspace for structured issue t
 4. For local Supabase, run `npm run db:start`, then `npm run db:reset` to apply migrations and seed data.
 5. Start the app with `npm run dev`, then open [http://localhost:3000](http://localhost:3000).
 
-Included today: email/password signup, login, logout, session refresh, workspace and project onboarding, project components and default workflow management, issue creation with human-readable IDs (`KEY-1`), an issue queue with filters/sorting/pagination/inline field editing, an audited issue detail page with unified activity timeline, and project-member comments (add/edit with `COMMENT_ADDED`/`COMMENT_EDITED` events, mention + issue-ref styling). GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
+Included today: email/password signup, login, logout, session refresh, workspace and project onboarding, project components and default workflow management, issue creation with human-readable IDs (`KEY-1`), live duplicate candidate search, an issue queue with filters/sorting/pagination/inline field editing, an audited issue detail page with unified activity timeline, project-member comments (add/edit with `COMMENT_ADDED`/`COMMENT_EDITED` events, mention + issue-ref styling), workflow transitions with resolution modal and reopen capability, planning metadata (labels with hex colors, versions, milestones), watchers & notification center, realtime updates, full-text search + saved views, and issue relationship links (`BLOCKS`, `DEPENDS_ON`, `DUPLICATE_OF`, etc.). GitHub OAuth is wired in the UI but remains disabled until provider credentials are configured in Supabase.
 
 ## Database workflow
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds twenty-three ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, project-first component mutation RPCs, comments + activity (`comments` table, `can_comment_on_issue`, `add_comment`/`edit_comment`), role/security refinements, create_project fix, Phase 6 workflow transitions & assignment, Phase 7 labels/versions/milestones, Phase 8 watchers/notifications, Phase 10 search/saved views (pg_trgm + tsvector), Phase 11 issue_links, deep-audit security fixes, realtime publication, audit refinements, and workflow transition role alignment.
+`supabase/migrations/` holds twenty-four ordered migrations: profiles (+trigger/RLS), workspaces/projects/memberships with RLS helpers and RPCs, components + default workflow seeding, issues + immutable audit trail with atomic `create_issue`, inline-edit RPC, security hardening, archived-project/component write guards, typed UUID update handling, project-first component mutation RPCs, comments + activity (`comments` table, `can_comment_on_issue`, `add_comment`/`edit_comment`), role/security refinements, create_project fix, Phase 6 workflow transitions & assignment, Phase 7 labels/versions/milestones, Phase 8 watchers/notifications, Phase 10 search/saved views (pg_trgm + tsvector), Phase 11 issue_links, deep-audit security fixes, realtime publication, audit refinements, workflow transition role alignment, and audit hardening.
 
 ## Quality checks
 

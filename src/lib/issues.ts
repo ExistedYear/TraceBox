@@ -58,6 +58,26 @@ export function eventSummary(
       };
     case "COMMENT_EDITED":
       return { heading: "edited a comment" };
+    case "ISSUE_LINKED":
+      return {
+        heading: "linked issue",
+        detail:
+          typeof meta.relationship === "string" && typeof event.new_value === "string"
+            ? `${meta.relationship.toLowerCase().replaceAll("_", " ")} ${event.new_value}`
+            : typeof event.new_value === "string"
+              ? event.new_value
+              : undefined,
+      };
+    case "ISSUE_UNLINKED":
+      return {
+        heading: "unlinked issue",
+        detail:
+          typeof meta.relationship === "string" && typeof event.old_value === "string"
+            ? `${meta.relationship.toLowerCase().replaceAll("_", " ")} ${event.old_value}`
+            : typeof event.old_value === "string"
+              ? event.old_value
+              : undefined,
+      };
     default:
       return { heading: event.event_type.toLowerCase().replaceAll("_", " ") };
   }
