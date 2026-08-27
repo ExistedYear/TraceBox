@@ -19,17 +19,30 @@ import { issueCreateSchema, type IssueCreateValues } from "@/lib/validation/issu
 const selectClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 const errorClass = "text-xs text-destructive";
 
+export type IssueTemplateItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  issue_type: string;
+  body_template: string;
+  default_priority: string | null;
+  default_severity: string | null;
+  default_component_id: string | null;
+};
+
 export function NewIssueForm({
   projectId,
   projectKey,
   components,
   members,
+  templates = [],
   initialStateName,
 }: {
   projectId: string;
   projectKey: string;
   components: { id: string; name: string; defaultAssigneeId: string | null }[];
   members: { userId: string; displayName: string | null }[];
+  templates?: IssueTemplateItem[];
   initialStateName: string;
 }) {
   const router = useRouter();
@@ -79,6 +92,17 @@ export function NewIssueForm({
     }, 450);
     return () => clearTimeout(handle);
   }, [watchedTitle, projectId]);
+  function applyTemplate(templateId: string) {
+    const tmpl = templates.find((t) => t.id === templateId);
+    if (!tmpl) return;
+    if (tmpl.body_template) form.setValue("description", tmpl.body_template, { shouldValidate: true });
+    if (tmpl.issue_type) form.setValue("type", tmpl.issue_type as any, { shouldValidate: true });
+    if (tmpl.default_priority) form.setValue("priority", tmpl.default_priority as any);
+    if (tmpl.default_severity) form.setValue("severity", tmpl.default_severity as any);
+    if (tmpl.default_component_id) form.setValue("component_id", tmpl.default_component_id);
+    toast.info(`Applied template "${tmpl.name}"`);
+  }
+
 
   async function onSubmit(values: IssueCreateValues) {
     let issueNumber: { data: number | null; error: { message: string } | null };
@@ -125,6 +149,22 @@ export function NewIssueForm({
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      {templates.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/80 bg-card/40 p-2.5">
+          <span className="font-mono text-xs text-muted-foreground">Load issue template:</span>
+          <select
+            aria-label="Load issue template"
+            className="h-8 max-w-xs rounded-md border border-input bg-background px-2 text-xs"
+            onChange={(e) => applyTemplate(e.target.value)}
+            defaultValue=""
+          >
+            <option value="" disabled>Choose a template...</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>{t.name} ({t.issue_type})</option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="issue-title">Title</Label>
         <Input id="issue-title" placeholder="summary of the issue" {...form.register("title")} />

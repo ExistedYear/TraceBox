@@ -11,7 +11,7 @@ https://trace-box.vercel.app/
 ```
 
 
-Implementation status: Phases 1–11 are complete in the repository. Phase 12 — Triage Inbox — is next.
+Implementation status: Phases 1–20 are complete in the repository.
 This plan assumes the following are already working:
 
 - Next.js + TypeScript

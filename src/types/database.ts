@@ -912,6 +912,272 @@ export type Database = {
           },
         ];
       };
+      attachments: {
+        Row: {
+          id: string;
+          issue_id: string;
+          uploader_id: string;
+          filename: string;
+          storage_path: string;
+          mime_type: string | null;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          issue_id: string;
+          uploader_id: string;
+          filename: string;
+          storage_path: string;
+          mime_type?: string | null;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          issue_id?: string;
+          uploader_id?: string;
+          filename?: string;
+          storage_path?: string;
+          mime_type?: string | null;
+          size_bytes?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attachments_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issue_templates: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          description: string | null;
+          issue_type: string;
+          body_template: string;
+          default_priority: string | null;
+          default_severity: string | null;
+          default_component_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          description?: string | null;
+          issue_type?: string;
+          body_template: string;
+          default_priority?: string | null;
+          default_severity?: string | null;
+          default_component_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          description?: string | null;
+          issue_type?: string;
+          body_template?: string;
+          default_priority?: string | null;
+          default_severity?: string | null;
+          default_component_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      issue_access: {
+        Row: {
+          issue_id: string;
+          user_id: string;
+          granted_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          issue_id: string;
+          user_id: string;
+          granted_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          issue_id?: string;
+          user_id?: string;
+          granted_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      issue_github_links: {
+        Row: {
+          id: string;
+          issue_id: string;
+          repo_name: string;
+          link_type: string;
+          number: number | null;
+          url: string;
+          title: string | null;
+          status: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          issue_id: string;
+          repo_name: string;
+          link_type: string;
+          number?: number | null;
+          url: string;
+          title?: string | null;
+          status?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          issue_id?: string;
+          repo_name?: string;
+          link_type?: string;
+          number?: number | null;
+          url?: string;
+          title?: string | null;
+          status?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      project_integrations: {
+        Row: {
+          id: string;
+          project_id: string;
+          provider: string;
+          repo_full_name: string | null;
+          auto_resolve_enabled: boolean;
+          config: Json;
+          is_enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          provider: string;
+          repo_full_name?: string | null;
+          auto_resolve_enabled?: boolean;
+          config?: Json;
+          is_enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          provider?: string;
+          repo_full_name?: string | null;
+          auto_resolve_enabled?: boolean;
+          config?: Json;
+          is_enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      custom_fields: {
+        Row: {
+          id: string;
+          project_id: string;
+          name: string;
+          field_type: string;
+          config: Json;
+          is_required: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          name: string;
+          field_type: string;
+          config?: Json;
+          is_required?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          name?: string;
+          field_type?: string;
+          config?: Json;
+          is_required?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      issue_custom_values: {
+        Row: {
+          issue_id: string;
+          custom_field_id: string;
+          value: Json;
+        };
+        Insert: {
+          issue_id: string;
+          custom_field_id: string;
+          value: Json;
+        };
+        Update: {
+          issue_id?: string;
+          custom_field_id?: string;
+          value?: Json;
+        };
+        Relationships: [];
+      };
+      api_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          organization_id: string;
+          name: string;
+          token_hash: string;
+          scopes: string[];
+          last_used_at: string | null;
+          expires_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          organization_id: string;
+          name: string;
+          token_hash: string;
+          scopes?: string[];
+          last_used_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          organization_id?: string;
+          name?: string;
+          token_hash?: string;
+          scopes?: string[];
+          last_used_at?: string | null;
+          expires_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -1084,6 +1350,66 @@ export type Database = {
       };
       transition_issue: {
         Args: { p_issue_id: string; p_resolution?: string; p_to_state_id: string };
+        Returns: undefined;
+      };
+      add_attachment: {
+        Args: { p_filename: string; p_issue_id: string; p_mime_type?: string; p_size_bytes?: number; p_storage_path: string };
+        Returns: string;
+      };
+      delete_attachment: {
+        Args: { p_attachment_id: string };
+        Returns: undefined;
+      };
+      create_issue_template: {
+        Args: { p_body_template?: string; p_default_component_id?: string; p_default_priority?: string; p_default_severity?: string; p_description?: string; p_issue_type?: string; p_name: string; p_project_id: string };
+        Returns: string;
+      };
+      update_issue_template: {
+        Args: { p_body_template?: string; p_default_component_id?: string; p_default_priority?: string; p_default_severity?: string; p_description?: string; p_issue_type?: string; p_name: string; p_template_id: string };
+        Returns: undefined;
+      };
+      delete_issue_template: {
+        Args: { p_template_id: string };
+        Returns: undefined;
+      };
+      grant_issue_access: {
+        Args: { p_issue_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      revoke_issue_access: {
+        Args: { p_issue_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      set_issue_visibility: {
+        Args: { p_issue_id: string; p_visibility: string };
+        Returns: undefined;
+      };
+      add_github_link: {
+        Args: { p_issue_id: string; p_link_type: string; p_number?: number; p_repo_name: string; p_status?: string; p_title?: string; p_url: string };
+        Returns: string;
+      };
+      remove_github_link: {
+        Args: { p_link_id: string };
+        Returns: undefined;
+      };
+      create_custom_field: {
+        Args: { p_config?: Json; p_field_type: string; p_is_required?: boolean; p_name: string; p_project_id: string };
+        Returns: string;
+      };
+      delete_custom_field: {
+        Args: { p_field_id: string };
+        Returns: undefined;
+      };
+      set_issue_custom_value: {
+        Args: { p_custom_field_id: string; p_issue_id: string; p_value: Json };
+        Returns: undefined;
+      };
+      create_api_token: {
+        Args: { p_expires_at?: string; p_name: string; p_organization_id: string; p_scopes?: string[]; p_token_hash: string };
+        Returns: string;
+      };
+      revoke_api_token: {
+        Args: { p_token_id: string };
         Returns: undefined;
       };
     };

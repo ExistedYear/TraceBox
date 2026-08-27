@@ -5366,3 +5366,1247 @@ $$;
 
 revoke execute on function public.remove_issue_link(uuid) from anon, public;
 grant execute on function public.remove_issue_link(uuid) to authenticated;
+-- Migration 025: Phase 13 - Attachments
+-- Table, RLS, Storage Bucket, RPCs, and Realtime publication for issue file attachments
+
+create table if not exists public.attachments (
+  id uuid primary key default gen_random_uuid(),
+  issue_id uuid not null references public.issues (id) on delete cascade,
+  uploader_id uuid not null references auth.users (id) on delete restrict,
+  filename text not null check (char_length(trim(filename)) between 1 and 255),
+  storage_path text not null check (char_length(trim(storage_path)) between 1 and 1000),
+  mime_type text,
+  size_bytes bigint not null check (size_bytes >= 0 and size_bytes <= 52428800), -- 50MB max
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+comment on table public.attachments is 'File and image attachments uploaded to issues.';
+
+create index if not exists idx_attachments_issue_id on public.attachments(issue_id, created_at);
+create index if not exists idx_attachments_uploader_id on public.attachments(uploader_id);
+
+alter table public.attachments enable row level security;
+
+-- Project members can view attachments of issues in accessible projects
+create policy "Project members can read attachments"
+  on public.attachments
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.issues i
+      where i.id = attachments.issue_id
+        and public.is_project_member(i.project_id)
+    )
+  );
+
+-- RPC: add_attachment
+create or replace function public.add_attachment(
+  p_issue_id uuid,
+  p_filename text,
+  p_storage_path text,
+  p_mime_type text default null,
+  p_size_bytes bigint default 0
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_project_id uuid;
+  v_archived boolean;
+  v_role text;
+  v_filename text;
+  v_storage_path text;
+  v_attachment_id uuid;
+  v_now timestamptz := timezone('utc'::text, now());
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_filename := nullif(trim(p_filename), '');
+  if v_filename is null then
+    raise exception 'VALIDATION: Filename is required' using errcode = '22023';
+  end if;
+
+  v_storage_path := nullif(trim(p_storage_path), '');
+  if v_storage_path is null then
+    raise exception 'VALIDATION: Storage path is required' using errcode = '22023';
+  end if;
+
+  if p_size_bytes < 0 or p_size_bytes > 52428800 then
+    raise exception 'VALIDATION: File size must be between 0 and 50MB' using errcode = '22023';
+  end if;
+
+  select project_id into v_project_id
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  -- Lock project row
+  select is_archived into v_archived
+  from public.projects
+  where id = v_project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_project_id);
+  if v_role not in ('REPORTER', 'DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.attachments (
+    issue_id,
+    uploader_id,
+    filename,
+    storage_path,
+    mime_type,
+    size_bytes,
+    created_at
+  ) values (
+    p_issue_id,
+    v_user,
+    v_filename,
+    v_storage_path,
+    nullif(trim(p_mime_type), ''),
+    p_size_bytes,
+    v_now
+  ) returning id into v_attachment_id;
+
+  -- Update issue updated_at
+  update public.issues
+  set updated_at = v_now
+  where id = p_issue_id;
+
+  -- Insert audit event
+  insert into public.issue_events (
+    issue_id,
+    actor_id,
+    event_type,
+    field_name,
+    new_value,
+    metadata
+  ) values (
+    p_issue_id,
+    v_user,
+    'ATTACHMENT_ADDED',
+    'attachment',
+    to_jsonb(v_filename),
+    jsonb_build_object(
+      'attachment_id', v_attachment_id,
+      'filename', v_filename,
+      'mime_type', p_mime_type,
+      'size_bytes', p_size_bytes
+    )
+  );
+
+  return v_attachment_id;
+end;
+$$;
+
+revoke execute on function public.add_attachment(uuid, text, text, text, bigint) from anon, public;
+grant execute on function public.add_attachment(uuid, text, text, text, bigint) to authenticated;
+
+-- RPC: delete_attachment
+create or replace function public.delete_attachment(
+  p_attachment_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_att record;
+  v_archived boolean;
+  v_role text;
+  v_now timestamptz := timezone('utc'::text, now());
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select a.*, i.project_id
+  into v_att
+  from public.attachments a
+  join public.issues i on i.id = a.issue_id
+  where a.id = p_attachment_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_att.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_att.project_id);
+  if v_att.uploader_id <> v_user and v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  delete from public.attachments
+  where id = p_attachment_id;
+
+  -- Insert audit event
+  insert into public.issue_events (
+    issue_id,
+    actor_id,
+    event_type,
+    field_name,
+    old_value,
+    metadata
+  ) values (
+    v_att.issue_id,
+    v_user,
+    'ATTACHMENT_DELETED',
+    'attachment',
+    to_jsonb(v_att.filename),
+    jsonb_build_object(
+      'attachment_id', p_attachment_id,
+      'filename', v_att.filename,
+      'storage_path', v_att.storage_path
+    )
+  );
+end;
+$$;
+
+revoke execute on function public.delete_attachment(uuid) from anon, public;
+grant execute on function public.delete_attachment(uuid) to authenticated;
+
+-- Realtime publication for attachments
+alter publication supabase_realtime add table public.attachments;
+-- Migration 026: Phase 17 - Issue Templates
+-- Table, RLS, and RPCs for markdown issue templates
+
+create table if not exists public.issue_templates (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 80),
+  description text check (char_length(trim(description)) <= 280),
+  issue_type text not null check (issue_type in ('BUG', 'ENHANCEMENT', 'TASK', 'SECURITY', 'PERFORMANCE', 'REGRESSION')),
+  body_template text not null check (char_length(trim(body_template)) <= 10000),
+  default_priority text check (default_priority in ('P0', 'P1', 'P2', 'P3', 'P4')),
+  default_severity text check (default_severity in ('BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'TRIVIAL')),
+  default_component_id uuid references public.components (id) on delete set null,
+  created_by uuid references auth.users (id) on delete restrict,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now())
+);
+
+comment on table public.issue_templates is 'Standard markdown templates for reporting bugs, security issues, and tasks.';
+
+create index if not exists idx_issue_templates_project_id on public.issue_templates(project_id);
+
+alter table public.issue_templates enable row level security;
+
+create policy "Project members can read issue templates"
+  on public.issue_templates
+  for select
+  to authenticated
+  using (public.is_project_member(project_id));
+
+-- Trigger for updated_at
+create trigger issue_templates_set_updated_at
+  before update on public.issue_templates
+  for each row execute procedure public.set_updated_at();
+
+-- RPC: create_issue_template
+create or replace function public.create_issue_template(
+  p_project_id uuid,
+  p_name text,
+  p_description text default null,
+  p_issue_type text default 'BUG',
+  p_body_template text default '',
+  p_default_priority text default null,
+  p_default_severity text default null,
+  p_default_component_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_archived boolean;
+  v_role text;
+  v_name text;
+  v_body text;
+  v_template_id uuid;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_name := nullif(trim(p_name), '');
+  if v_name is null then
+    raise exception 'VALIDATION: Template name is required' using errcode = '22023';
+  end if;
+
+  v_body := nullif(trim(p_body_template), '');
+  if v_body is null then
+    raise exception 'VALIDATION: Body template is required' using errcode = '22023';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = p_project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(p_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.issue_templates (
+    project_id,
+    name,
+    description,
+    issue_type,
+    body_template,
+    default_priority,
+    default_severity,
+    default_component_id,
+    created_by
+  ) values (
+    p_project_id,
+    v_name,
+    nullif(trim(p_description), ''),
+    coalesce(p_issue_type, 'BUG'),
+    v_body,
+    p_default_priority,
+    p_default_severity,
+    p_default_component_id,
+    v_user
+  ) returning id into v_template_id;
+
+  return v_template_id;
+end;
+$$;
+
+revoke execute on function public.create_issue_template(uuid, text, text, text, text, text, text, uuid) from anon, public;
+grant execute on function public.create_issue_template(uuid, text, text, text, text, text, text, uuid) to authenticated;
+
+-- RPC: update_issue_template
+create or replace function public.update_issue_template(
+  p_template_id uuid,
+  p_name text,
+  p_description text default null,
+  p_issue_type text default 'BUG',
+  p_body_template text default '',
+  p_default_priority text default null,
+  p_default_severity text default null,
+  p_default_component_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_template record;
+  v_archived boolean;
+  v_role text;
+  v_name text;
+  v_body text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_name := nullif(trim(p_name), '');
+  if v_name is null then
+    raise exception 'VALIDATION: Template name is required' using errcode = '22023';
+  end if;
+
+  v_body := nullif(trim(p_body_template), '');
+  if v_body is null then
+    raise exception 'VALIDATION: Body template is required' using errcode = '22023';
+  end if;
+
+  select * into v_template
+  from public.issue_templates
+  where id = p_template_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_template.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_template.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  update public.issue_templates
+  set name = v_name,
+      description = nullif(trim(p_description), ''),
+      issue_type = coalesce(p_issue_type, 'BUG'),
+      body_template = v_body,
+      default_priority = p_default_priority,
+      default_severity = p_default_severity,
+      default_component_id = p_default_component_id,
+      updated_at = timezone('utc'::text, now())
+  where id = p_template_id;
+end;
+$$;
+
+revoke execute on function public.update_issue_template(uuid, text, text, text, text, text, text, uuid) from anon, public;
+grant execute on function public.update_issue_template(uuid, text, text, text, text, text, text, uuid) to authenticated;
+
+-- RPC: delete_issue_template
+create or replace function public.delete_issue_template(
+  p_template_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_template record;
+  v_archived boolean;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select * into v_template
+  from public.issue_templates
+  where id = p_template_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_template.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_template.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  delete from public.issue_templates
+  where id = p_template_id;
+end;
+$$;
+
+revoke execute on function public.delete_issue_template(uuid) from anon, public;
+grant execute on function public.delete_issue_template(uuid) to authenticated;
+-- Migration 027: Phase 18 - Restricted Security Issues
+-- Table, can_view_issue helper, RLS policies, and RPCs for restricted visibility issues
+
+create table if not exists public.issue_access (
+  issue_id uuid not null references public.issues (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  granted_by uuid references auth.users (id) on delete restrict,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  primary key (issue_id, user_id)
+);
+
+comment on table public.issue_access is 'Explicit access grants for restricted security issues.';
+
+create index if not exists idx_issue_access_user_id on public.issue_access(user_id, issue_id);
+
+alter table public.issue_access enable row level security;
+
+-- Helper function: can_view_issue
+create or replace function public.can_view_issue(p_issue_id uuid)
+returns boolean
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+begin
+  if v_user is null then
+    return false;
+  end if;
+
+  select i.id, i.project_id, i.reporter_id, i.assignee_id, coalesce(i.visibility, 'PUBLIC') as visibility
+  into v_issue
+  from public.issues i
+  where i.id = p_issue_id;
+
+  if not found then
+    return false;
+  end if;
+
+  -- Maintainer / org admin always has access to all project issues
+  v_role := public.project_role(v_issue.project_id);
+  if v_role = 'MAINTAINER' or public.can_manage_project(v_issue.project_id) then
+    return true;
+  end if;
+
+  -- Public issues are viewable by all active project members
+  if v_issue.visibility = 'PUBLIC' and public.is_project_member(v_issue.project_id) then
+    return true;
+  end if;
+
+  -- Restricted issues: reporter, assignee, or explicit access grantee
+  if v_issue.reporter_id = v_user or v_issue.assignee_id = v_user then
+    return true;
+  end if;
+
+  if exists (
+    select 1 from public.issue_access ia
+    where ia.issue_id = p_issue_id and ia.user_id = v_user
+  ) then
+    return true;
+  end if;
+
+  return false;
+end;
+$$;
+
+revoke execute on function public.can_view_issue(uuid) from anon, public;
+grant execute on function public.can_view_issue(uuid) to authenticated;
+
+-- RLS Policy for issue_access
+create policy "Grantees and maintainers can read issue access"
+  on public.issue_access
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+-- Update issues RLS SELECT policy
+drop policy if exists "Project members can read issues" on public.issues;
+drop policy if exists "Project members and access grantees can read issues" on public.issues;
+
+create policy "Project members and access grantees can read issues"
+  on public.issues
+  for select
+  to authenticated
+  using (public.can_view_issue(id));
+
+-- Update comments RLS SELECT policy
+drop policy if exists "Project members can read comments" on public.comments;
+
+create policy "Project members can read comments"
+  on public.comments
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+-- Update attachments RLS SELECT policy
+drop policy if exists "Project members can read attachments" on public.attachments;
+
+create policy "Project members can read attachments"
+  on public.attachments
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+-- RPC: grant_issue_access
+create or replace function public.grant_issue_access(
+  p_issue_id uuid,
+  p_user_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select project_id, reporter_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.issue_access (issue_id, user_id, granted_by)
+  values (p_issue_id, p_user_id, v_user)
+  on conflict do nothing;
+
+  -- Add audit event
+  insert into public.issue_events (
+    issue_id, actor_id, event_type, field_name, new_value
+  ) values (
+    p_issue_id, v_user, 'ACCESS_GRANTED', 'issue_access', to_jsonb(p_user_id::text)
+  );
+end;
+$$;
+
+revoke execute on function public.grant_issue_access(uuid, uuid) from anon, public;
+grant execute on function public.grant_issue_access(uuid, uuid) to authenticated;
+
+-- RPC: revoke_issue_access
+create or replace function public.revoke_issue_access(
+  p_issue_id uuid,
+  p_user_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select project_id, reporter_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  delete from public.issue_access
+  where issue_id = p_issue_id and user_id = p_user_id;
+
+  -- Add audit event
+  insert into public.issue_events (
+    issue_id, actor_id, event_type, field_name, old_value
+  ) values (
+    p_issue_id, v_user, 'ACCESS_REVOKED', 'issue_access', to_jsonb(p_user_id::text)
+  );
+end;
+$$;
+
+revoke execute on function public.revoke_issue_access(uuid, uuid) from anon, public;
+grant execute on function public.revoke_issue_access(uuid, uuid) to authenticated;
+
+-- RPC: set_issue_visibility
+create or replace function public.set_issue_visibility(
+  p_issue_id uuid,
+  p_visibility text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+  v_vis text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_vis := upper(trim(coalesce(p_visibility, 'PUBLIC')));
+  if v_vis not in ('PUBLIC', 'RESTRICTED') then
+    raise exception 'VALIDATION: Visibility must be PUBLIC or RESTRICTED' using errcode = '22023';
+  end if;
+
+  select id, project_id, visibility, reporter_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') and v_issue.reporter_id <> v_user then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  update public.issues
+  set visibility = v_vis,
+      updated_at = timezone('utc'::text, now())
+  where id = p_issue_id;
+
+  insert into public.issue_events (
+    issue_id, actor_id, event_type, field_name, old_value, new_value
+  ) values (
+    p_issue_id, v_user, 'VISIBILITY_CHANGED', 'visibility', to_jsonb(v_issue.visibility), to_jsonb(v_vis)
+  );
+end;
+$$;
+
+revoke execute on function public.set_issue_visibility(uuid, text) from anon, public;
+grant execute on function public.set_issue_visibility(uuid, text) to authenticated;
+-- Migration 028: Phase 19 - GitHub Integration & PR Linking
+-- Tables, RLS, and RPCs for linking GitHub pull requests, commits, and repository integrations
+
+create table if not exists public.issue_github_links (
+  id uuid primary key default gen_random_uuid(),
+  issue_id uuid not null references public.issues (id) on delete cascade,
+  repo_name text not null check (char_length(trim(repo_name)) between 1 and 100),
+  link_type text not null check (link_type in ('PULL_REQUEST', 'COMMIT', 'BRANCH')),
+  number int,
+  url text not null check (char_length(trim(url)) between 1 and 500),
+  title text check (char_length(trim(title)) <= 300),
+  status text default 'OPEN' check (status in ('OPEN', 'MERGED', 'CLOSED', 'DRAFT')),
+  created_by uuid references auth.users (id) on delete restrict,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+comment on table public.issue_github_links is 'Linked GitHub pull requests, commits, and branches.';
+
+create index if not exists idx_github_links_issue_id on public.issue_github_links(issue_id);
+
+alter table public.issue_github_links enable row level security;
+
+create policy "Project members can read github links"
+  on public.issue_github_links
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.issues i
+      where i.id = issue_github_links.issue_id
+        and public.can_view_issue(i.id)
+    )
+  );
+
+create table if not exists public.project_integrations (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  provider text not null check (provider in ('GITHUB', 'GITLAB', 'SLACK', 'WEBHOOK')),
+  repo_full_name text,
+  auto_resolve_enabled boolean default true,
+  config jsonb default '{}'::jsonb,
+  is_enabled boolean default true,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  updated_at timestamptz not null default timezone('utc'::text, now()),
+  unique (project_id, provider)
+);
+
+comment on table public.project_integrations is 'Third-party integrations configuration for projects.';
+
+create index if not exists idx_project_integrations_project_id on public.project_integrations(project_id);
+
+alter table public.project_integrations enable row level security;
+
+create policy "Project members can read project integrations"
+  on public.project_integrations
+  for select
+  to authenticated
+  using (public.is_project_member(project_id));
+
+-- Trigger for updated_at
+create trigger project_integrations_set_updated_at
+  before update on public.project_integrations
+  for each row execute procedure public.set_updated_at();
+
+-- RPC: add_github_link
+create or replace function public.add_github_link(
+  p_issue_id uuid,
+  p_repo_name text,
+  p_link_type text,
+  p_url text,
+  p_title text default null,
+  p_status text default 'OPEN',
+  p_number int default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_archived boolean;
+  v_role text;
+  v_repo text;
+  v_url text;
+  v_link_id uuid;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_repo := nullif(trim(p_repo_name), '');
+  if v_repo is null then
+    raise exception 'VALIDATION: Repository name is required' using errcode = '22023';
+  end if;
+
+  v_url := nullif(trim(p_url), '');
+  if v_url is null then
+    raise exception 'VALIDATION: URL is required' using errcode = '22023';
+  end if;
+
+  select project_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_issue.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.issue_github_links (
+    issue_id, repo_name, link_type, number, url, title, status, created_by
+  ) values (
+    p_issue_id, v_repo, p_link_type, p_number, v_url, nullif(trim(p_title), ''), coalesce(p_status, 'OPEN'), v_user
+  ) returning id into v_link_id;
+
+  -- Add audit event
+  insert into public.issue_events (
+    issue_id, actor_id, event_type, field_name, new_value, metadata
+  ) values (
+    p_issue_id, v_user, 'GITHUB_LINKED', 'github_link', to_jsonb(v_url),
+    jsonb_build_object('repo', v_repo, 'type', p_link_type, 'number', p_number, 'title', p_title)
+  );
+
+  return v_link_id;
+end;
+$$;
+
+revoke execute on function public.add_github_link(uuid, text, text, text, text, text, int) from anon, public;
+grant execute on function public.add_github_link(uuid, text, text, text, text, text, int) to authenticated;
+
+-- RPC: remove_github_link
+create or replace function public.remove_github_link(
+  p_link_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_link record;
+  v_archived boolean;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select gl.*, i.project_id
+  into v_link
+  from public.issue_github_links gl
+  join public.issues i on i.id = gl.issue_id
+  where gl.id = p_link_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_link.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_link.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  delete from public.issue_github_links
+  where id = p_link_id;
+
+  -- Add audit event
+  insert into public.issue_events (
+    issue_id, actor_id, event_type, field_name, old_value
+  ) values (
+    v_link.issue_id, v_user, 'GITHUB_UNLINKED', 'github_link', to_jsonb(v_link.url)
+  );
+end;
+$$;
+
+revoke execute on function public.remove_github_link(uuid) from anon, public;
+grant execute on function public.remove_github_link(uuid) to authenticated;
+-- Migration 029: Phase 20 - Custom Fields, Issue Custom Values & API Tokens
+-- Tables, RLS, and RPCs for project-level custom fields and scoped API tokens
+
+create table if not exists public.custom_fields (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects (id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 80),
+  field_type text not null check (field_type in ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE', 'SINGLE_SELECT', 'MULTI_SELECT', 'USER')),
+  config jsonb default '{}'::jsonb,
+  is_required boolean default false,
+  created_at timestamptz not null default timezone('utc'::text, now()),
+  unique (project_id, name)
+);
+
+comment on table public.custom_fields is 'Project-scoped custom metadata fields.';
+
+create index if not exists idx_custom_fields_project_id on public.custom_fields(project_id);
+
+alter table public.custom_fields enable row level security;
+
+create policy "Project members can read custom fields"
+  on public.custom_fields
+  for select
+  to authenticated
+  using (public.is_project_member(project_id));
+
+create table if not exists public.issue_custom_values (
+  issue_id uuid not null references public.issues (id) on delete cascade,
+  custom_field_id uuid not null references public.custom_fields (id) on delete cascade,
+  value jsonb not null,
+  primary key (issue_id, custom_field_id)
+);
+
+comment on table public.issue_custom_values is 'Values for project custom fields attached to issues.';
+
+create index if not exists idx_issue_custom_values_issue_id on public.issue_custom_values(issue_id);
+
+alter table public.issue_custom_values enable row level security;
+
+create policy "Users who can view issue can read custom values"
+  on public.issue_custom_values
+  for select
+  to authenticated
+  using (public.can_view_issue(issue_id));
+
+create table if not exists public.api_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 80),
+  token_hash text not null unique,
+  scopes text[] not null default '{"read", "write"}'::text[],
+  last_used_at timestamptz,
+  expires_at timestamptz,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+comment on table public.api_tokens is 'Personal and organization API access tokens for public REST API.';
+
+create index if not exists idx_api_tokens_user_id on public.api_tokens(user_id);
+create index if not exists idx_api_tokens_token_hash on public.api_tokens(token_hash);
+
+alter table public.api_tokens enable row level security;
+
+create policy "Users can read own api tokens"
+  on public.api_tokens
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+-- RPC: create_custom_field
+create or replace function public.create_custom_field(
+  p_project_id uuid,
+  p_name text,
+  p_field_type text,
+  p_config jsonb default '{}'::jsonb,
+  p_is_required boolean default false
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_archived boolean;
+  v_role text;
+  v_name text;
+  v_field_id uuid;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_name := nullif(trim(p_name), '');
+  if v_name is null then
+    raise exception 'VALIDATION: Custom field name is required' using errcode = '22023';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = p_project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(p_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.custom_fields (
+    project_id, name, field_type, config, is_required
+  ) values (
+    p_project_id, v_name, p_field_type, coalesce(p_config, '{}'::jsonb), p_is_required
+  ) returning id into v_field_id;
+
+  return v_field_id;
+end;
+$$;
+
+revoke execute on function public.create_custom_field(uuid, text, text, jsonb, boolean) from anon, public;
+grant execute on function public.create_custom_field(uuid, text, text, jsonb, boolean) to authenticated;
+
+-- RPC: delete_custom_field
+create or replace function public.delete_custom_field(
+  p_field_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_field record;
+  v_archived boolean;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select * into v_field
+  from public.custom_fields
+  where id = p_field_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  select is_archived into v_archived
+  from public.projects
+  where id = v_field.project_id
+  for update;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if v_archived then
+    raise exception 'PROJECT_ARCHIVED' using errcode = '42501';
+  end if;
+
+  v_role := public.project_role(v_field.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  delete from public.custom_fields
+  where id = p_field_id;
+end;
+$$;
+
+revoke execute on function public.delete_custom_field(uuid) from anon, public;
+grant execute on function public.delete_custom_field(uuid) to authenticated;
+
+-- RPC: set_issue_custom_value
+create or replace function public.set_issue_custom_value(
+  p_issue_id uuid,
+  p_custom_field_id uuid,
+  p_value jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_issue record;
+  v_role text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  select project_id into v_issue
+  from public.issues
+  where id = p_issue_id;
+
+  if not found then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  v_role := public.project_role(v_issue.project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.issue_custom_values (issue_id, custom_field_id, value)
+  values (p_issue_id, p_custom_field_id, p_value)
+  on conflict (issue_id, custom_field_id)
+  do update set value = excluded.value;
+end;
+$$;
+
+revoke execute on function public.set_issue_custom_value(uuid, uuid, jsonb) from anon, public;
+grant execute on function public.set_issue_custom_value(uuid, uuid, jsonb) to authenticated;
+
+-- RPC: create_api_token
+create or replace function public.create_api_token(
+  p_organization_id uuid,
+  p_name text,
+  p_token_hash text,
+  p_scopes text[] default '{"read", "write"}'::text[],
+  p_expires_at timestamptz default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_token_id uuid;
+  v_name text;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  v_name := nullif(trim(p_name), '');
+  if v_name is null then
+    raise exception 'VALIDATION: Token name is required' using errcode = '22023';
+  end if;
+
+  if not public.is_org_member(p_organization_id) then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  insert into public.api_tokens (
+    user_id, organization_id, name, token_hash, scopes, expires_at
+  ) values (
+    v_user, p_organization_id, v_name, p_token_hash, p_scopes, p_expires_at
+  ) returning id into v_token_id;
+
+  return v_token_id;
+end;
+$$;
+
+revoke execute on function public.create_api_token(uuid, text, text, text[], timestamptz) from anon, public;
+grant execute on function public.create_api_token(uuid, text, text, text[], timestamptz) to authenticated;
+
+-- RPC: revoke_api_token
+create or replace function public.revoke_api_token(
+  p_token_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+
+  delete from public.api_tokens
+  where id = p_token_id and user_id = v_user;
+end;
+$$;
+
+revoke execute on function public.revoke_api_token(uuid) from anon, public;
+grant execute on function public.revoke_api_token(uuid) to authenticated;

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 11 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views**, and **issue links & dependencies**. Auth is email/password + GitHub OAuth; every mutation goes through trusted SQL RPCs guarded by RLS. The marketing landing page remains illustrative; all authenticated product routes are database-backed.
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub integration & PR links**, and **custom fields + public REST API** with scoped tokens.
 
 ## Architecture & Data Flow
 
@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (24 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (29 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -153,6 +153,11 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260022_audit_refinements.sql` | `create_organization` input trimming/profile preflight, notification preferences check, VIEWER transition support, saved view search_path |
 | `supabase/migrations/202608260023_transition_viewer_role_fix.sql` | `transition_issue` role check alignment supporting `VIEWER` required roles |
 | `supabase/migrations/202608260024_deep_audit_hardening.sql` | Full audit hardening: revoke dispatcher execute, foreign key indexes, unwatch authz, unlink audit logging |
+| `supabase/migrations/202608260025_phase13_attachments.sql` | Phase 13: `attachments` table, 50MB storage bucket, `add_attachment`/`delete_attachment` RPCs, realtime publication |
+| `supabase/migrations/202608260026_phase17_issue_templates.sql` | Phase 17: `issue_templates` table, `create_issue_template`/`update_issue_template`/`delete_issue_template` RPCs |
+| `supabase/migrations/202608260027_phase18_restricted_issues.sql` | Phase 18: `issue_access` table, `can_view_issue` security definer helper, restricted visibility RLS across issues/comments/attachments |
+| `supabase/migrations/202608260028_phase19_github_integration.sql` | Phase 19: `issue_github_links`, `project_integrations`, PR/commit linking RPCs |
+| `supabase/migrations/202608260029_phase20_custom_fields_api.sql` | Phase 20: `custom_fields`, `issue_custom_values`, `api_tokens`, token management RPCs |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `.env.example` | Required vars (see below) |

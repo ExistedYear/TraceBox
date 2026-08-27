@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
+import { IssueAttachmentsSection } from "@/components/issues/issue-attachments-section";
 import { IssueLinksSection } from "@/components/issues/issue-links-section";
 import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
 import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
@@ -58,6 +59,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     { data: versionRows },
     { data: milestoneRows },
     { data: watcherRows },
+    { data: attachmentRows },
   ] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at").limit(100),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
@@ -70,6 +72,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     supabase.from("versions").select("id, name, is_released").eq("project_id", project.id).eq("is_archived", false).order("name"),
     supabase.from("milestones").select("id, name, status").eq("project_id", project.id).order("name"),
     supabase.from("issue_watchers").select("user_id").eq("issue_id", issue.id),
+    supabase.from("attachments").select("*").eq("issue_id", issue.id).order("created_at"),
   ]);
 
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
@@ -149,6 +152,14 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
               <p className="whitespace-pre-wrap text-sm leading-6">{value}</p>
             </Surface>
           ))}
+
+          <IssueAttachmentsSection
+            issueId={issue.id}
+            canUpload={canComment}
+            currentUserId={context.userId}
+            isMaintainerOrDev={canEditAnyComment}
+            initialAttachments={attachmentRows ?? []}
+          />
 
           <CommentsSection
             issueId={issue.id}
