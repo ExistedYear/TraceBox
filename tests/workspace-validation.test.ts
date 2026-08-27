@@ -56,6 +56,13 @@ describe("projectSchema", () => {
     expect(projectSchema.safeParse({ name: "Service", key: "AU-TH" }).success).toBe(false);
   });
 
+  it("enforces key length boundaries between 2 and 10 characters", () => {
+    expect(projectSchema.safeParse({ name: "Core", key: "A" }).success).toBe(false);
+    expect(projectSchema.safeParse({ name: "Core", key: "AB" }).success).toBe(true);
+    expect(projectSchema.safeParse({ name: "Core", key: "ABCDEFGHIJ" }).success).toBe(true);
+    expect(projectSchema.safeParse({ name: "Core", key: "ABCDEFGHIJK" }).success).toBe(false);
+  });
+
   it("allows an optional description within bounds", () => {
     expect(projectSchema.safeParse({ name: "Service", key: "AUTH", description: "" }).success).toBe(true);
     expect(projectSchema.safeParse({ name: "Service", key: "AUTH", description: "x".repeat(281) }).success).toBe(false);

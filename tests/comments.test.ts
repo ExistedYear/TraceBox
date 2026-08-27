@@ -86,6 +86,19 @@ describe("tokenizeCommentBody", () => {
     ]);
   });
 
+  it("handles multiple consecutive issue keys and mixed tokens", () => {
+    const tokens = tokenizeCommentBody("Fixed in AUTH-42 and verified in CORE-100 by @alice!");
+    expect(tokens).toEqual([
+      { text: "Fixed in ", kind: "text" },
+      { text: "AUTH-42", kind: "issue-ref" },
+      { text: " and verified in ", kind: "text" },
+      { text: "CORE-100", kind: "issue-ref" },
+      { text: " by ", kind: "text" },
+      { text: "@alice", kind: "mention" },
+      { text: "!", kind: "text" },
+    ]);
+  });
+
   it("handles empty bodies", () => {
     expect(tokenizeCommentBody("")).toEqual([{ text: "", kind: "text" }]);
   });
