@@ -61,21 +61,17 @@ export default async function SettingsPage() {
     displayName: names.get(row.user_id) ?? null,
   }])).values()];
 
-  return (
-    <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
-      <ProjectSettings
-        key={projectId}
-        projectId={projectId}
-        project={{ key: project.key, name: project.name, description: project.description }}
-        canManage={Boolean(canManage)}
-        initialComponents={components ?? []}
-        initialLabels={labels ?? []}
-        initialVersions={versions ?? []}
-        initialMilestones={milestones ?? []}
-        states={(states ?? []).map(({ id, name, category, position, is_initial, is_terminal }) => ({ id, name, category, position, isInitial: is_initial, isTerminal: is_terminal }))}
-        transitions={(transitions ?? []).map(({ from_state_id, to_state_id }) => ({ fromStateId: from_state_id, toStateId: to_state_id }))}
-        members={members}
-      />
-    </main>
-  );
+  return <ProjectSettings
+    key={projectId}
+    projectId={projectId}
+    project={{ key: project.key, name: project.name, description: project.description }}
+    canManage={Boolean(canManage)}
+    initialComponents={components ?? []}
+    initialLabels={labels ?? []}
+    initialVersions={versions ?? []}
+    initialMilestones={milestones ?? []}
+    states={(states ?? []).map(({ id, name, category, position, is_initial, is_terminal }) => ({ id, name, category, position, isInitial: is_initial, isTerminal: is_terminal }))}
+    transitions={(transitions ?? []).map(({ from_state_id, to_state_id }) => ({ fromStateId: from_state_id, toStateId: to_state_id }))}
+    members={members}
+  />;
 }

@@ -118,7 +118,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Theme**: light/dark mode and accent are independent. Blue is the default accent; neutral, amber, purple, and emerald are selected from the header palette and persisted in `tracebox-accent`. Accent variants override only `--primary`, `--primary-foreground`, and `--ring` through `html[data-accent]`.
 - **Navigation hierarchy**: the desktop/mobile shell groups the workspace and project switchers explicitly, keeps a primary Create issue action visible (icon-only when collapsed), and labels project navigation separately from Settings. Preserve the sticky, scrollable desktop sidebar so Settings remains reachable on short viewports.
 - **Issue workspace hierarchy**: issue-list filters and saved-view inputs use visible labels rather than placeholder-only instructions; keep result counts/ranges and pagination visible. Issue detail pages lead with breadcrumbs/title/actions and use a sticky, explicitly labeled facts rail on desktop.
-- **Settings navigation**: project-settings tabs use icons, human-readable labels, and live item counts; keep the tablist horizontally scrollable on narrow screens.
+- **Settings workspace**: `/dashboard/settings/*` shares a nested administration shell with project/role context and a 220px secondary navigation rail; it becomes a horizontally scrollable card row on narrow screens. Project configuration uses count cards as the accessible tablist for components, labels, versions, milestones, and workflow. Keep settings forms explicitly labeled and management lists dense.
 - **Narrow side-rail forms**: GitHub-link and linked-issue forms use explicit field labels and full-width stacked controls so their inputs remain understandable inside the issue-detail facts rail.
 - **Collapsed desktop navigation**: the collapsed 72px sidebar renders `TraceLogo compact` and keeps the expand chevron inside the available width; do not use the full wordmark in that state.
 - **Sidebar layout**: the desktop rail is sticky and viewport-height; its content scrolls vertically so the Settings link remains reachable when the workspace switcher or navigation exceeds the viewport. Keep JSX text nodes free of stray punctuation.
@@ -201,6 +201,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/lib/github-repository-sync.ts` | Installation repository reconciliation and access lifecycle updates |
 | `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding, link verification, sync, and cron reconciliation routes |
 | `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
+| `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
+| `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, and integrations |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 

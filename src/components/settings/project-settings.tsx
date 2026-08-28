@@ -488,34 +488,33 @@ export function ProjectSettings({
 
   const stateName = (id: string) => states.find((state) => state.id === id)?.name ?? "?";
   const settingTabs = [
-    { value: "components" as const, label: "Components", icon: Layers3, count: components.length },
-    { value: "labels" as const, label: "Labels", icon: Tag, count: labels.length },
-    { value: "versions" as const, label: "Versions", icon: Calendar, count: versions.length },
-    { value: "milestones" as const, label: "Milestones", icon: Milestone, count: milestones.length },
-    { value: "workflow" as const, label: "Workflow", icon: GitBranch, count: states.length },
+    { value: "components" as const, label: "Components", description: "Ownership areas", icon: Layers3, count: components.length },
+    { value: "labels" as const, label: "Labels", description: "Issue taxonomy", icon: Tag, count: labels.length },
+    { value: "versions" as const, label: "Versions", description: "Release targets", icon: Calendar, count: versions.length },
+    { value: "milestones" as const, label: "Milestones", description: "Delivery checkpoints", icon: Milestone, count: milestones.length },
+    { value: "workflow" as const, label: "Workflow", description: "States and transitions", icon: GitBranch, count: states.length },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">Project settings</p>
-          <h1 className="text-3xl font-semibold tracking-tight"><span className="font-mono text-primary">{project.key}</span> · {project.name}</h1>
-          <p className="mt-2 max-w-2xl text-muted-foreground">{project.description ?? "Components, planning metadata, and workflow for this project."}</p>
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Project configuration</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight">Configure {project.name}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{project.description ?? "Manage issue organization, release planning, and the workflow used by this project."}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/templates">Issue templates</Link></Button>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/custom-fields">Custom fields & API</Link></Button>
-          <Button asChild variant="outline" size="sm" className="h-8 text-xs"><Link href="/dashboard/settings/integrations">Integrations</Link></Button>
-        </div>
+        <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em]", canManage ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "border-border bg-muted text-muted-foreground")}>{canManage ? "Can manage" : "Read only"}</span>
       </div>
 
-      <div role="tablist" aria-label="Settings sections" className="flex gap-1 overflow-x-auto border-b border-border/80">
-        {settingTabs.map(({ value, label, icon: Icon, count }) => (
-          <button key={value} id={`tab-${value}`} aria-controls={`panel-${value}`} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {label}
-            <span className="font-mono text-[10px] text-muted-foreground/70">{count}</span>
+      <div role="tablist" aria-label="Project configuration sections" className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {settingTabs.map(({ value, label, description, icon: Icon, count }) => (
+          <button key={value} id={`tab-${value}`} aria-controls={`panel-${value}`} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("rounded-[10px] border p-3 text-left transition-colors", tab === value ? "border-primary/35 bg-primary/10" : "border-border/80 bg-card hover:border-primary/25 hover:bg-accent/40")}>
+            <span className="flex items-center justify-between gap-2">
+              <Icon className={cn("h-4 w-4", tab === value ? "text-primary" : "text-muted-foreground")} aria-hidden="true" />
+              <span className="font-mono text-lg font-semibold tabular-nums">{count}</span>
+            </span>
+            <span className="mt-2 block text-xs font-semibold">{label}</span>
+            <span className="mt-0.5 block text-[10px] text-muted-foreground">{description}</span>
           </button>
         ))}
       </div>
@@ -536,27 +535,27 @@ export function ProjectSettings({
             {components.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">No components yet.</p>
             ) : (
-              <ul className="divide-y divide-border/70">
-                {components.map((component) => (
-                  <li key={component.id} className={cn("flex items-center gap-3 px-4 py-2.5", component.is_archived && "opacity-55")}>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{component.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{component.description ?? memberLabel(members, component.default_assignee_id)}</p>
-                    </div>
-                    {canManage && (
-                      <>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => openEditComp(component)}>
-                          <Pencil className="h-3 w-3" /> Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground" onClick={() => toggleArchiveComp(component)} disabled={compBusyId === component.id}>
-                          {compBusyId === component.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
-                          {component.is_archived ? "Restore" : "Archive"}
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <div className="hidden grid-cols-[minmax(180px,1fr)_minmax(130px,0.65fr)_90px_150px] gap-3 border-b border-border/70 bg-muted/30 px-4 py-2 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:grid">
+                  <span>Component</span><span>Default assignee</span><span>State</span><span className="text-right">Actions</span>
+                </div>
+                <ul className="divide-y divide-border/70">
+                  {components.map((component) => (
+                    <li key={component.id} className={cn("grid gap-3 px-4 py-3 sm:grid-cols-[minmax(180px,1fr)_minmax(130px,0.65fr)_90px_150px] sm:items-center", component.is_archived && "opacity-55")}>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{component.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{component.description ?? "No description"}</p>
+                      </div>
+                      <div className="min-w-0"><span className="mr-1 font-mono text-[9px] uppercase tracking-wide text-muted-foreground sm:hidden">Assignee</span><span className="truncate text-xs">{memberLabel(members, component.default_assignee_id)}</span></div>
+                      <span className={cn("w-fit rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide", component.is_archived ? "border-zinc-500/25 bg-zinc-500/10 text-zinc-500" : "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300")}>{component.is_archived ? "Archived" : "Active"}</span>
+                      {canManage ? <div className="flex items-center justify-start gap-1 sm:justify-end">
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => openEditComp(component)}><Pencil className="h-3 w-3" /> Edit</Button>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-muted-foreground" onClick={() => toggleArchiveComp(component)} disabled={compBusyId === component.id}>{compBusyId === component.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}{component.is_archived ? "Restore" : "Archive"}</Button>
+                      </div> : <span className="hidden text-right text-xs text-muted-foreground sm:block">View only</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </Surface>
         </div>

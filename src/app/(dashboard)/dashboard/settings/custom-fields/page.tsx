@@ -16,5 +16,5 @@ export default async function CustomFieldsSettingsPage() {
     supabase.from("api_tokens").select("id, name, scopes, expires_at, created_at").eq("user_id", context.userId).eq("organization_id", context.activeOrganization.id).order("created_at", { ascending: false }),
     supabase.rpc("can_manage_project", { p_project_id: context.activeProject.id }),
   ]);
-  return <main className="mx-auto max-w-5xl p-4 sm:p-6 lg:p-8"><CustomFieldsManager projectId={context.activeProject.id} organizationId={context.activeOrganization.id} canManage={Boolean(canManage)} initialFields={(fields ?? []) as any} initialTokens={(tokens ?? []) as any} /></main>;
+  return <CustomFieldsManager projectId={context.activeProject.id} organizationId={context.activeOrganization.id} canManage={Boolean(canManage)} initialFields={(fields ?? []) as any} initialTokens={(tokens ?? []) as any} />;
 }
