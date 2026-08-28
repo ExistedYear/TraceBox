@@ -1,5 +1,5 @@
 const ISSUE_KEY_RE = /[A-Z][A-Z0-9]{1,9}-\d+/gi;
-const CLOSING_KEY_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?[\s#]*([A-Z][A-Z0-9]{1,9}-\d+)\b/gi;
+const CLOSING_DIRECTIVE_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*#?[A-Z][A-Z0-9]{1,9}-\d+(?:(?:\s*,\s*|\s+and\s+|\s+&)#?[A-Z][A-Z0-9]{1,9}-\d+)*/gi;
 
 export function normalizeGithubRepository(value: string): string | null {
   const normalized = value.trim().toLowerCase();
@@ -12,7 +12,7 @@ export function extractIssueKeys(text: string): string[] {
 
 export function extractClosingIssueKeys(text: string): string[] {
   const keys: string[] = [];
-  for (const match of text.matchAll(CLOSING_KEY_RE)) keys.push(match[1].toUpperCase());
+  for (const match of text.matchAll(CLOSING_DIRECTIVE_RE)) keys.push(...extractIssueKeys(match[0]));
   return [...new Set(keys)];
 }
 

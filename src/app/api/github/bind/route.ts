@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
   if (!supabase) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid GitHub repository binding." }, { status: 400 });
+  const { data: role } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can manage repository bindings." }, { status: 403 });
   const { error } = await (supabase as any).rpc("bind_github_repository", {
     p_project_id: body.projectId,
     p_github_repository_id: body.repositoryId,
@@ -47,6 +49,8 @@ export async function DELETE(request: NextRequest) {
   if (!supabase) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid GitHub repository binding." }, { status: 400 });
+  const { data: role } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can manage repository bindings." }, { status: 403 });
   const { error } = await (supabase as any).rpc("unbind_github_repository", { p_project_id: body.projectId, p_github_repository_id: body.repositoryId });
   if (error) {
     console.error("GitHub repository unbinding failed", { code: error.code, message: error.message });

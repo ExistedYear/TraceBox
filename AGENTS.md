@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (41 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (43 ordered), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -126,11 +126,13 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The generated types were refreshed from the linked project after migrations 042–043; nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
 - **GitHub installation verification**: verify callback installation IDs by paginating the user-token `GET /user/installations` endpoint; GitHub does not provide `GET /user/installations/{id}`.
 - **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
-- **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` for idempotency, process lifecycle events, and retain historical TraceBox links when GitHub access is removed. Log structured Supabase RPC failures server-side while keeping webhook responses generic. Never send restricted issue metadata back to GitHub.
+- **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` before acknowledging, atomically claim deliveries with a processing lease, and use `src/lib/github-webhook-processor.ts` for fast-path and replay processing. `after()` is best effort; `/api/github/webhook-replay` and the daily reconcile job recover eligible failures with an eight-attempt cap. Retain historical TraceBox links when GitHub access is removed, classify API errors without treating every 404/403 as revocation, invalidate cached installation tokens after authorization failures, and clear old terminal payload bodies through `/api/github/webhook-cleanup`. Log structured Supabase RPC failures server-side while keeping webhook responses generic. Never send restricted issue metadata back to GitHub.
+- **GitHub PR experience**: issue linking searches only repositories bound to the current project through `/api/github/pull-requests`; `/api/github/link-pull-request` fetches authoritative PR metadata and CI checks server-side. Automatic `Fixes`/`Closes`/`Resolves` relationships are derived state and are reconciled transactionally; manual links are never removed by automatic reconciliation. PR cards expose relationship, branch, state, and check summary.
+- **GitHub permissions**: Maintainers install/reconnect GitHub, bind/unbind repositories, change target branches, toggle auto-resolution, and set the primary repository. Developers may search and link PRs. Primary selection is explicit; the first binding is the only implicit primary.
 - **Service-role SQL guards**: use `is_service_role_request()` for compatibility with PostgREST JSON claims, legacy per-claim GUCs, and opaque Supabase secret keys; RPC execute grants remain the authorization boundary.
 
 ## Important Files
@@ -185,6 +187,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260039_release_validation_fixes.sql` | Release validation fixes: API issue argument ordering and granular scopes/comments, GitHub webhook upserts + optional merge resolution, issue-link authorization, typed custom-field validation, and saved-view sharing |
 | `supabase/migrations/202608260040_github_app_integration.sql` | Verified GitHub App installations, repository catalog/bindings, normalized artifacts, durable webhook deliveries, lifecycle RPCs, and branch-aware resolution |
 | `supabase/migrations/202608260041_service_role_claim_compatibility.sql` | PostgREST-compatible service-role detection for GitHub RPCs and issue-owned mutation triggers |
+| `supabase/migrations/202608260042_github_reliability_pr_experience.sql` | PR metadata/check summaries, derived auto-link reconciliation, atomic webhook claim/replay/retention, classified binding management, and primary repository control |
+| `supabase/migrations/202608260043_github_review_fixes.sql` | Service-role compatibility for 042 functions, bounded webhook retry finalization, stale automatic-link cleanup, and active-installation primary checks |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -193,13 +197,13 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
 | `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
 | `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, search, and verified GitHub resources |
-| `src/app/api/webhooks/github/` | HMAC-verified, idempotent GitHub App webhook ingestion with lifecycle handling and legacy fallback |
+| `src/app/api/webhooks/github/` | HMAC-verified, durable GitHub App webhook ingestion; processor/replay/cleanup helpers live under `src/lib/` |
 | `src/components/tracebox/markdown-content.tsx` | Safe GFM renderer for issue descriptions and comments; raw HTML remains disabled |
 | `src/lib/github.ts` | Repository normalization and case-insensitive issue/closing-key extraction |
-| `src/lib/github-app.ts` | Server-side GitHub App JWT, user-code exchange, installation tokens, repository/API helpers with bounded requests |
+| `src/lib/github-app.ts` | Server-side GitHub App JWT, user-code exchange, short-lived installation-token cache, classified API errors, PR/check helpers, and bounded requests |
 | `src/lib/github-connect-state.ts` | Signed, expiring TraceBox user/workspace/project state for GitHub App installation callbacks |
 | `src/lib/github-repository-sync.ts` | Installation repository reconciliation and access lifecycle updates |
-| `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding, link verification, sync, and cron reconciliation routes |
+| `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding/primary control, PR search/linking, link verification, sync, webhook replay/cleanup, and cron reconciliation routes |
 | `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
 | `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
 | `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, and integrations |

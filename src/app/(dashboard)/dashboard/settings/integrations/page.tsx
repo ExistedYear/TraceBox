@@ -23,5 +23,5 @@ export default async function IntegrationsSettingsPage() {
   const { data: organizationRepositories } = installationIds.length
     ? await db.from("github_repositories").select("id, installation_id, github_repository_id, owner_login, name, full_name, private, archived, default_branch, html_url, is_accessible, last_synced_at").in("installation_id", installationIds).order("full_name")
     : { data: [] };
-  return <GithubIntegrationManager projectId={context.activeProject.id} initialLegacyRepo={legacy?.repo_full_name ?? null} initialInstallations={(installations ?? []) as any} initialRepositories={(organizationRepositories ?? []) as any} initialBindings={(bindings ?? []) as any} />;
+  return <GithubIntegrationManager projectId={context.activeProject.id} canManage={role === "MAINTAINER"} initialLegacyRepo={legacy?.repo_full_name ?? null} initialInstallations={(installations ?? []) as any} initialRepositories={(organizationRepositories ?? []) as any} initialBindings={(bindings ?? []) as any} />;
 }

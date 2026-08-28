@@ -98,6 +98,18 @@ export function eventSummary(
               ? event.old_value
               : undefined,
       };
+    case "GITHUB_LINKED":
+      return { heading: "linked GitHub work", detail: typeof event.new_value === "string" ? event.new_value : typeof meta.relationship === "string" ? meta.relationship : undefined };
+    case "GITHUB_LINK_UPDATED":
+      return { heading: "updated GitHub relationship", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
+    case "GITHUB_LINK_REMOVED":
+      return { heading: "removed an automatic GitHub link" };
+    case "GITHUB_PR_MERGED":
+      return { heading: "merged a GitHub pull request", detail: typeof meta.title === "string" ? meta.title : undefined };
+    case "GITHUB_CHECKS_PASSED":
+      return { heading: "GitHub checks passed" };
+    case "GITHUB_CHECKS_FAILED":
+      return { heading: "GitHub checks failed" };
     default:
       return { heading: event.event_type.toLowerCase().replaceAll("_", " ") };
   }

@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   const { data: role } = await supabase.rpc("project_role", { p_project_id: projectId });
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot connect GitHub." }, { status: 409 });
-  if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can connect GitHub." }, { status: 403 });
+  if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can install or reconnect GitHub." }, { status: 403 });
 
   try {
     const { state, cookieValue, maxAge } = createGithubConnectState({

@@ -381,9 +381,11 @@ Existing functionality:
 
 - repository configuration;
 - repository binding;
-- manual PR/commit/branch links;
+- repository-bound PR search and linking;
+- rich PR cards with branches, relationships, and CI summaries;
+- manual commit/branch/URL links for advanced cases;
 - signed webhook ingestion;
-- reconciliation support.
+- atomic webhook replay and reconciliation support.
 
 Verified in the hosted deployment:
 
@@ -396,13 +398,13 @@ Missing or limited:
 
 - integration health/status view;
 - webhook delivery history;
-- failed-delivery retry;
-- rich PR/commit activity surface;
+- user-facing webhook delivery history and retry controls;
+- rich commit activity surface;
 - merge-state timeline;
 - visible automatic-resolution audit result;
 - complete GitHub App installation workflow inside the product.
 
-The manual issue-link form also asks for repository and URL text even when a configured repository exists. GitHub issue references must use the selected TraceBox project key, such as `BUG-1`; installation alone does not bind a repository to a project.
+The advanced URL form still asks for repository and URL text by design for commits, branches, and unusual cases. The default PR flow now searches only repositories bound to the current project. GitHub issue references must use the selected TraceBox project key, such as `BUG-1`; installation alone does not bind a repository to a project.
 
 Priority: **Medium**.
 

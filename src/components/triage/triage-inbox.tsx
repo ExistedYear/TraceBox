@@ -177,7 +177,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
   const handleAssign = async (assigneeId: string) => {
     if (!canManage || !activeIssue) return;
     try {
-      const { error } = await createClient().rpc("assign_issue", { p_issue_id: activeIssue.id, p_assignee_id: assigneeId || null });
+      const { error } = await createClient().rpc("assign_issue", { p_issue_id: activeIssue.id, p_assignee_id: assigneeId || undefined });
       if (error) {
         toast.error("Could not assign issue.");
         return;

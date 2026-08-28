@@ -310,20 +310,19 @@ Evidence: `src/components/settings/custom-fields-manager.tsx`, `src/app/(dashboa
 
 Priority: **Medium**.
 
-### 18. GitHub integration lacks operational UI depth
+### 18. GitHub integration still lacks some operational UI depth
 
-Repository connection, binding, manual links, signed webhooks, reconciliation, and GitHub App structures exist. The hosted installation → repository binding → PR webhook → automatic resolution flow was verified on 2026-08-28. Missing or limited:
+Repository connection, binding, a repository-bound PR picker, rich PR cards, CI summaries, signed webhooks, replay, reconciliation, and GitHub App structures exist. The hosted installation → repository binding → PR webhook → automatic resolution flow was verified on 2026-08-28. Missing or limited:
 
 - integration health/status;
 - webhook delivery history;
-- failed-delivery retry;
-- rich PR/commit activity;
-- CI/check status surface;
+- user-facing failed-delivery history/retry controls;
+- rich commit activity;
 - merge-state timeline;
 - visible automatic-resolution audit result;
-- complete in-product GitHub App installation setup.
+- complete in-product GitHub App installation setup and permission diagnostics.
 
-There are both legacy `project_integrations` and newer GitHub App/binding models, requiring a clear canonical path. Callback installation verification uses the supported paginated user-token installation list; migration 041 also makes service-role guards compatible with current PostgREST claim handling.
+There are both legacy `project_integrations` and newer GitHub App/binding models; the new picker and webhook processor use the verified App/binding path while legacy URL links remain supported for compatibility. Callback installation verification uses the supported paginated user-token installation list; migrations 041–043 make service-role guards, webhook claims, retry bounds, and active-installation checks compatible with current PostgREST behavior.
 
 Evidence:
 
@@ -331,7 +330,7 @@ Evidence:
 - `src/app/(dashboard)/dashboard/settings/integrations/page.tsx`
 - `src/app/api/github/**`
 - `src/app/api/webhooks/github/route.ts`
-- migrations `028`, `033`, `039`, `040`, `041`
+- migrations `028`, `033`, `039`, `040`, `041`, `042`, `043`
 
 Priority: **Medium**.
 
@@ -375,9 +374,9 @@ Priority: **Medium**.
 
 ## Database and type completeness gaps
 
-### 21. Generated database types are stale against the latest GitHub App schema
+### 21. Generated database types were stale against the latest GitHub App schema — resolved
 
-`src/types/database.ts` does not fully represent the latest migration additions, including GitHub App tables/fields and newer RPCs. Current GitHub integration code uses `any` casts to mask this drift.
+`src/types/database.ts` was stale against the GitHub App schema. It was regenerated from the linked Supabase project after migrations 042 and 043 were applied. Some existing integration boundaries still use `any` because they combine generated RPC/table shapes with legacy compatibility rows.
 
 Reported missing or incomplete items include:
 
@@ -393,13 +392,15 @@ Reported missing or incomplete items include:
 Evidence:
 
 - `supabase/migrations/202608260040_github_app_integration.sql`
+- `supabase/migrations/202608260042_github_reliability_pr_experience.sql`
+- `supabase/migrations/202608260043_github_review_fixes.sql`
 - `src/types/database.ts`
 - `src/app/(dashboard)/dashboard/settings/integrations/page.tsx`
 - `src/app/api/github/**`
 
-Priority: **High engineering hygiene issue**.
+Priority: **Resolved**.
 
-Regenerate types from the actual target database after migration application, then remove avoidable `any` casts.
+Keep generated types synchronized after future schema changes with `npm run db:types:linked`.
 
 ### 22. Membership tables have no safe product mutation contract
 
@@ -544,15 +545,15 @@ The source contains the required configuration guidance, but these steps remain 
 
 ## Audit scope and confidence
 
-This is a source-level completeness audit. It covers the current repository contents and compares implementation surfaces with both plan files. It does not claim that Supabase migrations, Storage, Realtime, Vercel, GitHub App credentials, or production browser flows have been executed successfully until the external deployment checklist is run.
+This is a source-level completeness audit. It covers the current repository contents and compares implementation surfaces with both plan files. Supabase migrations 001–043 are now applied to the linked project; Storage, Realtime, Vercel, GitHub App credentials, and production browser flows still require their respective live checks.
 
 ## Whole-codebase audit addendum
 
 The following findings were identified by auditing the current post-release-validation and GitHub App changes. They are additional to the phase matrix above.
 
-### 32. Generated database types are stale against the GitHub App schema
+### 32. Generated database types were stale against the GitHub App schema — resolved
 
-Migration `202608260040_github_app_integration.sql` adds GitHub App tables, artifacts, webhook deliveries, issue-link fields, and RPCs; migration `202608260041_service_role_claim_compatibility.sql` updates the service-role guard compatibility. `src/types/database.ts` does not represent the complete latest catalog. GitHub integration pages and routes compensate with `any` casts.
+Migration `202608260040_github_app_integration.sql` adds GitHub App tables, artifacts, webhook deliveries, issue-link fields, and RPCs; migrations `202608260041`–`202608260043` update service-role, reliability, and review behavior. `src/types/database.ts` has now been regenerated from the linked database; some intentional compatibility casts remain in GitHub integration boundaries.
 
 Affected capabilities include:
 
@@ -571,9 +572,9 @@ Evidence:
 - `src/app/(dashboard)/dashboard/settings/integrations/page.tsx`
 - `src/app/api/github/**`
 
-Priority: **High engineering completeness issue**.
+Priority: **Resolved**.
 
-Regenerate types from the applied database and remove avoidable casts.
+Regenerate types again after any future linked-schema migration and remove avoidable casts opportunistically.
 
 ### 33. API token scope contract requires verification
 
@@ -604,11 +605,13 @@ Either implement the body-field mutation fully or reject unsupported fields expl
 
 ### 35. GitHub webhook delivery data has limited product visibility
 
-The GitHub App schema stores durable webhook deliveries and processing state, but there is no user-facing delivery history, failure detail, retry, or integration-health screen. The data is effectively backend-only operational state.
+The GitHub App schema now stores durable webhook deliveries, atomic claim state, retry timing, attempt counts, and payload-retention metadata. There is still no user-facing delivery history, failure detail, manual retry button, or full integration-health screen; this remains backend-only operational state.
 
 Evidence:
 
 - `supabase/migrations/202608260040_github_app_integration.sql:116-165`
+- `supabase/migrations/202608260042_github_reliability_pr_experience.sql`
+- `supabase/migrations/202608260043_github_review_fixes.sql`
 - `src/app/api/github/reconcile/**`
 - `src/app/api/webhooks/github/route.ts`
 - `src/app/(dashboard)/dashboard/settings/integrations/page.tsx`
@@ -703,7 +706,7 @@ The deployment guide needs to distinguish:
 - migration tracking repair versus destructive schema reset;
 - `check:migrations` verification versus `sync:migrations` regeneration;
 - API PATCH and all current API routes;
-- current migration count through `041`.
+- current migration count through `043`.
 
 The migration-count and server-only-variable guidance has been updated; continue to avoid clearing migration history and replaying the full schema against an existing populated database without a backup and deliberate baseline plan.
 
@@ -712,7 +715,7 @@ Priority: **Medium**.
 ## Updated priority order
 
 1. Build safe member invitation and role-management workflows.
-2. Regenerate database types from the final migration 040 schema.
+2. Keep generated database types synchronized with the final applied schema.
 3. Align API PATCH fields with actual RPC behavior.
 4. Add explicit server loading/error/retry states.
 5. Add a realtime issue-update consumer.

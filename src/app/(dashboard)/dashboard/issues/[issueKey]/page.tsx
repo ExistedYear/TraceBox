@@ -83,7 +83,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     supabase.from("milestones").select("id, name, status").eq("project_id", project.id).order("name"),
     supabase.from("issue_watchers").select("user_id").eq("issue_id", issue.id),
     supabase.from("attachments").select("*").eq("issue_id", issue.id).order("created_at"),
-    supabase.from("issue_github_links").select("id, repo_name, link_type, number, url, title, status").eq("issue_id", issue.id).order("created_at"),
+    (supabase as any).from("issue_github_links").select("id, repo_name, link_type, number, url, title, status, github_artifact_id, relationship, source, github_artifact:github_artifacts(head_branch, base_branch, author_login, head_sha, draft, merged, state, github_updated_at, last_synced_at, github_pr_check_summaries(total_count, completed_count, successful_count, failed_count, pending_count, state, checks, last_synced_at, error))").eq("issue_id", issue.id).order("created_at"),
     supabase.from("custom_fields").select("id, name, field_type, config, is_required").eq("project_id", project.id).order("name"),
     supabase.from("issue_custom_values").select("custom_field_id, value").eq("issue_id", issue.id),
     supabase.from("project_members").select("user_id").eq("project_id", project.id),

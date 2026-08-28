@@ -17,6 +17,10 @@ describe("GitHub integration helpers", () => {
     expect(extractClosingIssueKeys("Fixes core-12; related to CORE-9. Resolves UI-4")).toEqual(["CORE-12", "UI-4"]);
   });
 
+  it("supports GitHub's multi-issue closing syntax", () => {
+    expect(extractClosingIssueKeys("Fixes CORE-12, CORE-13 and UI-4; refs CORE-9")).toEqual(["CORE-12", "CORE-13", "UI-4"]);
+  });
+
   it("matches configured target branch patterns", () => {
     expect(githubBranchMatches("main", ["main", "release/*"])).toBe(true);
     expect(githubBranchMatches("release/2026.08", ["main", "release/*"])).toBe(true);

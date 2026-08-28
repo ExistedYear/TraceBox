@@ -1,4 +1,4 @@
-import { createGithubInstallationToken, getGithubBranch, getGithubCommit, getGithubPullRequest, getGithubRepository, GithubApiError } from "@/lib/github-app";
+import { classifyGithubApiError, createGithubInstallationToken, getGithubBranch, getGithubCommit, getGithubPullRequest, getGithubRepository, GithubApiError, invalidateGithubInstallationToken } from "@/lib/github-app";
 import { normalizeGithubRepository } from "@/lib/github";
 
 export const GITHUB_LINK_TYPES = ["PULL_REQUEST", "COMMIT", "BRANCH"] as const;
@@ -35,8 +35,14 @@ export async function validateGithubLink(db: any, input: { projectId: string; li
   if (connectedRepository) {
     const { data: installation } = await db.from("github_installations").select("github_installation_id, status").eq("id", connectedRepository.installation_id).maybeSingle();
     if (installation?.status !== "ACTIVE") throw new GithubLinkValidationError("The connected GitHub installation is not active.", 409);
-    const token = await createGithubInstallationToken(installation.github_installation_id);
-    installationToken = token.token;
+    try {
+      const token = await createGithubInstallationToken(installation.github_installation_id);
+      installationToken = token.token;
+    } catch (error) {
+      const kind = error instanceof GithubApiError ? classifyGithubApiError(error) : "UNKNOWN";
+      if (error instanceof GithubApiError && (kind === "AUTH_REVOKED" || kind === "PERMISSION_MISSING")) invalidateGithubInstallationToken(installation.github_installation_id);
+      throw error;
+    }
   }
 
   try {

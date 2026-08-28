@@ -28,17 +28,33 @@ export type GithubPullRequestResponse = {
   html_url: string;
   state: string;
   draft: boolean | null;
+  merged?: boolean;
   merged_at: string | null;
   user?: { login: string } | null;
-  head?: { sha: string };
+  body?: string | null;
+  head?: { sha: string; ref?: string };
   base?: { ref: string };
+  merge_commit_sha?: string | null;
+  closed_at?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type GithubCheckRunsResponse = {
   total_count: number;
-  check_runs: Array<{ id: number; name: string; status: string; conclusion: string | null; html_url: string | null }>;
+  check_runs: Array<{ id: number; name: string; status: string; conclusion: string | null; html_url: string | null; completed_at?: string | null; started_at?: string | null }>;
+};
+
+export type GithubPullRequestListResponse = GithubPullRequestResponse[];
+
+export type GithubCheckSummary = {
+  state: "SUCCESS" | "FAILURE" | "PENDING" | "NEUTRAL" | "NONE" | "UNKNOWN";
+  totalCount: number;
+  completedCount: number;
+  successfulCount: number;
+  failedCount: number;
+  pendingCount: number;
+  checks: Array<{ id: number; name: string; status: string; conclusion: string | null; html_url: string | null }>;
 };
 
 export type GithubCommitResponse = {
@@ -54,14 +70,37 @@ export class GithubApiError extends Error {
   status: number;
   responseMessage: string;
   requestPath: string | null;
+  requestId: string | null;
+  retryAfter: number | null;
+  rateLimitRemaining: number | null;
+  rateLimitReset: number | null;
+  kind: GithubApiErrorKind;
 
-  constructor(status: number, responseMessage: string, requestPath: string | null = null) {
+  constructor(status: number, responseMessage: string, requestPath: string | null = null, details: Partial<Pick<GithubApiError, "requestId" | "retryAfter" | "rateLimitRemaining" | "rateLimitReset">> = {}) {
     super(`GitHub API request failed with status ${status}${requestPath ? ` for ${requestPath}` : ""}.`);
     this.name = "GithubApiError";
     this.status = status;
     this.responseMessage = responseMessage;
     this.requestPath = requestPath;
+    this.requestId = details.requestId ?? null;
+    this.retryAfter = details.retryAfter ?? null;
+    this.rateLimitRemaining = details.rateLimitRemaining ?? null;
+    this.rateLimitReset = details.rateLimitReset ?? null;
+    this.kind = classifyGithubApiError(this);
   }
+}
+
+export type GithubApiErrorKind = "AUTH_REVOKED" | "PERMISSION_MISSING" | "RATE_LIMITED" | "SECONDARY_RATE_LIMITED" | "NOT_FOUND" | "TEMPORARY" | "UNKNOWN";
+
+export function classifyGithubApiError(error: Pick<GithubApiError, "status" | "responseMessage" | "requestPath" | "retryAfter" | "rateLimitRemaining">): GithubApiErrorKind {
+  const message = error.responseMessage.toLowerCase();
+  if (error.status === 401) return "AUTH_REVOKED";
+  if (error.status === 404) return error.requestPath?.includes("/app/installations/") ? "AUTH_REVOKED" : "NOT_FOUND";
+  if (error.status === 403 && /(abuse|secondary rate|retry later|too many requests)/i.test(message)) return "SECONDARY_RATE_LIMITED";
+  if (error.status === 429 || (error.status === 403 && (error.rateLimitRemaining === 0 || error.retryAfter !== null))) return "RATE_LIMITED";
+  if (error.status === 403) return "PERMISSION_MISSING";
+  if (error.status === 408 || error.status === 409 || error.status === 425 || error.status >= 500) return "TEMPORARY";
+  return "UNKNOWN";
 }
 
 function requiredEnv(name: string) {
@@ -115,7 +154,17 @@ export async function githubApiRequest<T>(path: string, token: string | null, in
   const response = await fetch(`https://api.github.com${path}`, { ...init, headers, cache: "no-store", signal: init.signal ?? AbortSignal.timeout(10000) });
   if (!response.ok) {
     const message = (await response.text()).slice(0, 500);
-    throw new GithubApiError(response.status, message, path);
+    const numberHeader = (name: string) => {
+      const value = response.headers.get(name);
+      const parsed = value ? Number(value) : NaN;
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    throw new GithubApiError(response.status, message, path, {
+      requestId: response.headers.get("x-github-request-id"),
+      retryAfter: numberHeader("retry-after"),
+      rateLimitRemaining: numberHeader("x-ratelimit-remaining"),
+      rateLimitReset: numberHeader("x-ratelimit-reset"),
+    });
   }
   if (response.status === 204) return null as T;
   return response.json() as Promise<T>;
@@ -149,12 +198,21 @@ export async function getGithubInstallationForUser(userToken: string, installati
   throw new GithubApiError(404, "Installation is not accessible to the authenticated user.", "/user/installations");
 }
 
+const installationTokenCache = new Map<number, { token: { token: string; expires_at: string; permissions: Record<string, string>; repositories?: GithubRepositoryResponse[] }; expiresAt: number }>();
+
+export function invalidateGithubInstallationToken(installationId: number) {
+  installationTokenCache.delete(installationId);
+}
+
 export async function createGithubInstallationToken(installationId: number) {
+  const cached = installationTokenCache.get(installationId);
+  if (cached && cached.expiresAt - Date.now() > 5 * 60 * 1000) return cached.token;
   const response = await githubApiRequest<{ token: string; expires_at: string; permissions: Record<string, string>; repositories?: GithubRepositoryResponse[] }>(
     `/app/installations/${installationId}/access_tokens`,
     createGithubAppJwt(),
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
   );
+  installationTokenCache.set(installationId, { token: response, expiresAt: new Date(response.expires_at).getTime() });
   return response;
 }
 
@@ -179,8 +237,34 @@ export async function getGithubPullRequest(installationToken: string | null, own
   return githubApiRequest<GithubPullRequestResponse>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/pulls/${number}`, installationToken);
 }
 
+export async function listGithubPullRequests(installationToken: string | null, owner: string, repository: string, options: { state?: "open" | "closed" | "all"; page?: number; perPage?: number }) {
+  const query = new URLSearchParams({ state: options.state ?? "open", sort: "updated", direction: "desc", per_page: String(Math.min(options.perPage ?? 30, 100)), page: String(Math.max(options.page ?? 1, 1)) });
+  return githubApiRequest<GithubPullRequestListResponse>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/pulls?${query.toString()}`, installationToken);
+}
+
 export async function getGithubPullRequestChecks(installationToken: string | null, owner: string, repository: string, ref: string) {
-  return githubApiRequest<GithubCheckRunsResponse>(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/commits/${encodeURIComponent(ref)}/check-runs`, installationToken);
+  const checkRuns: GithubCheckRunsResponse["check_runs"] = [];
+  let totalCount = 0;
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await githubApiRequest<GithubCheckRunsResponse>(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/commits/${encodeURIComponent(ref)}/check-runs?per_page=100&page=${page}`,
+      installationToken,
+    );
+    totalCount = response.total_count;
+    checkRuns.push(...response.check_runs);
+    if (checkRuns.length >= totalCount || response.check_runs.length < 100) break;
+  }
+  return { total_count: totalCount, check_runs: checkRuns };
+}
+
+export function summarizeGithubChecks(response: GithubCheckRunsResponse): GithubCheckSummary {
+  const checks = response.check_runs ?? [];
+  const pending = checks.filter((check) => check.status !== "completed");
+  const failed = checks.filter((check) => check.status === "completed" && ["failure", "timed_out", "action_required", "cancelled", "startup_failure"].includes(check.conclusion ?? ""));
+  const successful = checks.filter((check) => check.status === "completed" && ["success", "neutral", "skipped"].includes(check.conclusion ?? ""));
+  const completedCount = checks.length - pending.length;
+  const state = checks.length === 0 ? "NONE" : failed.length > 0 ? "FAILURE" : pending.length > 0 ? "PENDING" : successful.length === checks.length ? "SUCCESS" : "NEUTRAL";
+  return { state, totalCount: checks.length, completedCount, successfulCount: successful.length, failedCount: failed.length, pendingCount: pending.length, checks: checks.map(({ id, name, status, conclusion, html_url }) => ({ id, name, status, conclusion, html_url })) };
 }
 
 export async function getGithubCommit(installationToken: string | null, owner: string, repository: string, sha: string) {

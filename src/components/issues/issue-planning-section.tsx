@@ -113,8 +113,8 @@ export function IssuePlanningSection({
     try {
       const { error } = await createClient().rpc("update_issue_planning", {
         p_issue_id: issueId,
-        p_affected_version_id: vId,
-        p_target_milestone_id: mId,
+        p_affected_version_id: vId ?? undefined,
+        p_target_milestone_id: mId ?? undefined,
       });
 
       if (error) {

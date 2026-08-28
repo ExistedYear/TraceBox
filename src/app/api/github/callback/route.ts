@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  classifyGithubApiError,
   createGithubInstallationToken,
   exchangeGithubUserCode,
   getGithubAppSlug,
   getGithubInstallationForUser,
+  GithubApiError,
+  invalidateGithubInstallationToken,
   listGithubInstallationRepositories,
 } from "@/lib/github-app";
 import { verifyGithubConnectState } from "@/lib/github-connect-state";
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     const { data: project } = await supabase.from("projects").select("id, organization_id, is_archived").eq("id", statePayload.projectId).eq("organization_id", statePayload.organizationId).maybeSingle();
     const { data: role } = await supabase.rpc("project_role", { p_project_id: statePayload.projectId });
-    if (!project || project.is_archived || (role !== "DEVELOPER" && role !== "MAINTAINER")) return redirectToSettings(request, "error");
+    if (!project || project.is_archived || role !== "MAINTAINER") return redirectToSettings(request, "error");
 
     // GitHub setup parameters are untrusted. The user access token proves that
     // this TraceBox user can see the installation before we persist its ID.
@@ -87,6 +90,8 @@ export async function GET(request: NextRequest) {
     }
     return redirectToSettings(request, "connected");
   } catch (error) {
+    const kind = error instanceof GithubApiError ? classifyGithubApiError(error) : "UNKNOWN";
+    if (kind === "AUTH_REVOKED" || kind === "PERMISSION_MISSING") invalidateGithubInstallationToken(installationId);
     console.error("GitHub App callback failed", { error: error instanceof Error ? error.message : "unknown" });
     return redirectToSettings(request, "error");
   }

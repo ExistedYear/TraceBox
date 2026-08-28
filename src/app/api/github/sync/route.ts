@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const { data: role } = await supabase.rpc("project_role", { p_project_id: projectId });
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot sync GitHub." }, { status: 409 });
-  if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can sync GitHub." }, { status: 403 });
+  if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can refresh GitHub repositories." }, { status: 403 });
 
   const db = supabase as any;
   const { data: installations, error } = await db.from("github_installations").select("id, github_installation_id, status").eq("organization_id", project.organization_id);
