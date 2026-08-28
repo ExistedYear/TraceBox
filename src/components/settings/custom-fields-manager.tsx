@@ -9,17 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { humanizeEnum } from "@/lib/issues";
+import { API_TOKEN_PRESETS } from "@/lib/api-scopes";
 import { createClient } from "@/lib/supabase/client";
 
 type Field = { id: string; name: string; field_type: string; config: Record<string, unknown>; is_required: boolean };
 type Token = { id: string; name: string; scopes: string[]; expires_at: string | null; created_at: string };
 type Props = { projectId: string; organizationId: string; canManage: boolean; initialFields: Field[]; initialTokens: Token[] };
 const fieldTypes = ["TEXT", "NUMBER", "BOOLEAN", "DATE", "SINGLE_SELECT", "MULTI_SELECT", "USER"];
-const tokenPresets = {
-  read: ["projects:read", "issues:read", "milestones:read", "search:read", "integrations:read", "github_links:read"],
-  contributor: ["projects:read", "issues:read", "issues:write", "comments:write", "milestones:read", "search:read", "integrations:read", "github_links:read", "github_links:write"],
-  full: ["projects:read", "issues:read", "issues:write", "comments:write", "milestones:read", "search:read", "integrations:read", "github_links:read", "github_links:write"],
-} as const;
+const tokenPresets = API_TOKEN_PRESETS;
 
 async function sha256(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));

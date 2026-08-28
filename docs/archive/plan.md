@@ -16,7 +16,7 @@ This phase is intentionally limited to infrastructure and boilerplate.
 
 ## Current repository status
 
-This foundation plan is complete. The implementation now continues through Phase 20 in `docs/tracebox-main-plan.md`; the current deployment and external-service checklist is maintained in `deployment.md`.
+This foundation plan is historical and complete as a deployment-foundation milestone. Product source implementation continues through Phase 20 in `tracebox-main-plan.md`; remaining UI, integration, and hosted-validation gaps are tracked in `../incomplete.md`, and the current deployment checklist is maintained in `../deployment.md`.
 
 ---
 

@@ -48,6 +48,7 @@ src/components/
   issues/                  new-issue-form, issue-table (TanStack v8 client table),
                            comments-section (unified timeline + composer + inline edit)
   settings/project-settings.tsx   components manager + workflow viewer tabs
+  settings/*members-manager.tsx  workspace invitations, ownership, and project contributors
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
   validation/auth.ts       zod schemas + inferred LoginValues/SignupValues
@@ -63,13 +64,14 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (43 ordered), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (45 ordered), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, gap, and feature plans
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work
+docs/completion_plan.md    dependency-ordered completion and verification plan
 ```
 
 ## Development Commands
@@ -127,7 +129,8 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The generated types were refreshed from the linked project after migrations 042–043; nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed types cover the 45-migration schema; refresh them after applying migrations 044–045 to a local or hosted database. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
 - **GitHub installation verification**: verify callback installation IDs by paginating the user-token `GET /user/installations` endpoint; GitHub does not provide `GET /user/installations/{id}`.
 - **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
@@ -190,6 +193,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260041_service_role_claim_compatibility.sql` | PostgREST-compatible service-role detection for GitHub RPCs and issue-owned mutation triggers |
 | `supabase/migrations/202608260042_github_reliability_pr_experience.sql` | PR metadata/check summaries, derived auto-link reconciliation, atomic webhook claim/replay/retention, classified binding management, and primary repository control |
 | `supabase/migrations/202608260043_github_review_fixes.sql` | Service-role compatibility for 042 functions, bounded webhook retry finalization, stale automatic-link cleanup, and active-installation primary checks |
+| `supabase/migrations/202608260044_issue_api_contracts.sql` | Shared validated browser/REST issue update contract, nullable body clearing, and per-field audit events |
+| `supabase/migrations/202608260045_membership_invitations.sql` | Explicit project membership backfill, hashed workspace/project invitations, membership audit history, role/removal RPCs, and ownership transfer |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -207,7 +212,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding/primary control, PR search/linking, link verification, sync, webhook replay/cleanup, and cron reconciliation routes |
 | `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
 | `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
-| `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, and integrations |
+| `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, membership, contributors, and integrations |
+| `src/components/settings/workspace-members-manager.tsx` / `src/components/settings/project-members-manager.tsx` | Workspace invitations/roles, project contributor roles, access removal, and ownership controls |
 | `docs/collaboration-github-dashboard-plan.md` | Implementation plan for invitations, role-aware collaboration UI, and the GitHub administration dashboard |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |

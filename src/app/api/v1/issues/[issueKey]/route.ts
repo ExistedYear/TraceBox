@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authenticateApiRequest, filterApiVisibleIssues, type ApiScope } from "@/lib/api-auth";
 import { parseIssueKey } from "@/lib/issues";
+import { issueUpdateSchema } from "@/lib/validation/issue-update";
 import type { Json } from "@/types/database";
 
 type Params = Promise<{ issueKey: string }>;
@@ -15,7 +16,7 @@ async function getIssue(request: NextRequest, issueKey: string, scope: ApiScope)
   if (!project) return { auth: null, response: NextResponse.json({ error: "Project not found." }, { status: 404 }) } as const;
   const { data: issue, error } = await auth.client.from("issues").select("*").eq("project_id", project.id).eq("issue_number", parsed.issueNumber).maybeSingle();
   if (error || !issue) return { auth: null, response: NextResponse.json({ error: "Issue not found." }, { status: 404 }) } as const;
-  const visibleIds = await filterApiVisibleIssues(auth.client, auth.context, [issue as any]);
+  const visibleIds = await filterApiVisibleIssues(auth.client, auth.context, [issue]);
   if (!visibleIds.includes(issue.id)) return { auth: null, response: NextResponse.json({ error: "Issue not found." }, { status: 404 }) } as const;
   return { auth, issue, response: null } as const;
 }
@@ -34,10 +35,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   let updates: unknown;
   try { updates = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
   if (!updates || typeof updates !== "object" || Array.isArray(updates)) return NextResponse.json({ error: "JSON object body required." }, { status: 400 });
-  const allowed = new Set(["title", "description", "priority", "severity", "type", "assignee_id", "component_id"]);
-  const keys = Object.keys(updates);
-  if (!keys.length || keys.some((key) => !allowed.has(key))) return NextResponse.json({ error: "Unsupported or empty update payload." }, { status: 422 });
-  const { error } = await result.auth!.client.rpc("api_update_issue", { p_token_hash: result.auth!.context.tokenHash, p_issue_id: result.issue.id, p_updates: updates as Json });
+  const parsedUpdates = issueUpdateSchema.safeParse(updates);
+  if (!parsedUpdates.success) return NextResponse.json({ error: "Unsupported or invalid update payload." }, { status: 422 });
+  const { error } = await result.auth!.client.rpc("api_update_issue", { p_token_hash: result.auth!.context.tokenHash, p_issue_id: result.issue.id, p_updates: parsedUpdates.data as Json });
   if (error) return NextResponse.json({ error: "Could not update issue." }, { status: 400 });
   return NextResponse.json({ success: true });
 }

@@ -1,5 +1,8 @@
 import { classifyGithubApiError, createGithubInstallationToken, getGithubBranch, getGithubCommit, getGithubPullRequest, getGithubRepository, GithubApiError, invalidateGithubInstallationToken } from "@/lib/github-app";
 import { normalizeGithubRepository } from "@/lib/github";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/types/database";
 
 export const GITHUB_LINK_TYPES = ["PULL_REQUEST", "COMMIT", "BRANCH"] as const;
 export type GithubLinkType = (typeof GITHUB_LINK_TYPES)[number];
@@ -14,7 +17,7 @@ export class GithubLinkValidationError extends Error {
   }
 }
 
-export async function validateGithubLink(db: any, input: { projectId: string; linkType: string; repoName: string; url: string }) {
+export async function validateGithubLink(db: SupabaseClient<Database>, input: { projectId: string; linkType: string; repoName: string; url: string }) {
   const requestedRepository = normalizeGithubRepository(input.repoName);
   if (!requestedRepository || !GITHUB_LINK_TYPES.includes(input.linkType as GithubLinkType)) throw new GithubLinkValidationError("Repository and link type are invalid.");
   let parsedUrl: URL;

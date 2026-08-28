@@ -41,6 +41,7 @@ import {
   type IssueFilters,
 } from "@/lib/issues";
 import { cn } from "@/lib/utils";
+import type { IssueUpdateField } from "@/lib/validation/issue-update";
 
 export type TableRow = {
   id: string;
@@ -229,7 +230,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   }, [fetchData, refreshNonce]);
 
   const updateField = useCallback(
-    async (issue: TableRow, field: string, value: string) => {
+    async (issue: TableRow, field: IssueUpdateField, value: string) => {
       setEditingId(issue.id);
       try {
         const { error } = await createClient().rpc("update_issue_fields", {

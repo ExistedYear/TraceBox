@@ -39,17 +39,18 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsSubmitting(true);
     try {
       const supabase = createClient();
+      const requestedNext = getSafeRedirectPath(searchParams.get("next"));
       if (isSignup) {
         const signupValues = values as SignupValues;
-        const { data, error } = await supabase.auth.signUp({ email: signupValues.email, password: signupValues.password, options: { data: { display_name: signupValues.displayName }, emailRedirectTo: `${window.location.origin}/auth/callback` } });
+        const { data, error } = await supabase.auth.signUp({ email: signupValues.email, password: signupValues.password, options: { data: { display_name: signupValues.displayName }, emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(requestedNext)}` } });
         if (error) throw error;
         if (data.session) {
           toast.success("Your account is ready.");
-          router.push("/dashboard");
+          router.push(requestedNext);
           router.refresh();
         } else {
           toast.success("Account created. Check your email to confirm it, then log in.");
-          router.push("/login");
+          router.push(`/login?next=${encodeURIComponent(requestedNext)}`);
         }
       } else {
         const loginValues = values as LoginValues;

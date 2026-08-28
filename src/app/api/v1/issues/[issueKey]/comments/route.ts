@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
   const parsed = commentSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Comment body must be 1-10,000 characters." }, { status: 422 });
-  const { data, error } = await (auth.client as any).rpc("api_add_comment", { p_token_hash: auth.context.tokenHash, p_issue_id: issue.id, p_body: parsed.data.body });
+  const { data, error } = await auth.client.rpc("api_add_comment", { p_token_hash: auth.context.tokenHash, p_issue_id: issue.id, p_body: parsed.data.body });
   if (error) return NextResponse.json({ error: "Could not add comment." }, { status: 400 });
   return NextResponse.json({ success: true, id: data }, { status: 201 });
 }

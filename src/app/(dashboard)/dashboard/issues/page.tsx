@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CircleDot, ListFilter, Plus } from "lucide-react";
+import { CircleDot, ListFilter, Plus, Users } from "lucide-react";
 
 import { IssueTable } from "@/components/issues/issue-table";
 import { Button } from "@/components/ui/button";
@@ -60,9 +60,10 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
             </div>
           </div>
         </div>
-        <Button asChild size="sm" className="gap-2">
-          <Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs"><Link href="/dashboard/settings/contributors"><Users className="h-3.5 w-3.5" /> Contributors</Link></Button>
+          <Button asChild size="sm" className="gap-2"><Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link></Button>
+        </div>
       </div>
 
       {(states ?? []).length === 0 ? (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authenticateApiRequest } from "@/lib/api-auth";
+import { authenticateApiRequest, canApiAccessProject } from "@/lib/api-auth";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Params = Promise<{ projectId: string }>;
@@ -11,10 +11,11 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
   const projectId = (await params).projectId;
   if (!UUID_RE.test(projectId)) return NextResponse.json({ error: "Invalid project ID." }, { status: 400 });
 
-  const db = auth.client as any;
+  const db = auth.client;
   const { data: project } = await db.from("projects").select("id, organization_id").eq("id", projectId).eq("is_archived", false).maybeSingle();
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
+  if (!await canApiAccessProject(db, auth.context, project.id)) return NextResponse.json({ error: "Project not found." }, { status: 404 });
 
   const { data: installations, error: installationError } = await db
     .from("github_installations")
@@ -32,5 +33,12 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
   ]);
   if (repositoryError || bindingError) return NextResponse.json({ error: "Could not load GitHub repositories." }, { status: 500 });
 
-  return NextResponse.json({ data: repositories ?? [], bindings: bindings ?? [], installations: installations ?? [] });
+  const projectBindings = bindings ?? [];
+  const boundIds = new Set(projectBindings.map((binding) => binding.github_repository_id));
+  const visibleRepositories = auth.context.organizationRole === "OWNER" || auth.context.organizationRole === "ADMIN"
+    ? repositories ?? []
+    : (repositories ?? []).filter((repository) => boundIds.has(repository.id));
+  const visibleInstallationIds = new Set(visibleRepositories.map((repository) => repository.installation_id));
+  const visibleInstallations = (installations ?? []).filter((installation) => visibleInstallationIds.has(installation.id));
+  return NextResponse.json({ data: visibleRepositories, bindings: projectBindings, installations: visibleInstallations });
 }

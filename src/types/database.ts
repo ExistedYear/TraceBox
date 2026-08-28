@@ -1154,6 +1154,50 @@ export type Database = {
           },
         ]
       }
+      membership_events: {
+        Row: {
+          id: string
+          organization_id: string
+          project_id: string | null
+          actor_id: string | null
+          target_user_id: string | null
+          event_type: string
+          old_role: string | null
+          new_role: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          project_id?: string | null
+          actor_id?: string | null
+          target_user_id?: string | null
+          event_type: string
+          old_role?: string | null
+          new_role?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          project_id?: string | null
+          actor_id?: string | null
+          target_user_id?: string | null
+          event_type?: string
+          old_role?: string | null
+          new_role?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "membership_events_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_target_user_id_fkey"; columns: ["target_user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ]
+      }
       notifications: {
         Row: {
           actor_id: string | null
@@ -1660,6 +1704,59 @@ export type Database = {
           },
         ]
       }
+      workspace_invitations: {
+        Row: {
+          id: string
+          organization_id: string
+          project_id: string | null
+          email: string
+          organization_role: string
+          project_role: string | null
+          token_hash: string
+          expires_at: string
+          invited_by: string
+          accepted_by: string | null
+          accepted_at: string | null
+          revoked_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          project_id?: string | null
+          email: string
+          organization_role?: string
+          project_role?: string | null
+          token_hash: string
+          expires_at?: string
+          invited_by: string
+          accepted_by?: string | null
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          project_id?: string | null
+          email?: string
+          organization_role?: string
+          project_role?: string | null
+          token_hash?: string
+          expires_at?: string
+          invited_by?: string
+          accepted_by?: string | null
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "workspace_invitations_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_invited_by_fkey"; columns: ["invited_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_accepted_by_fkey"; columns: ["accepted_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1781,6 +1878,10 @@ export type Database = {
           p_project_id: string
         }
         Returns: string
+      }
+      create_organization_invitation: {
+        Args: { p_email: string; p_organization_id: string; p_organization_role?: string; p_project_id?: string; p_project_role?: string }
+        Returns: { id: string; email: string; token: string; expires_at: string }[]
       }
       create_custom_field: {
         Args: {
@@ -1916,6 +2017,14 @@ export type Database = {
       is_org_member: { Args: { p_organization_id: string }; Returns: boolean }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       is_service_role_request: { Args: never; Returns: boolean }
+      list_organization_invitations: {
+        Args: { p_organization_id: string }
+        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[]
+      }
+      list_project_invitations: {
+        Args: { p_project_id: string }
+        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[]
+      }
       link_github_artifact: {
         Args: {
           p_github_artifact_id: string
@@ -1939,6 +2048,8 @@ export type Database = {
         Args: { p_notification_id: string }
         Returns: undefined
       }
+      membership_role_rank: { Args: { p_role: string }; Returns: number }
+      organization_role: { Args: { p_organization_id: string; p_user_id?: string }; Returns: string }
       project_role: { Args: { p_project_id: string }; Returns: string }
       reconcile_auto_github_links: {
         Args: {
@@ -1978,6 +2089,8 @@ export type Database = {
       }
       remove_github_link: { Args: { p_link_id: string }; Returns: undefined }
       remove_issue_link: { Args: { p_link_id: string }; Returns: undefined }
+      remove_organization_member: { Args: { p_organization_id: string; p_user_id: string }; Returns: undefined }
+      remove_project_member: { Args: { p_project_id: string; p_user_id: string }; Returns: undefined }
       reopen_issue: {
         Args: { p_comment?: string; p_issue_id: string }
         Returns: undefined
@@ -2005,6 +2118,9 @@ export type Database = {
         Args: { p_issue_id: string; p_user_id: string }
         Returns: undefined
       }
+      revoke_organization_invitation: { Args: { p_invitation_id: string }; Returns: undefined }
+      accept_organization_invitation: { Args: { p_token: string }; Returns: string }
+      add_project_member: { Args: { p_project_id: string; p_user_id: string; p_role?: string }; Returns: undefined }
       set_github_installation_status: {
         Args: { p_github_installation_id: number; p_status: string }
         Returns: undefined
@@ -2064,6 +2180,8 @@ export type Database = {
         Args: { p_issue_id: string; p_updates: Json }
         Returns: undefined
       }
+      update_organization_member_role: { Args: { p_organization_id: string; p_user_id: string; p_role: string }; Returns: undefined }
+      update_project_member_role: { Args: { p_project_id: string; p_user_id: string; p_role: string }; Returns: undefined }
       update_issue_planning: {
         Args: {
           p_affected_version_id?: string
@@ -2119,6 +2237,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      transfer_organization_ownership: { Args: { p_organization_id: string; p_new_owner_id: string }; Returns: undefined }
       upsert_github_artifact: {
         Args: {
           p_artifact_type: string

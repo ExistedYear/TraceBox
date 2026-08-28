@@ -1,17 +1,19 @@
 import { createHash } from "node:crypto";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { type ApiScope } from "@/lib/api-scopes";
 import type { Database } from "@/types/database";
+
+export type { ApiScope } from "@/lib/api-scopes";
 
 export type ApiTokenContext = {
   tokenHash: string;
   tokenId: string;
   userId: string;
   organizationId: string;
+  organizationRole: string;
   scopes: string[];
 };
-export type ApiScope = "projects:read" | "issues:read" | "issues:write" | "comments:write" | "milestones:read" | "search:read" | "integrations:read" | "github_links:read" | "github_links:write";
-
 function hasScope(scopes: string[], requiredScope: ApiScope) {
   if (scopes.includes(requiredScope)) return true;
   return requiredScope.endsWith(":read") ? scopes.includes("read") : scopes.includes("write");
@@ -51,7 +53,7 @@ export async function authenticateApiRequest(request: Request, requiredScope: Ap
   if (error || !data || (data.expires_at && new Date(data.expires_at).getTime() <= Date.now())) {
     return { response: Response.json({ error: "Invalid or expired API token." }, { status: 401 }) };
   }
-  const { data: membership } = await client.from("organization_members").select("user_id").eq("organization_id", data.organization_id).eq("user_id", data.user_id).maybeSingle();
+  const { data: membership } = await client.from("organization_members").select("user_id, role").eq("organization_id", data.organization_id).eq("user_id", data.user_id).maybeSingle();
   if (!membership) return { response: Response.json({ error: "API token owner is no longer an organization member." }, { status: 401 }) };
 
   const scopes = Array.isArray(data.scopes) ? data.scopes : [];
@@ -67,9 +69,20 @@ export async function authenticateApiRequest(request: Request, requiredScope: Ap
       tokenId: data.id,
       userId: data.user_id,
       organizationId: data.organization_id,
+      organizationRole: membership.role,
       scopes,
     },
   };
+}
+export async function getApiAccessibleProjectIds(client: SupabaseClient<Database>, context: ApiTokenContext, projectIds: string[]) {
+  if (context.organizationRole === "OWNER" || context.organizationRole === "ADMIN") return new Set(projectIds);
+  if (!projectIds.length) return new Set<string>();
+  const { data } = await client.from("project_members").select("project_id").eq("user_id", context.userId).in("project_id", projectIds);
+  return new Set((data ?? []).map((row) => row.project_id));
+}
+
+export async function canApiAccessProject(client: SupabaseClient<Database>, context: ApiTokenContext, projectId: string) {
+  return (await getApiAccessibleProjectIds(client, context, [projectId])).has(projectId);
 }
 export async function filterApiVisibleIssues(
   client: SupabaseClient<Database>,

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const installation = await getGithubInstallationForUser(userToken, installationId);
     if (installation.id !== installationId || (installation.app_slug && installation.app_slug !== getGithubAppSlug())) return redirectToSettings(request, "error");
 
-    const admin = createAdminClient() as any;
+    const admin = createAdminClient();
     const status = installation.suspended_at ? "SUSPENDED" : setupAction === "request" ? "PENDING" : "ACTIVE";
     const { data: dbInstallationId, error: installationError } = await admin.rpc("upsert_github_installation", {
       p_organization_id: statePayload.organizationId,
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         p_full_name: repository.full_name,
         p_private: repository.private,
         p_archived: repository.archived,
-        p_default_branch: repository.default_branch,
+        p_default_branch: repository.default_branch ?? undefined,
         p_html_url: repository.html_url,
         p_is_accessible: true,
       });

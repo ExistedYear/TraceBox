@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 43) via SQL Script
+### 1.3 Apply Database Migrations (1 through 45) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 43 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 45 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 41 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 45 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -82,6 +82,8 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 41. `202608260041_service_role_claim_compatibility.sql`
 42. `202608260042_github_reliability_pr_experience.sql`
 43. `202608260043_github_review_fixes.sql`
+44. `202608260044_issue_api_contracts.sql`
+45. `202608260045_membership_invitations.sql`
 
 ### 1.4 Configure Supabase Authentication
 

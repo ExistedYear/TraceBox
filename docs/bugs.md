@@ -37,10 +37,19 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- Migration `202608260041_service_role_claim_compatibility.sql` is applied to the linked Supabase project; the full chain is now `202608260001` through `202608260041`.
+- Migrations `202608260041` through `202608260045` complete the current service-role, GitHub reliability, issue-contract, and membership work; apply the full chain `202608260001` through `202608260045` to the linked Supabase project.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
 - Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, reconciliation cron, and broader multi-user/RLS behavior.
 
 ## 4. Live-test limitation
 
 Source-level gates and the core hosted GitHub flow pass. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes; it still requires the production URL and secrets in its ignored `.env` file. Do not commit that file or generated Playwright artifacts.
+
+## 5. Persistent Contributors Panel and add public contributions for repos.
+
+- **Status**: Persistent project Contributors panel is source-implemented; hosted multi-user validation and the separate public-repository contributions request remain pending.
+- Add a dedicated **Contributors** panel for each project. It should remain directly accessible in the project shell rather than being hidden inside unrelated settings tabs; default it open on the project-facing screen.
+- The panel should show each contributor’s avatar/display name, organization role, project role, and access state.
+- It should provide the complete contributor workflow: invite a user, add an existing workspace member, assign/change project role, remove project access, and clearly report pending invitations or failed actions.
+- The panel must use authenticated server-side RPCs and RLS; contributors must never be managed through unrestricted browser table writes.
+- Acceptance: an owner/maintainer can open a project, see its contributors in the separate panel, invite or add a second contributor, assign a role, and remove that access. The second contributor can sign in and immediately find the project without manual SQL.

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CheckSquare, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Plus, Settings2, ShieldCheck } from "lucide-react";
+import { BarChart3, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Plus, Settings2, ShieldCheck, Users } from "lucide-react";
 
 import { TraceLogo } from "@/components/tracebox/trace-mark";
 import { WorkspaceSwitcher, type ProjectSummary, type WorkspaceSummary } from "@/components/layout/workspace-switcher";
@@ -44,7 +44,7 @@ function SidebarContent({ mobile = false, collapsed = false, onCollapse, onNavig
       {!collapsed && <p className="mb-2 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">Project</p>}
       {primaryLinks.map((item) => <SidebarLink key={item.href} {...item} collapsed={collapsed} onNavigate={onNavigate} />)}
     </nav>
-    <div className="mt-auto shrink-0 space-y-1"><SidebarLink href="/dashboard/settings" label="Settings" icon={Settings2} collapsed={collapsed} onNavigate={onNavigate} />{!collapsed && <div className="mt-4 border-t border-border/70 px-2.5 pt-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">TraceBox</p><p className="mt-1 text-xs text-muted-foreground">v0.1</p></div>}</div>
+    <div className="mt-auto shrink-0 space-y-1"><SidebarLink href="/dashboard/settings/contributors" label="Contributors" icon={Users} collapsed={collapsed} onNavigate={onNavigate} /><SidebarLink href="/dashboard/settings" label="Settings" icon={Settings2} collapsed={collapsed} onNavigate={onNavigate} />{!collapsed && <div className="mt-4 border-t border-border/70 px-2.5 pt-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">TraceBox</p><p className="mt-1 text-xs text-muted-foreground">v0.1</p></div>}</div>
   </div>;
 }
 

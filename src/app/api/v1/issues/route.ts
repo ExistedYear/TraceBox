@@ -5,6 +5,22 @@ import { ISSUE_TYPES, PRIORITIES } from "@/lib/issues";
 import { issueCreateSchema } from "@/lib/validation/issue";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type ApiIssueRow = {
+  id: string;
+  project_id: string;
+  visibility: string;
+  reporter_id: string;
+  assignee_id: string | null;
+  issue_number: number;
+  title: string;
+  type: string;
+  priority: string;
+  severity: string;
+  status: { name: string; category: string } | null;
+  component: { name: string } | null;
+  created_at: string;
+  updated_at: string;
+};
 
 function parseBoundedInteger(value: string | null, fallback: number, minimum: number, maximum: number) {
   if (value === null || value.trim() === "") return fallback;
@@ -36,7 +52,7 @@ export async function GET(request: NextRequest) {
   if (priority) {
     if (!(PRIORITIES as readonly string[]).includes(priority)) return NextResponse.json({ error: "Invalid priority." }, { status: 400 });
   }
-  const allIssues: any[] = [];
+  const allIssues: ApiIssueRow[] = [];
   const batchSize = 1000;
   for (let from = 0; ; from += batchSize) {
     let query = auth.client
@@ -53,8 +69,8 @@ export async function GET(request: NextRequest) {
     allIssues.push(...(data ?? []));
     if ((data ?? []).length < batchSize) break;
   }
-  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, allIssues as any));
-  const visible = allIssues.filter((issue: any) => visibleIds.has(issue.id));
+  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, allIssues));
+  const visible = allIssues.filter((issue) => visibleIds.has(issue.id));
   return NextResponse.json({ data: visible.slice(offset, offset + limit), total: visible.length, limit, offset });
 }
 

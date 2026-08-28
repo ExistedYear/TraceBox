@@ -25,7 +25,7 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260043`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 041 makes service-role SQL guards compatible with legacy JWT claims, PostgREST JSON claims, and opaque Supabase secret-key requests. Migration 042 adds the PR picker/CI data model, derived-link reconciliation, atomic webhook replay state, payload cleanup, and explicit Maintainer-only primary repository management. Migration 043 applies the same compatibility guard to new RPCs, bounds failed retries, removes conflicting derived links, and requires an active installation for primary selection.
+Database state is represented by migrations `202608260001` through `202608260045`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 041 makes service-role SQL guards compatible with legacy JWT claims, PostgREST JSON claims, and opaque Supabase secret-key requests. Migration 042 adds the PR picker/CI data model, derived-link reconciliation, atomic webhook replay state, payload cleanup, and explicit Maintainer-only primary repository management. Migration 043 applies the same compatibility guard to new RPCs, bounds failed retries, removes conflicting derived links, and requires an active installation for primary selection. Migration 044 aligns browser and REST issue updates on a shared validated contract. Migration 045 adds explicit project membership, hashed invitations, membership audit history, role management, and ownership transfer.
 
 ## Important runtime configuration
 
@@ -54,8 +54,8 @@ TypeScript:  npx tsc --noEmit — passed
 Tests:       120/120 passed across 16 test files
 Lint:        0 errors; 3 existing warnings (ESLint export, TanStack Table, and React Hook Form compatibility)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 43 files contiguous and `supabase/full_schema.sql` synchronized — passed
-Database types: regenerated from the linked Supabase project after migrations 042–043 — passed
+Migration check: 45 files contiguous and `supabase/full_schema.sql` synchronized — rerun after this merge
+Database types: committed types include the current 45-migration schema; regenerate after applying migrations 044–045 to a local or linked database
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
@@ -68,7 +68,7 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`043` in order from `supabase/full_schema.sql` or the individual files.
+2. Apply all migrations `001`–`045` in order from `supabase/full_schema.sql` or the individual files.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
@@ -76,9 +76,9 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
 9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.
-10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile` (repository reconciliation plus webhook replay/cleanup), and regenerate database types from the live schema if the deployed schema differs. Migrations 042 and 043 are required for the new GitHub paths.
+10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile` (repository reconciliation plus webhook replay/cleanup), and regenerate database types from the live schema if the deployed schema differs. Migrations 042–045 are required for the current GitHub, issue-update, and membership paths.
 
-Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.
+Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `docs/deployment.md`.
 
 ### Vercel Git deployment troubleshooting
 
