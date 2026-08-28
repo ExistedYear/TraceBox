@@ -86,7 +86,8 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, currentUs
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card/50 p-2">
       <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-        <Bookmark className="h-3.5 w-3.5" /> Saved views:
+        <Bookmark className="h-3.5 w-3.5" />
+        <span>Saved views</span>
       </div>
 
       {savedViews.length === 0 ? (
@@ -124,13 +125,11 @@ export function SavedViewsBar({ projectId, currentFilters, savedViews, currentUs
         </div>
       )}
 
-      <div className="ml-auto flex items-center gap-1.5">
-        <Input
-          placeholder="saved view name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="h-7 w-32 text-xs"
-        />
+      <div className="ml-auto flex items-end gap-1.5">
+        <div>
+          <label htmlFor="saved-view-name" className="mb-1 block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Save view</label>
+          <Input id="saved-view-name" placeholder="View name" value={name} onChange={(e) => setName(e.target.value)} className="h-7 w-32 text-xs" />
+        </div>
         <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => void handleSave()} disabled={saving}>
           {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookmarkCheck className="h-3 w-3" />}
           Save current

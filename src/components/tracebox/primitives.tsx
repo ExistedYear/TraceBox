@@ -5,7 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Surface({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return <section id={id} className={cn("rounded-[10px] border bg-card", className)}>{children}</section>;
+  return <section id={id} className={cn("rounded-[10px] border border-border/80 bg-card", className)}>{children}</section>;
 }
 
 export function EmptyState({ icon: Icon, title, description, action }: { icon: LucideIcon; title: string; description: string; action?: ReactNode }) {

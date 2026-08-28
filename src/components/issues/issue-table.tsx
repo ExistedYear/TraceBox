@@ -12,7 +12,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Loader2, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
@@ -62,6 +62,18 @@ export type FilterOption = { value: string; label: string };
 
 const selectClass = "h-7 rounded-md border border-input bg-background px-2 text-xs";
 const PAGE_SIZE = 25;
+
+function FilterSelect({ id, label, value, placeholder, options, onChange }: { id: string; label: string; value: string; placeholder: string; options: FilterOption[]; onChange: (value: string) => void }) {
+  return (
+    <div className="min-w-[126px] flex-1 sm:flex-none">
+      <label htmlFor={id} className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">{label}</label>
+      <select id={id} aria-label={label} className={cn(selectClass, "mt-1 w-full sm:w-auto")} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </div>
+  );
+}
 
 type Props = {
   projectKey: string;
@@ -389,6 +401,10 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     setFilters((current) => ({ ...current, [key]: value || undefined }));
   }
 
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const firstRow = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const lastRow = Math.min(total, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="space-y-3">
       <SavedViewsBar
@@ -403,67 +419,46 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         }}
         onViewsChange={setSavedViews}
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="search title, description, or KEY-123..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-7 w-48 text-xs sm:w-64"
-          aria-label="Search issues"
-        />
-        <select aria-label="Status filter" className={selectClass} value={filters.statusId ?? ""} onChange={(event) => setFilter("statusId", event.target.value)}>
-          <option value="">All statuses</option>
-          {states.map((state) => (
-            <option key={state.value} value={state.value}>{state.label}</option>
-          ))}
-        </select>
-        <select aria-label="Priority filter" className={selectClass} value={filters.priority ?? ""} onChange={(event) => setFilter("priority", event.target.value)}>
-          <option value="">Any priority</option>
-          {PRIORITIES.map((value) => (
-            <option key={value} value={value}>{priorityLabel(value)}</option>
-          ))}
-        </select>
-        <select aria-label="Severity filter" className={selectClass} value={filters.severity ?? ""} onChange={(event) => setFilter("severity", event.target.value)}>
-          <option value="">Any severity</option>
-          {SEVERITIES.map((value) => (
-            <option key={value} value={value}>{severityLabel(value)}</option>
-          ))}
-        </select>
-        <select aria-label="Type filter" className={selectClass} value={filters.type ?? ""} onChange={(event) => setFilter("type", event.target.value)}>
-          <option value="">Any type</option>
-          {ISSUE_TYPES.map((value) => (
-            <option key={value} value={value}>{issueTypeLabel(value)}</option>
-          ))}
-        </select>
-        <select aria-label="Component filter" className={selectClass} value={filters.componentId ?? ""} onChange={(event) => setFilter("componentId", event.target.value)}>
-          <option value="">All components</option>
-          {components.map((component) => (
-            <option key={component.value} value={component.value}>{component.label}</option>
-          ))}
-        </select>
-        <select aria-label="Assignee filter" className={selectClass} value={filters.assigneeId ?? ""} onChange={(event) => setFilter("assigneeId", event.target.value)}>
-          <option value="">All assignees</option>
-          {members.map((member) => (
-            <option key={member.value} value={member.value}>{member.label}</option>
-          ))}
-        </select>
-        {Object.values(filters).some(Boolean) && (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setFilters({})}>Clear</Button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="ml-auto h-7 gap-1.5 px-2 text-xs"><SlidersHorizontal className="h-3 w-3" /> Columns</Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Visible columns</DropdownMenuLabel>
-            {table.getAllLeafColumns().map((column) => (
-              <DropdownMenuCheckboxItem key={column.id} checked={column.getIsVisible()} onCheckedChange={(value) => column.toggleVisibility(Boolean(value))}>
-                {typeof column.columnDef.header === "string" ? column.columnDef.header : column.id}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <span className="font-mono text-[10px] text-muted-foreground">{total} issues</span>
+      <div className="rounded-[10px] border border-border/80 bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Filter className="h-3.5 w-3.5" /></span>
+            <div>
+              <p className="text-xs font-semibold">Issue view</p>
+              <p className="text-[11px] text-muted-foreground">Narrow the queue by ownership, state, or impact.</p>
+            </div>
+          </div>
+          <span className="font-mono text-[10px] text-muted-foreground" aria-live="polite">{total} {total === 1 ? "issue" : "issues"}</span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-[220px] flex-1 sm:max-w-xs">
+            <label htmlFor="issue-search" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Search</label>
+            <div className="relative mt-1">
+              <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input id="issue-search" placeholder="Title, description, or KEY-123..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-7 pl-7 text-xs" aria-label="Search issues" />
+            </div>
+          </div>
+          <FilterSelect id="issue-status-filter" label="Status" value={filters.statusId ?? ""} placeholder="All statuses" options={states} onChange={(value) => setFilter("statusId", value)} />
+          <FilterSelect id="issue-priority-filter" label="Priority" value={filters.priority ?? ""} placeholder="Any priority" options={PRIORITIES.map((value) => ({ value, label: priorityLabel(value) }))} onChange={(value) => setFilter("priority", value)} />
+          <FilterSelect id="issue-severity-filter" label="Severity" value={filters.severity ?? ""} placeholder="Any severity" options={SEVERITIES.map((value) => ({ value, label: severityLabel(value) }))} onChange={(value) => setFilter("severity", value)} />
+          <FilterSelect id="issue-type-filter" label="Type" value={filters.type ?? ""} placeholder="Any type" options={ISSUE_TYPES.map((value) => ({ value, label: issueTypeLabel(value) }))} onChange={(value) => setFilter("type", value)} />
+          <FilterSelect id="issue-component-filter" label="Component" value={filters.componentId ?? ""} placeholder="All components" options={components} onChange={(value) => setFilter("componentId", value)} />
+          <FilterSelect id="issue-assignee-filter" label="Assignee" value={filters.assigneeId ?? ""} placeholder="All assignees" options={members} onChange={(value) => setFilter("assigneeId", value)} />
+          {activeFilterCount > 0 && <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setFilters({})}><X className="h-3 w-3" /> Clear {activeFilterCount}</Button>}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs"><SlidersHorizontal className="h-3 w-3" /> Columns</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Visible columns</DropdownMenuLabel>
+              {table.getAllLeafColumns().map((column) => (
+                <DropdownMenuCheckboxItem key={column.id} checked={column.getIsVisible()} onCheckedChange={(value) => column.toggleVisibility(Boolean(value))}>
+                  {typeof column.columnDef.header === "string" ? column.columnDef.header : column.id}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <Surface>
@@ -507,7 +502,9 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         </div>
       </Surface>
 
-      <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>Showing <span className="font-mono text-foreground">{firstRow}–{lastRow}</span> of <span className="font-mono text-foreground">{total}</span></span>
+        <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" className="h-7 gap-1 px-2" disabled={page === 0 || loading} onClick={() => setPage((value) => Math.max(0, value - 1))}>
           <ChevronLeft className="h-3 w-3" /> Prev
         </Button>
@@ -515,6 +512,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         <Button variant="outline" size="sm" className="h-7 gap-1 px-2" disabled={page + 1 >= pageCount || loading} onClick={() => setPage((value) => value + 1)}>
           Next <ChevronRight className="h-3 w-3" />
         </Button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CircleDot, Plus } from "lucide-react";
+import { CircleDot, ListFilter, Plus } from "lucide-react";
 
 import { IssueTable } from "@/components/issues/issue-table";
 import { Button } from "@/components/ui/button";
@@ -45,10 +45,20 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 flex items-end justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-border/80 pb-5">
         <div>
-          <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">{context.activeProject.key} · Issue queue</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Issues</h1>
+          <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <Link href="/dashboard" className="transition-colors hover:text-foreground">Overview</Link>
+            <span aria-hidden="true">/</span>
+            <span className="text-primary">{context.activeProject.key}</span>
+          </nav>
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/25 bg-primary/10 text-primary"><ListFilter className="h-4 w-4" /></span>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Issues</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Search, triage, and update {context.activeProject.name} issues.</p>
+            </div>
+          </div>
         </div>
         <Button asChild size="sm" className="gap-2">
           <Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link>

@@ -8,6 +8,7 @@ import {
   Calendar,
   CheckCircle2,
   ExternalLink,
+  GitBranch,
   Layers3,
   Loader2,
   Milestone,
@@ -486,6 +487,13 @@ export function ProjectSettings({
   }
 
   const stateName = (id: string) => states.find((state) => state.id === id)?.name ?? "?";
+  const settingTabs = [
+    { value: "components" as const, label: "Components", icon: Layers3, count: components.length },
+    { value: "labels" as const, label: "Labels", icon: Tag, count: labels.length },
+    { value: "versions" as const, label: "Versions", icon: Calendar, count: versions.length },
+    { value: "milestones" as const, label: "Milestones", icon: Milestone, count: milestones.length },
+    { value: "workflow" as const, label: "Workflow", icon: GitBranch, count: states.length },
+  ];
 
   return (
     <div className="space-y-6">
@@ -502,10 +510,12 @@ export function ProjectSettings({
         </div>
       </div>
 
-      <div role="tablist" aria-label="Settings sections" className="flex flex-wrap gap-1 border-b border-border/80">
-        {(["components", "labels", "versions", "milestones", "workflow"] as const).map((value) => (
-          <button key={value} id={`tab-${value}`} aria-controls={`panel-${value}`} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
-            {value}
+      <div role="tablist" aria-label="Settings sections" className="flex gap-1 overflow-x-auto border-b border-border/80">
+        {settingTabs.map(({ value, label, icon: Icon, count }) => (
+          <button key={value} id={`tab-${value}`} aria-controls={`panel-${value}`} onClick={() => setTab(value)} role="tab" aria-selected={tab === value} className={cn("-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium", tab === value ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}>
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {label}
+            <span className="font-mono text-[10px] text-muted-foreground/70">{count}</span>
           </button>
         ))}
       </div>

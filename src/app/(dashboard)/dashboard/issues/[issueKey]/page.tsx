@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, ChevronRight, Clock3 } from "lucide-react";
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
@@ -119,19 +120,25 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
   ];
 
   return (
-    <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-          <Link href="/dashboard/issues" className="hover:text-foreground">{parsed.projectKey} · issues</Link>
-        </p>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-              <span className="font-mono text-primary">{issueKeyLabel}</span> · {issue.title}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">{issue.type} · {issue.severity} · {issue.priority}</p>
+    <main className="mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8">
+      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Link href="/dashboard/issues" className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Issues</Link>
+        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" aria-hidden="true" />
+        <span className="font-mono text-primary">{issueKeyLabel}</span>
+      </nav>
+
+      <div className="mb-6 border-b border-border/80 pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-semibold tracking-wide text-primary">{issueKeyLabel}</span>
+              <span className="rounded-full border border-border/80 bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{issue.type}</span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 className="h-3 w-3" /> Updated {new Date(issue.updated_at).toLocaleDateString()}</span>
+            </div>
+            <h1 className="mt-2 max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{issue.title}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{issue.severity} severity · {issue.priority} priority · reported by {personLabel(mergedNames.get(issue.reporter_id), issue.reporter_id)}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <IssueWatchButton
               issueId={issue.id}
               initialWatching={(watcherRows ?? []).some((w) => w.user_id === context.userId)}
@@ -154,10 +161,13 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-        <div className="space-y-4">
-          <Surface className="p-4">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</h2>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-4">
+          <Surface id="description" className="p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">Description</h2>
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">Issue context</span>
+            </div>
             <MarkdownContent body={issue.description ?? "No description provided."} />
           </Surface>
 
@@ -196,9 +206,24 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
           />
         </div>
 
-        <aside className="space-y-3">
+        <aside className="space-y-3 lg:sticky lg:top-[4.5rem]">
+          <Surface id="issue-details" className="p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Details</h2>
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">Facts</span>
+            </div>
+            <dl className="divide-y divide-border/70 text-sm">
+              {facts.map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                  <dt className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</dt>
+                  <dd className="min-w-0 truncate text-right text-xs font-medium" title={value}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Surface>
+
           <Surface className="p-4">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planning & Labels</h2>
+            <h2 className="mb-3 text-sm font-semibold">Planning & labels</h2>
             <IssuePlanningSection key={`planning-${issue.id}`}
               issueId={issue.id}
               canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
@@ -238,16 +263,6 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             />
           </Surface>
 
-          <Surface className="p-4">
-            <dl className="space-y-2.5 text-sm">
-              {facts.map(([label, value]) => (
-                <div key={label} className="flex items-start justify-between gap-2">
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-                  <dd className="max-w-[60%] truncate text-right font-medium" title={value}>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Surface>
           <Button asChild variant="outline" className="w-full">
             <Link href={`/dashboard/issues/${issueKeyLabel}`}>Refresh</Link>
           </Button>

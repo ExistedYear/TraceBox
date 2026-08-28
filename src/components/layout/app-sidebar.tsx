@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CheckSquare, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Settings2, ShieldCheck } from "lucide-react";
+import { BarChart3, CheckSquare, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Plus, Settings2, ShieldCheck } from "lucide-react";
 
 import { TraceLogo } from "@/components/tracebox/trace-mark";
 import { WorkspaceSwitcher, type ProjectSummary, type WorkspaceSummary } from "@/components/layout/workspace-switcher";
@@ -34,7 +34,14 @@ function SidebarContent({ mobile = false, collapsed = false, onCollapse, onNavig
       {!mobile && onCollapse && <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" onClick={onCollapse} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}</Button>}
     </div>
     {!collapsed && switcher && <div className="mt-4">{switcher}</div>}
-    <nav aria-label="Workspace navigation" className={cn("mt-6 space-y-1", collapsed && "mt-8")}>
+    <div className={cn("mt-5", collapsed && "mt-8")}>
+      <Link href="/dashboard/issues/new" onClick={onNavigate} title={collapsed ? "Create issue" : undefined} className={cn("flex h-8 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90", collapsed && "px-0")}>
+        <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {!collapsed && <span>Create issue</span>}
+      </Link>
+    </div>
+    <nav aria-label="Project navigation" className="mt-5 space-y-1">
+      {!collapsed && <p className="mb-2 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">Project</p>}
       {primaryLinks.map((item) => <SidebarLink key={item.href} {...item} collapsed={collapsed} onNavigate={onNavigate} />)}
     </nav>
     <div className="mt-auto shrink-0 space-y-1"><SidebarLink href="/dashboard/settings" label="Settings" icon={Settings2} collapsed={collapsed} onNavigate={onNavigate} />{!collapsed && <div className="mt-4 border-t border-border/70 px-2.5 pt-4"><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">TraceBox</p><p className="mt-1 text-xs text-muted-foreground">v0.1</p></div>}</div>

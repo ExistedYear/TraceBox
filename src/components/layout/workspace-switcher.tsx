@@ -60,10 +60,12 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
   const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-3">
+      <div>
+        <p className="mb-1 px-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">Workspace</p>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-auto w-full justify-between gap-2 px-2.5 py-2 text-left" title={activeOrganization?.name}>
+          <Button variant="ghost" className="h-auto w-full justify-between gap-2 px-2.5 py-2 text-left" title={activeOrganization?.name} aria-label={`Workspace: ${activeOrganization?.name ?? "No workspace"}`}>
             <span className="flex min-w-0 items-center gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/15 font-mono text-[10px] font-semibold text-primary">{activeOrganization?.name.slice(0, 1).toUpperCase() ?? "?"}</span>
               <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{activeOrganization?.name ?? "No workspace"}</span>
@@ -85,10 +87,13 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
 
+      <div>
+      <p className="mb-1 px-2.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60">Project</p>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-auto w-full justify-between gap-2 px-2.5 py-1.5 text-left" title={activeProject?.name}>
+          <Button variant="ghost" className="h-auto w-full justify-between gap-2 px-2.5 py-1.5 text-left" title={activeProject?.name} aria-label={`Project: ${activeProject ? `${activeProject.key} · ${activeProject.name}` : "No project selected"}`}>
             <span className="flex min-w-0 items-center gap-2">
               <FolderKanban className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{activeProject ? <><span className="font-mono">{activeProject.key}</span> · {activeProject.name}</> : "No project selected"}</span>
@@ -110,6 +115,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
           <DropdownMenuItem onSelect={() => setNewProjectOpen(true)}><Plus className="mr-2 h-4 w-4" />New project</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
 
       <NewProjectDialog
         open={newProjectOpen}
