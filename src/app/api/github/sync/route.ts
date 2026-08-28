@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot sync GitHub." }, { status: 409 });
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can sync GitHub." }, { status: 403 });
 
-  const db = supabase as any;
+  const db = supabase;
   const { data: installations, error } = await db.from("github_installations").select("id, github_installation_id, status").eq("organization_id", project.organization_id);
   if (error) return NextResponse.json({ error: "Could not load GitHub installations." }, { status: 500 });
-  const admin = createAdminClient() as any;
+  const admin = createAdminClient();
   let synced = 0;
   let failed = 0;
   for (const installation of installations ?? []) {

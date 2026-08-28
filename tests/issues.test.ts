@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { decodeIssueSearchParams, encodeIssueFilters, eventSummary, formatIssueKey, parseIssueKey } from "../src/lib/issues";
 import { issueCreateSchema } from "../src/lib/validation/issue";
+import { ISSUE_UPDATE_FIELDS, issueUpdateSchema } from "../src/lib/validation/issue-update";
 
 describe("formatIssueKey", () => {
   it("renders KEY-N", () => {
@@ -105,6 +106,31 @@ describe("issue filter codecs", () => {
     });
     expect(decodeIssueSearchParams({ status: "bogus", component: "nope" }, valid).statusId).toBeUndefined();
     expect(decodeIssueSearchParams({ status: ["s1"] }, valid).statusId).toBeUndefined();
+  });
+});
+
+describe("issue mutation contract", () => {
+  it("shares all supported body fields with REST PATCH", () => {
+    expect(ISSUE_UPDATE_FIELDS).toEqual([
+      "title",
+      "description",
+      "environment",
+      "steps_to_reproduce",
+      "expected_behavior",
+      "actual_behavior",
+      "priority",
+      "severity",
+      "type",
+      "assignee_id",
+      "component_id",
+    ]);
+    expect(issueUpdateSchema.safeParse({ description: null, environment: "  Chrome  " }).success).toBe(true);
+  });
+
+  it("rejects empty and unsupported updates", () => {
+    expect(issueUpdateSchema.safeParse({}).success).toBe(false);
+    expect(issueUpdateSchema.safeParse({ status_id: "state" }).success).toBe(false);
+    expect(issueUpdateSchema.safeParse({ description: "a".repeat(10001) }).success).toBe(false);
   });
 });
 

@@ -11,10 +11,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   if ("response" in auth) return auth.response;
   const { issueKey, linkId } = await params;
   if (!UUID_RE.test(linkId)) return NextResponse.json({ error: "Invalid GitHub link ID." }, { status: 400 });
-  const result = await findApiIssue(auth.client as any, auth.context, issueKey);
+  const result = await findApiIssue(auth.client, auth.context, issueKey);
   if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  const db = auth.client as any;
+  const db = auth.client;
   const { data: link } = await db.from("issue_github_links").select("id").eq("id", linkId).eq("issue_id", result.issue.id).maybeSingle();
   if (!link) return NextResponse.json({ error: "GitHub link not found." }, { status: 404 });
   const { error } = await db.rpc("api_remove_github_link", { p_token_hash: auth.context.tokenHash, p_link_id: linkId });

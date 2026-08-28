@@ -22,10 +22,10 @@ async function readBody(request: NextRequest) {
 export async function GET(request: NextRequest, { params }: { params: Params }) {
   const auth = await authenticateApiRequest(request, "github_links:read");
   if ("response" in auth) return auth.response;
-  const result = await findApiIssue(auth.client as any, auth.context, (await params).issueKey);
+  const result = await findApiIssue(auth.client, auth.context, (await params).issueKey);
   if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
 
-  const db = auth.client as any;
+  const db = auth.client;
   const { data, error } = await db
     .from("issue_github_links")
     .select("id, repo_name, link_type, number, url, title, status, github_artifact_id, relationship, source, created_at")
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 export async function POST(request: NextRequest, { params }: { params: Params }) {
   const auth = await authenticateApiRequest(request, "github_links:write");
   if ("response" in auth) return auth.response;
-  const result = await findApiIssue(auth.client as any, auth.context, (await params).issueKey);
+  const result = await findApiIssue(auth.client, auth.context, (await params).issueKey);
   if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
 
   const body = await readBody(request);
@@ -47,13 +47,13 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   }
 
   try {
-    const verified = await validateGithubLink(auth.client as any, {
+    const verified = await validateGithubLink(auth.client, {
       projectId: result.issue.project_id,
       linkType: body.linkType,
       repoName: body.repoName,
       url: body.url,
     });
-    const { data: id, error } = await (auth.client as any).rpc("api_add_github_link", {
+    const { data: id, error } = await auth.client.rpc("api_add_github_link", {
       p_token_hash: auth.context.tokenHash,
       p_issue_id: result.issue.id,
       p_repo_name: verified.repoName,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       p_url: verified.url,
       p_title: verified.title,
       p_status: verified.status,
-      p_number: verified.number,
+      p_number: verified.number ?? undefined,
     });
     if (error || !id) {
       console.error("GitHub API link creation failed", { code: error?.code, message: error?.message });

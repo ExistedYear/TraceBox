@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CircleDot, Plus } from "lucide-react";
+import { CircleDot, Plus, Users } from "lucide-react";
 
 import { IssueTable } from "@/components/issues/issue-table";
 import { Button } from "@/components/ui/button";
@@ -50,9 +50,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">{context.activeProject.key} · Issue queue</p>
           <h1 className="text-3xl font-semibold tracking-tight">Issues</h1>
         </div>
-        <Button asChild size="sm" className="gap-2">
-          <Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link>
-        </Button>
+        <div className="flex items-center gap-2"><Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs"><Link href="/dashboard/settings/contributors"><Users className="h-3.5 w-3.5" /> Contributors</Link></Button><Button asChild size="sm" className="gap-2"><Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link></Button></div>
       </div>
 
       {(states ?? []).length === 0 ? (

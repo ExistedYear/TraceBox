@@ -35,6 +35,8 @@ src/app/
                            resolution from tb_org/tb_project cookies (redirects to
                            /onboarding when the user has no workspace)
   dashboard/issues/[issueKey]/  issue detail with description + unified activity (events+comments)
+  dashboard/settings/members|contributors/  workspace and project access management
+  invite/[token]/          authenticated invitation acceptance with safe terminal states
   onboarding/              two-step create-workspace → create-first-project flow;
                            ?create=1 bypasses the has-orgs redirect for extra workspaces
   auth/callback/route.ts   OAuth/email code exchange handler
@@ -48,11 +50,13 @@ src/components/
   issues/                  new-issue-form, issue-table (TanStack v8 client table),
                            comments-section (unified timeline + composer + inline edit)
   settings/project-settings.tsx   components manager + workflow viewer tabs
+  settings/*members-manager.tsx   invitation, role, removal, and ownership workflows
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
   validation/auth.ts       zod schemas + inferred LoginValues/SignupValues
   validation/workspace.ts  workspaceSchema (name+slug) / projectSchema (name+KEY+description)
   validation/issue.ts      issueCreateSchema (title/type/component + advanced fields)
+  validation/issue-update.ts shared browser/REST issue mutation contract
   validation/components.ts componentSchema
   validation/comment.ts    commentSchema (body 1–10k chars)
   issues.ts                KEY format/parse, event timeline copy, category pills, filter codecs,
@@ -61,14 +65,16 @@ src/lib/
   workspace-context.ts     server helper resolving cookie-backed org/project context
   server-people.ts         server-only profile display-name maps
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
+  api-scopes.ts            canonical persisted API scopes and UI token presets
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (41 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (43 ordered; 042–043 need hosted application), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work
+docs/completion_plan.md    dependency-ordered closure plan for both incomplete-feature audits; re-audit before implementing to avoid duplicating completed work
 docs/bugs.md               release validation log and pending product requests, including Contributors panel
 ```
 
@@ -122,7 +128,9 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Sidebar layout**: the desktop rail is sticky and viewport-height; its content scrolls vertically so the Settings link remains reachable when the workspace switcher or navigation exceeds the viewport. Keep JSX text nodes free of stray punctuation.
 - **Issue components**: `component_id` is optional when a project has no components yet; the RPC accepts null and the form exposes `None`. When a component is selected, its configured default assignee is preselected if the user has not chosen one.
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
-- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
+- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, component/issue/comment mutations, and membership/invitation/ownership mutations) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client writes for memberships, invitations, issues, components, comments, and audit history are blocked by RLS/grants — keep it that way.
+- **Membership access**: ordinary workspace membership does not imply future project access. `is_project_member` requires an explicit `project_members` row, while organization owners/admins retain workspace-wide access. Migration 043 backfills existing ordinary members into existing projects before enforcing this rule. Project removal also clears restricted grants, watchers, and notifications; workspace removal additionally revokes organization API tokens.
+- **Invitations**: raw invitation tokens are returned once and stored only as SHA-256 hashes with seven-day expiry. Acceptance is bound to the authenticated email. Organization owners/admins manage workspace invitations; project maintainers may issue and observe project-scoped MEMBER invitations within their project.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **DB types are generated**: edit schema via migration, then `npm run db:types`; do not hand-edit `src/types/database.ts`.
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
@@ -183,6 +191,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260039_release_validation_fixes.sql` | Release validation fixes: API issue argument ordering and granular scopes/comments, GitHub webhook upserts + optional merge resolution, issue-link authorization, typed custom-field validation, and saved-view sharing |
 | `supabase/migrations/202608260040_github_app_integration.sql` | Verified GitHub App installations, repository catalog/bindings, normalized artifacts, durable webhook deliveries, lifecycle RPCs, and branch-aware resolution |
 | `supabase/migrations/202608260041_service_role_claim_compatibility.sql` | PostgREST-compatible service-role detection for GitHub RPCs and issue-owned mutation triggers |
+| `supabase/migrations/202608260042_phase1_issue_api_contracts.sql` | Shared validated browser/REST issue-update fields, nullable body clearing, canonical UUID handling, and per-field audit events |
+| `supabase/migrations/202608260043_phase2_membership_invitations.sql` | Hashed expiring invitations, explicit project membership, immutable membership audit, role/removal RPCs, and atomic ownership transfer |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -190,6 +200,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/reports/reports-dashboard.tsx` | Phase 14 time-window metrics, MTTR, aging, component, and priority reports |
 | `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
 | `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
+| `src/lib/api-scopes.ts` / `src/lib/validation/issue-update.ts` | Canonical API scope presets and shared issue mutation validation |
+| `src/components/settings/workspace-members-manager.tsx` / `project-members-manager.tsx` | Workspace invitation/ownership and project Contributors workflows |
 | `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, search, and verified GitHub resources |
 | `src/app/api/webhooks/github/` | HMAC-verified, idempotent GitHub App webhook ingestion with lifecycle handling and legacy fallback |
 | `src/components/tracebox/markdown-content.tsx` | Safe GFM renderer for issue descriptions and comments; raw HTML remains disabled |

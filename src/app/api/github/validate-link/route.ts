@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can add GitHub links." }, { status: 403 });
 
   try {
-    const result = await validateGithubLink(supabase as any, { projectId, linkType, repoName, url });
+    const result = await validateGithubLink(supabase, { projectId, linkType, repoName, url });
     return NextResponse.json({ repo_name: result.repoName, url: result.url, title: result.title, number: result.number, status: result.status });
   } catch (error) {
     if (error instanceof GithubLinkValidationError) return NextResponse.json({ error: error.message }, { status: error.status });

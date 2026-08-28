@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can manage GitHub." }, { status: 403 });
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot use GitHub." }, { status: 409 });
 
-  const db = supabase as any;
+  const db = supabase;
   const { data: installations, error: installationError } = await db
     .from("github_installations")
     .select("id, github_installation_id, github_account_login, github_account_type, status, permissions, last_verified_at")

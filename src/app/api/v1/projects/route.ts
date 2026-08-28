@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authenticateApiRequest } from "@/lib/api-auth";
+import { authenticateApiRequest, getApiAccessibleProjectIds } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateApiRequest(request, "projects:read");
@@ -21,5 +21,7 @@ export async function GET(request: NextRequest) {
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Could not load projects." }, { status: 500 });
-  return NextResponse.json({ data: data ?? [] });
+  const projects = data ?? [];
+  const accessible = await getApiAccessibleProjectIds(auth.client, auth.context, projects.map((project) => project.id));
+  return NextResponse.json({ data: projects.filter((project) => accessible.has(project.id)) });
 }

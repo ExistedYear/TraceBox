@@ -359,6 +359,103 @@ export type Database = {
           },
         ];
       };
+      membership_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          project_id: string | null;
+          actor_id: string | null;
+          target_user_id: string | null;
+          event_type: string;
+          old_role: string | null;
+          new_role: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          project_id?: string | null;
+          actor_id?: string | null;
+          target_user_id?: string | null;
+          event_type: string;
+          old_role?: string | null;
+          new_role?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          project_id?: string | null;
+          actor_id?: string | null;
+          target_user_id?: string | null;
+          event_type?: string;
+          old_role?: string | null;
+          new_role?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "membership_events_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "membership_events_target_user_id_fkey"; columns: ["target_user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ];
+      };
+      workspace_invitations: {
+        Row: {
+          id: string;
+          organization_id: string;
+          project_id: string | null;
+          email: string;
+          organization_role: string;
+          project_role: string | null;
+          token_hash: string;
+          expires_at: string;
+          invited_by: string;
+          accepted_by: string | null;
+          accepted_at: string | null;
+          revoked_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          project_id?: string | null;
+          email: string;
+          organization_role?: string;
+          project_role?: string | null;
+          token_hash: string;
+          expires_at?: string;
+          invited_by: string;
+          accepted_by?: string | null;
+          accepted_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          project_id?: string | null;
+          email?: string;
+          organization_role?: string;
+          project_role?: string | null;
+          token_hash?: string;
+          expires_at?: string;
+          invited_by?: string;
+          accepted_by?: string | null;
+          accepted_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "workspace_invitations_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_invited_by_fkey"; columns: ["invited_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "workspace_invitations_accepted_by_fkey"; columns: ["accepted_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+        ];
+      };
       projects: {
         Row: {
           id: string;
@@ -1031,6 +1128,9 @@ export type Database = {
           status: string;
           created_by: string | null;
           created_at: string;
+          github_artifact_id: string | null;
+          relationship: string;
+          source: string;
         };
         Insert: {
           id?: string;
@@ -1043,6 +1143,9 @@ export type Database = {
           status?: string;
           created_by?: string | null;
           created_at?: string;
+          github_artifact_id?: string | null;
+          relationship?: string;
+          source?: string;
         };
         Update: {
           id?: string;
@@ -1055,6 +1158,9 @@ export type Database = {
           status?: string;
           created_by?: string | null;
           created_at?: string;
+          github_artifact_id?: string | null;
+          relationship?: string;
+          source?: string;
         };
         Relationships: [];
       };
@@ -1091,6 +1197,258 @@ export type Database = {
           is_enabled?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      github_installations: {
+        Row: {
+          id: string;
+          organization_id: string;
+          github_installation_id: number;
+          github_account_id: number;
+          github_account_login: string;
+          github_account_type: string;
+          repository_selection: string;
+          permissions: Json;
+          status: string;
+          installed_by: string | null;
+          suspended_at: string | null;
+          last_verified_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          github_installation_id: number;
+          github_account_id: number;
+          github_account_login: string;
+          github_account_type?: string;
+          repository_selection?: string;
+          permissions?: Json;
+          status?: string;
+          installed_by?: string | null;
+          suspended_at?: string | null;
+          last_verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          github_installation_id?: number;
+          github_account_id?: number;
+          github_account_login?: string;
+          github_account_type?: string;
+          repository_selection?: string;
+          permissions?: Json;
+          status?: string;
+          installed_by?: string | null;
+          suspended_at?: string | null;
+          last_verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      github_repositories: {
+        Row: {
+          id: string;
+          installation_id: string;
+          github_repository_id: number;
+          owner_login: string;
+          name: string;
+          full_name: string;
+          private: boolean;
+          archived: boolean;
+          default_branch: string | null;
+          html_url: string;
+          is_accessible: boolean;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          installation_id: string;
+          github_repository_id: number;
+          owner_login: string;
+          name: string;
+          full_name: string;
+          private?: boolean;
+          archived?: boolean;
+          default_branch?: string | null;
+          html_url: string;
+          is_accessible?: boolean;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          installation_id?: string;
+          github_repository_id?: number;
+          owner_login?: string;
+          name?: string;
+          full_name?: string;
+          private?: boolean;
+          archived?: boolean;
+          default_branch?: string | null;
+          html_url?: string;
+          is_accessible?: boolean;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      project_github_repositories: {
+        Row: {
+          project_id: string;
+          github_repository_id: string;
+          is_primary: boolean;
+          auto_resolve_enabled: boolean;
+          target_branches: string[];
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          project_id: string;
+          github_repository_id: string;
+          is_primary?: boolean;
+          auto_resolve_enabled?: boolean;
+          target_branches?: string[];
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          project_id?: string;
+          github_repository_id?: string;
+          is_primary?: boolean;
+          auto_resolve_enabled?: boolean;
+          target_branches?: string[];
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      github_artifacts: {
+        Row: {
+          id: string;
+          github_repository_id: string;
+          artifact_type: string;
+          external_key: string;
+          github_id: number | null;
+          github_node_id: string | null;
+          number: number | null;
+          sha: string | null;
+          title: string | null;
+          html_url: string;
+          state: string | null;
+          draft: boolean;
+          merged: boolean;
+          author_login: string | null;
+          head_sha: string | null;
+          base_branch: string | null;
+          github_created_at: string | null;
+          github_updated_at: string | null;
+          last_synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          github_repository_id: string;
+          artifact_type: string;
+          external_key: string;
+          github_id?: number | null;
+          github_node_id?: string | null;
+          number?: number | null;
+          sha?: string | null;
+          title?: string | null;
+          html_url: string;
+          state?: string | null;
+          draft?: boolean;
+          merged?: boolean;
+          author_login?: string | null;
+          head_sha?: string | null;
+          base_branch?: string | null;
+          github_created_at?: string | null;
+          github_updated_at?: string | null;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          github_repository_id?: string;
+          artifact_type?: string;
+          external_key?: string;
+          github_id?: number | null;
+          github_node_id?: string | null;
+          number?: number | null;
+          sha?: string | null;
+          title?: string | null;
+          html_url?: string;
+          state?: string | null;
+          draft?: boolean;
+          merged?: boolean;
+          author_login?: string | null;
+          head_sha?: string | null;
+          base_branch?: string | null;
+          github_created_at?: string | null;
+          github_updated_at?: string | null;
+          last_synced_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      github_webhook_deliveries: {
+        Row: {
+          id: string;
+          delivery_id: string;
+          event_name: string;
+          action: string | null;
+          github_installation_id: number | null;
+          github_repository_id: number | null;
+          payload: Json;
+          status: string;
+          attempt_count: number;
+          error: string | null;
+          received_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          delivery_id: string;
+          event_name: string;
+          action?: string | null;
+          github_installation_id?: number | null;
+          github_repository_id?: number | null;
+          payload?: Json;
+          status?: string;
+          attempt_count?: number;
+          error?: string | null;
+          received_at?: string;
+          processed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          delivery_id?: string;
+          event_name?: string;
+          action?: string | null;
+          github_installation_id?: number | null;
+          github_repository_id?: number | null;
+          payload?: Json;
+          status?: string;
+          attempt_count?: number;
+          error?: string | null;
+          received_at?: string;
+          processed_at?: string | null;
         };
         Relationships: [];
       };
@@ -1428,6 +1786,109 @@ export type Database = {
         Args: { p_issue_id: string; p_updates: Json; p_token_hash: string };
         Returns: undefined;
       };
+      api_add_comment: {
+        Args: { p_body: string; p_issue_id: string; p_token_hash: string };
+        Returns: string;
+      };
+      update_saved_view_sharing: {
+        Args: { p_is_shared: boolean; p_view_id: string };
+        Returns: undefined;
+      };
+      is_service_role_request: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      upsert_github_installation: {
+        Args: {
+          p_github_account_id: number;
+          p_github_account_login: string;
+          p_github_account_type?: string;
+          p_github_installation_id: number;
+          p_installed_by?: string;
+          p_organization_id: string;
+          p_permissions?: Json;
+          p_repository_selection?: string;
+          p_status?: string;
+        };
+        Returns: string;
+      };
+      upsert_github_repository: {
+        Args: {
+          p_archived?: boolean;
+          p_default_branch?: string | null;
+          p_full_name: string;
+          p_github_repository_id: number;
+          p_html_url?: string;
+          p_installation_id: string;
+          p_is_accessible?: boolean;
+          p_name: string;
+          p_owner_login: string;
+          p_private?: boolean;
+        };
+        Returns: string;
+      };
+      set_github_installation_status: {
+        Args: { p_github_installation_id: number; p_status: string };
+        Returns: undefined;
+      };
+      set_github_repository_access: {
+        Args: { p_archived?: boolean; p_github_repository_id: number; p_is_accessible: boolean };
+        Returns: undefined;
+      };
+      bind_github_repository: {
+        Args: { p_auto_resolve_enabled?: boolean; p_github_repository_id: string; p_is_primary?: boolean; p_project_id: string; p_target_branches?: string[] };
+        Returns: undefined;
+      };
+      unbind_github_repository: {
+        Args: { p_github_repository_id: string; p_project_id: string };
+        Returns: undefined;
+      };
+      record_github_webhook_delivery: {
+        Args: { p_action?: string; p_delivery_id: string; p_event_name: string; p_github_installation_id?: number; p_github_repository_id?: number; p_payload?: Json };
+        Returns: string;
+      };
+      mark_github_webhook_delivery: {
+        Args: { p_delivery_id: string; p_error?: string; p_status: string };
+        Returns: undefined;
+      };
+      upsert_github_artifact: {
+        Args: {
+          p_artifact_type: string;
+          p_author_login?: string | null;
+          p_base_branch?: string | null;
+          p_draft?: boolean;
+          p_external_key: string;
+          p_github_created_at?: string;
+          p_github_id?: number;
+          p_github_node_id?: string | null;
+          p_github_repository_id: string;
+          p_github_updated_at?: string;
+          p_head_sha?: string | null;
+          p_html_url?: string | null;
+          p_merged?: boolean;
+          p_number?: number;
+          p_sha?: string | null;
+          p_state?: string | null;
+          p_title?: string | null;
+        };
+        Returns: string;
+      };
+      link_github_artifact: {
+        Args: { p_github_artifact_id: string; p_issue_id: string; p_relationship?: string; p_source?: string };
+        Returns: string;
+      };
+      resolve_issue_from_github: {
+        Args: { p_github_repository_id: string; p_issue_id: string; p_project_id: string; p_target_branch: string };
+        Returns: boolean;
+      };
+      api_add_github_link: {
+        Args: { p_link_type: string; p_number?: number; p_repo_name: string; p_issue_id: string; p_status?: string; p_title?: string; p_token_hash: string; p_url: string };
+        Returns: string;
+      };
+      api_remove_github_link: {
+        Args: { p_link_id: string; p_token_hash: string };
+        Returns: undefined;
+      };
       record_github_webhook: {
         Args: { p_link_type: string; p_issue_id: string; p_number?: number; p_project_id: string; p_repo_name: string; p_status?: string; p_title?: string; p_url: string };
         Returns: string;
@@ -1438,6 +1899,58 @@ export type Database = {
       };
       remove_github_integration: {
         Args: { p_project_id: string };
+        Returns: undefined;
+      };
+      organization_role: {
+        Args: { p_organization_id: string; p_user_id?: string };
+        Returns: string;
+      };
+      membership_role_rank: {
+        Args: { p_role: string };
+        Returns: number;
+      };
+      create_organization_invitation: {
+        Args: { p_email: string; p_organization_id: string; p_organization_role?: string; p_project_id?: string; p_project_role?: string };
+        Returns: { id: string; email: string; token: string; expires_at: string }[];
+      };
+      list_organization_invitations: {
+        Args: { p_organization_id: string };
+        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[];
+      };
+      list_project_invitations: {
+        Args: { p_project_id: string };
+        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[];
+      };
+      revoke_organization_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: undefined;
+      };
+      accept_organization_invitation: {
+        Args: { p_token: string };
+        Returns: string;
+      };
+      add_project_member: {
+        Args: { p_project_id: string; p_user_id: string; p_role?: string };
+        Returns: undefined;
+      };
+      update_organization_member_role: {
+        Args: { p_organization_id: string; p_user_id: string; p_role: string };
+        Returns: undefined;
+      };
+      update_project_member_role: {
+        Args: { p_project_id: string; p_user_id: string; p_role: string };
+        Returns: undefined;
+      };
+      remove_project_member: {
+        Args: { p_project_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      remove_organization_member: {
+        Args: { p_organization_id: string; p_user_id: string };
+        Returns: undefined;
+      };
+      transfer_organization_ownership: {
+        Args: { p_organization_id: string; p_new_owner_id: string };
         Returns: undefined;
       };
     };

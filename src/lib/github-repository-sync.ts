@@ -1,9 +1,12 @@
 import { createGithubInstallationToken, getGithubPullRequest, GithubApiError, listGithubInstallationRepositories } from "@/lib/github-app";
 import { githubBranchMatches } from "@/lib/github";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/types/database";
 
 type Installation = { id: string; github_installation_id: number; status: string };
 
-export async function syncGithubInstallation(admin: any, installation: Installation) {
+export async function syncGithubInstallation(admin: SupabaseClient<Database>, installation: Installation) {
   if (installation.status === "REVOKED" || installation.status === "SUSPENDED" || installation.status === "PENDING") return { synced: 0, failed: 0, revoked: false };
   try {
     const token = await createGithubInstallationToken(installation.github_installation_id);
@@ -50,7 +53,7 @@ export async function syncGithubInstallation(admin: any, installation: Installat
   }
 }
 
-async function reconcilePullRequestArtifacts(admin: any, installationToken: string, repository: { id: number; owner: { login: string }; name: string; full_name: string }) {
+async function reconcilePullRequestArtifacts(admin: SupabaseClient<Database>, installationToken: string, repository: { id: number; owner: { login: string }; name: string; full_name: string }) {
   const { data: repositoryRow } = await admin.from("github_repositories").select("id").eq("github_repository_id", repository.id).maybeSingle();
   if (!repositoryRow) return;
   const { data: artifacts } = await admin.from("github_artifacts").select("id, number").eq("github_repository_id", repositoryRow.id).eq("artifact_type", "PULL_REQUEST").not("number", "is", null).limit(100);

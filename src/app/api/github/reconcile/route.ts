@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return NextResponse.json({ error: "Reconciliation is not configured." }, { status: 503 });
   if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  const admin = createAdminClient() as any;
+  const admin = createAdminClient();
   const { data: installations, error } = await admin.from("github_installations").select("id, github_installation_id, status").neq("status", "REVOKED");
   if (error) return NextResponse.json({ error: "Could not load GitHub installations." }, { status: 500 });
   let synced = 0;

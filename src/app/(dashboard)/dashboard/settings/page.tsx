@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FolderKanban } from "lucide-react";
 
 import { ProjectSettings } from "@/components/settings/project-settings";
-import { EmptyState } from "@/components/tracebox/primitives";
+import { ProjectMembersManager } from "@/components/settings/project-members-manager";
+import { EmptyState, Surface } from "@/components/tracebox/primitives";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { displayNameMap } from "@/lib/server-people";
 import { getWorkspaceContext } from "@/lib/workspace-context";
@@ -28,16 +31,17 @@ export default async function SettingsPage() {
   const projectId = context.activeProject.id;
 
   const [
-    { data: project },
-    { data: components },
-    { data: labels },
-    { data: versions },
-    { data: milestones },
-    { data: states },
-    { data: transitions },
-    { data: memberRows },
-    { data: adminRows },
-    { data: canManage },
+    { data: project, error: projectError },
+    { data: components, error: componentsError },
+    { data: labels, error: labelsError },
+    { data: versions, error: versionsError },
+    { data: milestones, error: milestonesError },
+    { data: states, error: statesError },
+    { data: transitions, error: transitionsError },
+    { data: memberRows, error: membersError },
+    { data: adminRows, error: adminsError },
+    { data: organizationMemberRows, error: organizationMembersError },
+    { data: canManage, error: manageError },
   ] = await Promise.all([
     supabase.from("projects").select("name, key, description").eq("id", projectId).maybeSingle(),
     supabase.from("components").select("*").eq("project_id", projectId).order("name"),
@@ -48,8 +52,15 @@ export default async function SettingsPage() {
     supabase.from("workflow_transitions").select("from_state_id, to_state_id").eq("project_id", projectId),
     supabase.from("project_members").select("user_id, role").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id, role").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
+    supabase.from("organization_members").select("user_id, role").eq("organization_id", context.activeOrganization.id),
     supabase.rpc("can_manage_project", { p_project_id: projectId }),
   ]);
+
+  const loadError = projectError ?? componentsError ?? labelsError ?? versionsError ?? milestonesError ?? statesError ?? transitionsError ?? membersError ?? adminsError ?? organizationMembersError ?? manageError;
+  if (loadError) {
+    console.error("Project settings load failed", { code: loadError.code, message: loadError.message });
+    return <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><Surface className="p-8 text-center"><h1 className="text-lg font-semibold">Project settings unavailable</h1><p className="mt-2 text-sm text-muted-foreground">We could not load the complete project configuration. Try again in a moment.</p><Button asChild variant="outline" className="mt-5"><Link href="/dashboard/settings">Retry</Link></Button></Surface></main>;
+  }
 
   if (!project) redirect("/dashboard");
 
@@ -60,6 +71,14 @@ export default async function SettingsPage() {
     role: row.role,
     displayName: names.get(row.user_id) ?? null,
   }])).values()];
+  const organizationNames = await displayNameMap((organizationMemberRows ?? []).map((row) => row.user_id));
+  const projectMemberIds = new Map((memberRows ?? []).map((row) => [row.user_id, row.role]));
+  const contributorCandidates = (organizationMemberRows ?? []).map((row) => ({
+    userId: row.user_id,
+    role: projectMemberIds.get(row.user_id) ?? null,
+    organizationRole: row.role,
+    displayName: organizationNames.get(row.user_id) ?? null,
+  }));
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
@@ -76,6 +95,7 @@ export default async function SettingsPage() {
         transitions={(transitions ?? []).map(({ from_state_id, to_state_id }) => ({ fromStateId: from_state_id, toStateId: to_state_id }))}
         members={members}
       />
+      <ProjectMembersManager organizationId={context.activeOrganization.id} projectId={projectId} members={contributorCandidates} canManage={Boolean(canManage)} canInvite={Boolean(canManage)} />
     </main>
   );
 }

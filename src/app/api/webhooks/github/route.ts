@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/api-auth";
 import { extractClosingIssueKeys, extractIssueKeys, githubBranchMatches, normalizeGithubRepository } from "@/lib/github";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/types/database";
 
 function isValidSignature(body: string, signature: string | null, secret: string) {
   if (!signature?.startsWith("sha256=")) return false;
@@ -24,7 +27,7 @@ function installationStatus(action: string | null) {
   return null;
 }
 
-async function syncRepository(db: any, installationId: any, repository: any, accessible = true) {
+async function syncRepository(db: SupabaseClient<Database>, installationId: string, repository: any, accessible = true) {
   if (!installationId || !repository || !Number.isSafeInteger(repository.id) || typeof repository.full_name !== "string") return;
   await db.rpc("upsert_github_repository", {
     p_installation_id: installationId,
@@ -40,7 +43,7 @@ async function syncRepository(db: any, installationId: any, repository: any, acc
   });
 }
 
-async function processLifecycleEvent(db: any, payload: any, event: string, action: string | null) {
+async function processLifecycleEvent(db: SupabaseClient<Database>, payload: any, event: string, action: string | null) {
   const installationId = Number(payload.installation?.id);
   if (event === "installation" && Number.isSafeInteger(installationId) && installationId > 0) {
     const status = installationStatus(action);
@@ -62,14 +65,14 @@ async function processLifecycleEvent(db: any, payload: any, event: string, actio
   }
 }
 
-async function processBoundEvent(db: any, payload: any, event: string, repositoryGithubId: number) {
+async function processBoundEvent(db: SupabaseClient<Database>, payload: any, event: string, repositoryGithubId: number) {
   const { data: repository } = await db.from("github_repositories").select("id, full_name").eq("github_repository_id", repositoryGithubId).maybeSingle();
   if (!repository) return { linked: 0, resolved: 0, hasBindings: false };
   const { data: bindings } = await db.from("project_github_repositories").select("project_id, auto_resolve_enabled, target_branches").eq("github_repository_id", repository.id);
   if (!bindings?.length) return { linked: 0, resolved: 0, hasBindings: false };
-  const projectIds = bindings.map((binding: any) => binding.project_id);
+  const projectIds = bindings.map((binding) => binding.project_id);
   const { data: projects } = await db.from("projects").select("id, key").in("id", projectIds).eq("is_archived", false);
-  const projectMap = new Map<string, { id: string; key: string }>((projects ?? []).map((project: any) => [project.id, { id: project.id, key: project.key }]));
+  const projectMap = new Map<string, { id: string; key: string }>((projects ?? []).map((project) => [project.id, { id: project.id, key: project.key }]));
   let linked = 0;
   let resolved = 0;
 
@@ -85,7 +88,7 @@ async function processBoundEvent(db: any, payload: any, event: string, repositor
       p_github_repository_id: repository.id,
       p_artifact_type: "PULL_REQUEST",
       p_external_key: `pr:${number}`,
-      p_github_id: Number.isSafeInteger(pullRequest?.id) ? pullRequest.id : null,
+      p_github_id: Number.isSafeInteger(pullRequest?.id) ? pullRequest.id : undefined,
       p_github_node_id: pullRequest?.node_id ?? null,
       p_number: number,
       p_title: pullRequest?.title ?? null,
@@ -134,7 +137,7 @@ async function processBoundEvent(db: any, payload: any, event: string, repositor
       p_github_repository_id: repository.id,
       p_artifact_type: "COMMIT",
       p_external_key: `sha:${sha}`,
-      p_github_id: null,
+      p_github_id: undefined,
       p_sha: sha,
       p_title: commit.message ?? null,
       p_html_url: url,
@@ -160,12 +163,17 @@ async function processBoundEvent(db: any, payload: any, event: string, repositor
   return { linked, resolved, hasBindings: true };
 }
 
-async function processLegacyEvent(db: any, payload: any, event: string, repositoryName: string) {
+async function processLegacyEvent(db: SupabaseClient<Database>, payload: any, event: string, repositoryName: string) {
+  // Migration 040 adds a typed overload while the legacy integration path
+  // still calls the repository-name overload retained by migration 039.
+  const legacyResolver = db as unknown as {
+    rpc: (name: "resolve_issue_from_github", args: { p_project_id: string; p_issue_id: string; p_repo_name: string }) => Promise<{ data: boolean | null; error: { message: string } | null }>;
+  };
   const { data: integrations } = await db.from("project_integrations").select("project_id, auto_resolve_enabled").eq("provider", "GITHUB").ilike("repo_full_name", repositoryName).eq("is_enabled", true);
   if (!integrations?.length) return { linked: 0, resolved: 0 };
   const source = event === "pull_request"
     ? `${payload.pull_request?.title ?? ""} ${payload.pull_request?.body ?? ""}`
-    : `${payload.head_commit?.message ?? ""} ${(payload.commits ?? []).map((commit: any) => typeof commit?.message === "string" ? commit.message : "").join(" ")}`;
+    : `${payload.head_commit?.message ?? ""} ${(payload.commits ?? []).map((commit: { message?: unknown }) => typeof commit?.message === "string" ? commit.message : "").join(" ")}`;
   const keys = extractIssueKeys(source);
   const closingKeys = new Set(extractClosingIssueKeys(source));
   const headCommitSha = typeof payload.head_commit?.id === "string" ? payload.head_commit.id : null;
@@ -190,11 +198,11 @@ async function processLegacyEvent(db: any, payload: any, event: string, reposito
         p_url: url,
         p_title: event === "pull_request" ? payload.pull_request?.title : payload.head_commit?.message,
         p_status: event === "pull_request" ? (payload.pull_request?.merged ? "MERGED" : String(payload.pull_request?.state ?? "OPEN").toUpperCase()) : "OPEN",
-        p_number: event === "pull_request" && Number.isSafeInteger(payload.pull_request?.number) ? payload.pull_request.number : null,
+        p_number: event === "pull_request" && Number.isSafeInteger(payload.pull_request?.number) ? payload.pull_request.number : undefined,
       });
       if (!error && linkId) linked += 1;
       if (event === "pull_request" && payload.pull_request?.merged === true && integration.auto_resolve_enabled && closingKeys.has(key)) {
-        const { data: didResolve, error: resolveError } = await db.rpc("resolve_issue_from_github", { p_project_id: project.id, p_issue_id: issue.id, p_repo_name: repositoryName });
+        const { data: didResolve, error: resolveError } = await legacyResolver.rpc("resolve_issue_from_github", { p_project_id: project.id, p_issue_id: issue.id, p_repo_name: repositoryName });
         if (!resolveError && didResolve) resolved += 1;
       }
     }
@@ -216,13 +224,13 @@ export async function POST(request: NextRequest) {
   const action = typeof payload.action === "string" ? payload.action : null;
   const repositoryId = Number(payload.repository?.id);
   const installationId = Number(payload.installation?.id);
-  const admin = createAdminClient() as any;
+  const admin = createAdminClient();
   const { data: delivery, error: deliveryError } = await admin.rpc("record_github_webhook_delivery", {
     p_delivery_id: deliveryId,
     p_event_name: event,
     p_action: action,
-    p_github_installation_id: Number.isSafeInteger(installationId) ? installationId : null,
-    p_github_repository_id: Number.isSafeInteger(repositoryId) ? repositoryId : null,
+    p_github_installation_id: Number.isSafeInteger(installationId) ? installationId : undefined,
+    p_github_repository_id: Number.isSafeInteger(repositoryId) ? repositoryId : undefined,
     p_payload: payload,
   });
   if (deliveryError) {

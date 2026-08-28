@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20:
+TraceBox has repository implementation through Phase 20 in `docs/tracebox-main-plan.md`; this is source coverage, not a claim that every UI, integration, or hosted-validation item is complete. The authoritative closure backlog is `docs/incomplete.md`.
 
 1. Organizations and projects
 2. Components and default workflow
@@ -25,7 +25,9 @@ TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260041`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 041 makes service-role SQL guards compatible with legacy JWT claims, PostgREST JSON claims, and opaque Supabase secret-key requests.
+Completion-plan Phases 0–2 are now source-implemented: the closure backlog is consolidated, issue body mutations share a browser/REST contract, and RPC-backed invitations, explicit project membership, role management, removal, ownership transfer, and persistent Contributors surfaces are present. Multi-user hosted validation remains external.
+
+Database state is represented by migrations `202608260001` through `202608260043`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 042 aligns issue body mutations and audit events; migration 043 adds membership invitations, immutable membership history, explicit project access, and ownership workflows.
 
 ## Important runtime configuration
 
@@ -51,14 +53,16 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npx tsc --noEmit — passed
-Tests:       115/115 passed across 16 test files
+Tests:       123/123 passed across 18 test files
 Lint:        0 errors; 3 existing warnings (ESLint export, TanStack Table, and React Hook Form compatibility)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 41 files contiguous and `supabase/full_schema.sql` synchronized — passed
+Migration check: 43 files contiguous and `supabase/full_schema.sql` synchronized — passed
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
 The ignored `qa/live/` Playwright suite remains local-only. It was not fully run from this checkout because no ignored `qa/live/.env` credentials were present and the runner lacked the Chromium `libnspr4.so` dependency. Run it from a normal workstation with the deployment URL, disposable API token, and matching webhook secret configured locally.
+
+The Supabase CLI was downloaded for this completion run, but the sandbox could not access the Docker socket. Migrations 001–043 were therefore not replayed against a disposable database here, and `src/types/database.ts` was reconciled to the migration catalog rather than regenerated from a running local schema. Run `npm run db:start`, `npm run db:reset`, and `npm run db:types` on a Docker-enabled workstation before applying migrations 042–043 to a hosted project.
 
 Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, sidebar layout, and responsive table layout issues.
 
@@ -67,7 +71,7 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`041` in order from `supabase/full_schema.sql` or the individual files.
+2. Replay and then apply all migrations `001`–`043` in order from `supabase/full_schema.sql` or the individual files; regenerate database types from that applied schema.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
