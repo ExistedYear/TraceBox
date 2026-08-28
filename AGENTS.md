@@ -63,7 +63,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (40 applied), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (41 applied), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
@@ -126,6 +126,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
 - **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
 - **GitHub webhooks**: verify the raw body with HMAC before parsing, persist `X-GitHub-Delivery` for idempotency, process lifecycle events, and retain historical TraceBox links when GitHub access is removed. Log structured Supabase RPC failures server-side while keeping webhook responses generic. Never send restricted issue metadata back to GitHub.
+- **Service-role SQL guards**: use `is_service_role_request()` for compatibility with PostgREST JSON claims, legacy per-claim GUCs, and opaque Supabase secret keys; RPC execute grants remain the authorization boundary.
 
 ## Important Files
 
@@ -178,6 +179,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260038_final_invariant_hardening.sql` | Archived-project watcher checks and API token hash constraints |
 | `supabase/migrations/202608260039_release_validation_fixes.sql` | Release validation fixes: API issue argument ordering and granular scopes/comments, GitHub webhook upserts + optional merge resolution, issue-link authorization, typed custom-field validation, and saved-view sharing |
 | `supabase/migrations/202608260040_github_app_integration.sql` | Verified GitHub App installations, repository catalog/bindings, normalized artifacts, durable webhook deliveries, lifecycle RPCs, and branch-aware resolution |
+| `supabase/migrations/202608260041_service_role_claim_compatibility.sql` | PostgREST-compatible service-role detection for GitHub RPCs and issue-owned mutation triggers |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |

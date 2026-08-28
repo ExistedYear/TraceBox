@@ -26,7 +26,7 @@ The header palette supports independent accent themes (blue by default, neutral,
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds forty ordered migrations through Phase 20 and the release-validation corrections. These cover the foundational schema/RLS/RPC hardening, collaboration/planning, notifications/realtime, search/saved views, issue links, triage, attachments/storage policies, templates, restricted issue access, GitHub App installations/repositories/artifacts/webhooks, typed custom fields, granular API scopes, and final audit corrections. The consolidated `supabase/full_schema.sql` contains the same 40 migrations in order; run `npm run sync:migrations` after adding a migration.
+`supabase/migrations/` holds forty-one ordered migrations through Phase 20 and the release-validation corrections. These cover the foundational schema/RLS/RPC hardening, collaboration/planning, notifications/realtime, search/saved views, issue links, triage, attachments/storage policies, templates, restricted issue access, GitHub App installations/repositories/artifacts/webhooks, service-role claim compatibility, typed custom fields, granular API scopes, and final audit corrections. The consolidated `supabase/full_schema.sql` contains the same 41 migrations in order; run `npm run sync:migrations` after adding a migration.
 
 ## Quality checks
 
