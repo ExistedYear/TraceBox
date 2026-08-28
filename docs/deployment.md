@@ -23,9 +23,9 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 41) via SQL Script
+### 1.3 Apply Database Migrations (1 through 43) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 41 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 43 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 

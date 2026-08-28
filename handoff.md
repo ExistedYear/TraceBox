@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20:
+TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through Phase 20:
 
 1. Organizations and projects
 2. Components and default workflow

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub App integration & PR links**, and **custom fields + public REST API** with scoped tokens.
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/archive/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub App integration & PR links**, and **custom fields + public REST API** with scoped tokens.
 
 ## Architecture & Data Flow
 
@@ -66,7 +66,8 @@ src/lib/
 supabase/                  config.toml, migrations/ (43 ordered), seed.sql (intentionally empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
-docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
+docs/                      active deployment, gap, and feature plans
+  archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work
 ```
@@ -207,6 +208,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
 | `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
 | `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, and integrations |
+| `docs/collaboration-github-dashboard-plan.md` | Implementation plan for invitations, role-aware collaboration UI, and the GitHub administration dashboard |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 

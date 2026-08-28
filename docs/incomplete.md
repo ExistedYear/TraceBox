@@ -1,6 +1,6 @@
 # TraceBox Incomplete Features and UI Gaps
 
-This document is the result of a whole-codebase completeness audit. Every current database migration, consolidated schema, database type file, API route, server page, client component, hook, validation module, test file, CI workflow, and project Markdown document was compared with both `docs/plan.md` and `docs/tracebox-main-plan.md`.
+This document is the result of a whole-codebase completeness audit. Every current database migration, consolidated schema, database type file, API route, server page, client component, hook, validation module, test file, CI workflow, and project Markdown document was compared with both `docs/archive/plan.md` and `docs/archive/tracebox-main-plan.md`.
 
 The audit asks a stricter question than “does a table or RPC exist?” A capability is complete only when a user can discover it, configure it, execute it, recover from failure, and observe its result through a safe product workflow.
 
@@ -501,7 +501,7 @@ The source contains the required configuration guidance, but these steps remain 
 
 ### 31. Known product limitations remain documented
 
-`docs/bugs.md` still records product limitations such as password recovery history and provider setup requirements. Those should remain explicit until the corresponding product workflows are verified in the deployed environment.
+`docs/archive/bugs.md` still records product limitations such as password recovery history and provider setup requirements. Those should remain explicit until the corresponding product workflows are verified in the deployed environment.
 
 ## Phase summary
 
@@ -633,7 +633,7 @@ Priority: **Medium**.
 
 ### 37. Plan schema and implementation schema diverge in several places
 
-The database target schema in `docs/tracebox-main-plan.md` describes capabilities that differ from the final migrations:
+The database target schema in `docs/archive/tracebox-main-plan.md` describes capabilities that differ from the final migrations:
 
 - planned profile `username` is absent from the implemented profile table;
 - planned saved-view `owner_id`, nullable project scope, and three visibility values are represented by `created_by`, required project scope, and `is_shared`;

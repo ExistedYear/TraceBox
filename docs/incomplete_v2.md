@@ -1,6 +1,6 @@
 # TraceBox Incomplete Features and UI Gaps
 
-This document records product capabilities that are implemented only partially, exist in the database/backend without a complete UI, or require manual external setup. It was produced from a source audit against both `docs/plan.md` and `docs/tracebox-main-plan.md`.
+This document records product capabilities that are implemented only partially, exist in the database/backend without a complete UI, or require manual external setup. It was produced from a source audit against both `docs/archive/plan.md` and `docs/archive/tracebox-main-plan.md`.
 
 ## Executive Summary
 
@@ -477,7 +477,7 @@ The API exists as an external contract, but there is no in-product API documenta
 
 ### 24. Foundation deployment status content is historical
 
-`docs/plan.md` contains a foundation/deployment checklist. It should be treated as historical infrastructure guidance; current implementation and external setup are documented in `deployment.md` and `handoff.md`.
+`docs/archive/plan.md` contains a foundation/deployment checklist. It should be treated as historical infrastructure guidance; current implementation and external setup are documented in `docs/deployment.md` and `handoff.md`.
 
 ## Phase summary
 
