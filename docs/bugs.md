@@ -44,3 +44,12 @@
 ## 4. Live-test limitation
 
 Source-level gates and the core hosted GitHub flow pass. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes; it still requires the production URL and secrets in its ignored `.env` file. Do not commit that file or generated Playwright artifacts.
+
+## 5. Persistent Contributors Panel
+
+- **Status**: Requested feature; not implemented.
+- Add a dedicated **Contributors** panel for each project. It should remain directly accessible in the project shell rather than being hidden inside unrelated settings tabs; default it open on the project-facing screen.
+- The panel should show each contributor’s avatar/display name, organization role, project role, and access state.
+- It should provide the complete contributor workflow: invite a user, add an existing workspace member, assign/change project role, remove project access, and clearly report pending invitations or failed actions.
+- The panel must use authenticated server-side RPCs and RLS; contributors must never be managed through unrestricted browser table writes.
+- Acceptance: an owner/maintainer can open a project, see its contributors in the separate panel, invite or add a second contributor, assign a role, and remove that access. The second contributor can sign in and immediately find the project without manual SQL.

@@ -69,6 +69,7 @@ tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 docs/                      plan.md (foundation plan), tracebox-main-plan.md (roadmap)
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work
+docs/bugs.md               release validation log and pending product requests, including Contributors panel
 ```
 
 ## Development Commands
