@@ -25,6 +25,8 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
+The GitHub integrations settings page now presents the approved command-center layout: connection metrics, Active / Needs attention / History tabs, verified installation health, sanitized webhook delivery history, inaccessible/archived repository warnings, GitHub installation management links, repository sync, primary selection, and per-repository target-branch/auto-resolution saves. Existing maintainer/developer permissions are preserved; developers retain read/search/link access while installation and binding mutations remain maintainer-only.
+
 Database state is represented by migrations `202608260001` through `202608260045`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 041 makes service-role SQL guards compatible with legacy JWT claims, PostgREST JSON claims, and opaque Supabase secret-key requests. Migration 042 adds the PR picker/CI data model, derived-link reconciliation, atomic webhook replay state, payload cleanup, and explicit Maintainer-only primary repository management. Migration 043 applies the same compatibility guard to new RPCs, bounds failed retries, removes conflicting derived links, and requires an active installation for primary selection. Migration 044 aligns browser and REST issue updates on a shared validated contract. Migration 045 adds explicit project membership, hashed invitations, membership audit history, role management, and ownership transfer.
 
 ## Important runtime configuration
@@ -51,10 +53,10 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npx tsc --noEmit — passed
-Tests:       120/120 passed across 16 test files
+Tests:       128/128 passed across 18 test files
 Lint:        0 errors; 3 existing warnings (ESLint export, TanStack Table, and React Hook Form compatibility)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 45 files contiguous and `supabase/full_schema.sql` synchronized — rerun after this merge
+Migration check: 45 files contiguous and `supabase/full_schema.sql` synchronized
 Database types: committed types include the current 45-migration schema; regenerate after applying migrations 044–045 to a local or linked database
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.

@@ -183,7 +183,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: TB-004
 - Owner area: GitHub App / Integrations
 - Status: OPEN
-- Evidence: `src/components/settings/github-integration-manager.tsx`; integrations settings route; `src/app/api/github/**`; webhook route; migrations `202608260028`, `202608260033`, `202608260040`, and `202608260041`
+- Evidence: `src/components/settings/github-integration-manager.tsx` now provides Active / Needs attention / History views, connection metrics, installation/repository/webhook health, installation management links, repository sync, primary selection, and per-binding automation saves; integrations settings route; `src/app/api/github/**`; webhook route; migrations `202608260028`, `202608260033`, `202608260040`, and `202608260041`
 - Acceptance: The canonical GitHub App model is clear (including treatment of legacy integrations), and users can see installation/repository health, webhook delivery history and failure detail, retry failed deliveries, rich PR/commit/CI/merge activity, and automatic-resolution audit results. Historical links survive access removal and restricted issue data never leaves TraceBox.
 - Verification: Hosted GitHub App install/bind/link/merge flow (already verified 2026-08-28) plus delivery failure/retry, lifecycle, reconciliation, and restricted-data tests.
 
