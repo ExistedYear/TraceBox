@@ -14,6 +14,8 @@ Most important gap:                   no invite/member-management workflow
 
 The existence of an RPC, table, or route is not treated as complete product functionality unless a user can reach it through a safe, understandable workflow.
 
+Validation update (2026-08-28): the hosted GitHub App installation, repository binding, pull-request webhook linking, and `Fixes BUG-1` merge resolution flow passed against a private repository. The remaining GitHub gaps below concern operational visibility and broader validation, not the core path.
+
 ## Critical and high-priority gaps
 
 ### 1. Contributor invitation and member management are absent
@@ -383,6 +385,13 @@ Existing functionality:
 - signed webhook ingestion;
 - reconciliation support.
 
+Verified in the hosted deployment:
+
+- installation callback and user-installation ownership verification;
+- repository discovery and project binding;
+- pull-request webhook link creation;
+- branch-aware automatic resolution after merging into `main`.
+
 Missing or limited:
 
 - integration health/status view;
@@ -393,7 +402,7 @@ Missing or limited:
 - visible automatic-resolution audit result;
 - complete GitHub App installation workflow inside the product.
 
-The manual issue-link form also asks for repository and URL text even when a configured repository exists.
+The manual issue-link form also asks for repository and URL text even when a configured repository exists. GitHub issue references must use the selected TraceBox project key, such as `BUG-1`; installation alone does not bind a repository to a project.
 
 Priority: **Medium**.
 

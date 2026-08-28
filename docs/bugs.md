@@ -19,11 +19,11 @@
       - `http://localhost:3000/**`
 
 ## 1.1 GitHub App repository connection
-- **Status**: Implemented in source; requires a GitHub App installation and Vercel server variables.
+- **Status**: Hosted flow verified on 2026-08-28 with a private repository. It still requires a GitHub App installation and Vercel server variables in each deployment.
 - GitHub login and repository access are intentionally separate. Login creates the TraceBox session; **Connect GitHub** in project settings performs an explicit App installation.
-- The callback verifies the signed TraceBox state and checks the installation through GitHub user authorization before persisting it.
+- The callback verifies the signed TraceBox state and checks the installation by paginating the user-token `GET /user/installations` response before persisting it. GitHub does not provide `GET /user/installations/{installation_id}`.
 - Repository access is read-only and selected per GitHub account/organization. The project can bind multiple verified repositories.
-- Verify App webhook events, delivery idempotency, lifecycle status changes, branch-aware auto-resolution, and six-hour reconciliation after deployment.
+- A PR containing `Fixes BUG-1` was linked through the signed webhook and resolved after merging into the configured `main` branch. Delivery idempotency and lifecycle handling remain implemented; daily reconciliation and broader multi-user/API testing remain to be exercised.
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## 3. External deployment validation
 
-- **Status**: Pending external setup, not a source-code defect.
-- Apply migrations `202608260001` through `202608260040` to the intended Supabase project.
-- Verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, Vercel server-only variables, and GitHub webhook.
-- Run the full live flow documented in `deployment.md`, including restricted issue isolation, attachment lifecycle, API-token scopes, and webhook linking.
+- **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
+- Migration `202608260041_service_role_claim_compatibility.sql` is applied to the linked Supabase project; the full chain is now `202608260001` through `202608260041`.
+- The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
+- Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, reconciliation cron, and broader multi-user/RLS behavior.
 
 ## 4. Live-test limitation
 
-The source-level gates pass, but hosted behavior must be verified after the commit is deployed. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes. It must be run with the production URL and secrets supplied through its ignored `.env` file.
+Source-level gates and the core hosted GitHub flow pass. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes; it still requires the production URL and secrets in its ignored `.env` file. Do not commit that file or generated Playwright artifacts.

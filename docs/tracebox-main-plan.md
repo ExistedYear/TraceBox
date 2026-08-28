@@ -824,7 +824,7 @@ PRIMARY KEY(issue_id, custom_field_id)
 
 ## 6.26 integrations
 
-Implemented for GitHub in migrations `202608260028_phase19_github_integration.sql`, `202608260033_github_webhooks.sql`, and `202608260040_github_app_integration.sql`. The App flow verifies installation ownership, supports multiple repository bindings, validates manual links through GitHub's API, records durable webhook deliveries, handles lifecycle changes, and reconciles repository access on a schedule.
+Implemented for GitHub in migrations `202608260028_phase19_github_integration.sql`, `202608260033_github_webhooks.sql`, `202608260040_github_app_integration.sql`, and `202608260041_service_role_claim_compatibility.sql`. The App flow verifies installation ownership through the supported user-installation list endpoint, supports multiple repository bindings, validates manual links through GitHub's API, records durable webhook deliveries, handles lifecycle changes, and reconciles repository access on a schedule. The hosted installation, binding, PR-link, webhook, and merge-resolution path has been manually verified; broader operational health and multi-user validation remain follow-up work.
 ```text
 id UUID PRIMARY KEY
 project_id UUID NOT NULL
@@ -2826,7 +2826,7 @@ Phases 1–20 are implemented in the repository. The next work is production val
 
 ```text
 Phase 1–20: complete
-Database migrations: 001–040
+Database migrations: 001–041
 API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/issues/[issueKey]/comments, /api/v1/projects, /api/v1/milestones, /api/v1/search, /api/v1/projects/[projectId]/github/repositories, /api/v1/issues/[issueKey]/github-links, /api/v1/issues/[issueKey]/github-links/[linkId], /api/github/connect, /api/github/callback, /api/github/repositories, /api/github/bind, /api/github/validate-link, /api/github/sync, /api/github/reconcile, /api/webhooks/github
-Production deployment: requires Supabase migration application, Auth URL configuration, Storage bucket verification, Realtime publication verification, Vercel environment configuration, GitHub webhook configuration, and live end-to-end testing
+Production deployment: core GitHub installation, repository binding, webhook linking, and merge resolution verified; broader Supabase/Auth/Storage/Realtime/API/RLS and multi-user end-to-end validation still required
 ```

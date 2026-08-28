@@ -8,12 +8,12 @@ The audit asks a stricter question than “does a table or RPC exist?” A capab
 
 ```text
 Roadmap phases represented in source: 1–20
-Database migrations inspected:         001–040
+Database migrations inspected:         001–041
 Backend/schema coverage:              broad
 Frontend feature coverage:            partial
 Multi-contributor usability:          incomplete
 Automated tests:                      synthetic-heavy; no DB/browser/RLS suite committed
-Production validation:                pending external Supabase/Vercel setup
+Production validation:                partial; hosted GitHub PR flow verified, broader checks pending
 ```
 
 The repository contains substantial implementation for every roadmap phase, but the “Phase 1–20 complete” wording in the roadmap means source implementation exists. It does not mean every planned UI surface, integration workflow, test layer, or production operation is complete.
@@ -312,7 +312,7 @@ Priority: **Medium**.
 
 ### 18. GitHub integration lacks operational UI depth
 
-Repository connection, binding, manual links, signed webhooks, reconciliation, and GitHub App structures exist. Missing or limited:
+Repository connection, binding, manual links, signed webhooks, reconciliation, and GitHub App structures exist. The hosted installation → repository binding → PR webhook → automatic resolution flow was verified on 2026-08-28. Missing or limited:
 
 - integration health/status;
 - webhook delivery history;
@@ -323,7 +323,7 @@ Repository connection, binding, manual links, signed webhooks, reconciliation, a
 - visible automatic-resolution audit result;
 - complete in-product GitHub App installation setup.
 
-There are both legacy `project_integrations` and newer GitHub App/binding models, requiring a clear canonical path.
+There are both legacy `project_integrations` and newer GitHub App/binding models, requiring a clear canonical path. Callback installation verification uses the supported paginated user-token installation list; migration 041 also makes service-role guards compatible with current PostgREST claim handling.
 
 Evidence:
 
@@ -331,7 +331,7 @@ Evidence:
 - `src/app/(dashboard)/dashboard/settings/integrations/page.tsx`
 - `src/app/api/github/**`
 - `src/app/api/webhooks/github/route.ts`
-- migrations `028`, `033`, `039`, `040`
+- migrations `028`, `033`, `039`, `040`, `041`
 
 Priority: **Medium**.
 
@@ -447,7 +447,7 @@ No committed pgTAP or equivalent database test suite verifies:
 
 ### 26. Missing browser end-to-end tests in the repository
 
-Documentation references `qa/live/`, but the current checkout does not contain a committed `qa/` directory. The documented hosted checks therefore cannot be run from a fresh clone without additional local-only files/credentials.
+The current checkout contains an ignored local `qa/live/` suite, but it is intentionally not committed because it uses deployment credentials, browser state, disposable fixtures, and generated reports. A fresh clone cannot run the documented hosted checks until that local suite is restored and configured separately.
 
 ### 27. CI does not execute SQL or browser/security integration checks
 
@@ -485,18 +485,18 @@ Roadmap implementation present through Phase 20;
 full UI, integration, test, and production validation still pending in listed areas.
 ```
 
-### 30. Deployment is still externally pending
+### 30. Deployment is partially validated and still externally incomplete
 
 The source contains the required configuration guidance, but these steps remain environment-dependent:
 
-- apply migrations `001`–`040` to the intended Supabase project;
+- apply migrations `001`–`041` to the intended Supabase project (completed for the linked project);
 - regenerate database types from the applied schema;
 - verify Storage bucket/policies;
 - verify Realtime publication;
 - configure Auth URLs and password recovery;
 - set Vercel public and server-only environment variables;
-- configure GitHub App/webhook credentials;
-- run live multi-user/RLS/API/browser checks.
+- configure GitHub App/webhook credentials (completed for the linked deployment);
+- run live multi-user/RLS/API/browser checks. The hosted GitHub installation, repository binding, PR link, webhook, and merge-resolution path has been verified, but this does not cover every phase or every security boundary.
 
 ### 31. Known product limitations remain documented
 
@@ -524,7 +524,7 @@ The source contains the required configuration guidance, but these steps remain 
 | 16 — Command Palette | Partial: My Issues, notifications, and quick status actions incomplete |
 | 17 — Issue Templates | Partial: default configuration and lifecycle controls incomplete |
 | 18 — Restricted Security Issues | Partial: creation, indicators, search, and access history incomplete |
-| 19 — GitHub Integration | Partial: operational health, delivery history, and canonical model incomplete |
+| 19 — GitHub Integration | Core hosted flow verified; operational health, delivery history, and canonical model remain incomplete |
 | 20 — Custom Fields and Public API | Partial: field lifecycle, issue-create/list integration, token lifecycle, and API docs incomplete |
 
 ## Recommended implementation order
@@ -552,7 +552,7 @@ The following findings were identified by auditing the current post-release-vali
 
 ### 32. Generated database types are stale against the GitHub App schema
 
-Migration `202608260040_github_app_integration.sql` adds GitHub App tables, artifacts, webhook deliveries, issue-link fields, and RPCs. `src/types/database.ts` does not represent the complete latest catalog. GitHub integration pages and routes compensate with `any` casts.
+Migration `202608260040_github_app_integration.sql` adds GitHub App tables, artifacts, webhook deliveries, issue-link fields, and RPCs; migration `202608260041_service_role_claim_compatibility.sql` updates the service-role guard compatibility. `src/types/database.ts` does not represent the complete latest catalog. GitHub integration pages and routes compensate with `any` casts.
 
 Affected capabilities include:
 
@@ -651,7 +651,7 @@ Each divergence should be explicitly accepted, removed from the plan, or impleme
 
 ### 38. Tests do not exercise the real database or browser integration
 
-The current tests are primarily pure synthetic tests. They do not execute:
+The current tests are primarily pure synthetic tests. The suite now includes mocked GitHub user-installation pagination, but it does not execute:
 
 - RLS denial cases;
 - migration replay;
@@ -673,9 +673,9 @@ Specific weaknesses:
 
 Priority: **High verification gap**.
 
-### 39. Documented `qa/live` suite is not available in a fresh checkout
+### 39. Documented `qa/live` suite is intentionally local-only
 
-README, handoff, and deployment documentation refer to an ignored local `qa/live/` Playwright suite, but the repository does not contain the suite/configuration. A fresh clone cannot run the documented hosted checks without separately recreating local files and credentials.
+README, handoff, and deployment documentation refer to an ignored local `qa/live/` Playwright suite. The suite exists in this working checkout but is intentionally not tracked because it uses deployment credentials, browser state, disposable fixtures, and generated reports. A fresh clone cannot run the hosted checks until the local suite is restored/configured separately.
 
 Evidence:
 
@@ -703,9 +703,9 @@ The deployment guide needs to distinguish:
 - migration tracking repair versus destructive schema reset;
 - `check:migrations` verification versus `sync:migrations` regeneration;
 - API PATCH and all current API routes;
-- current migration count through `040`.
+- current migration count through `041`.
 
-Do not clear migration history and replay the full schema against an existing populated database without a backup and a deliberate baseline plan.
+The migration-count and server-only-variable guidance has been updated; continue to avoid clearing migration history and replaying the full schema against an existing populated database without a backup and deliberate baseline plan.
 
 Priority: **Medium**.
 

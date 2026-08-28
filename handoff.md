@@ -22,10 +22,10 @@ TraceBox implements the roadmap in `docs/tracebox-main-plan.md` through Phase 20
 16. Command palette, issue search, and global keyboard shortcuts
 17. Issue templates and template selection during issue creation
 18. Restricted security issues with explicit access grants and RLS
-19. GitHub App installation verification, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
+19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260040`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order.
+Database state is represented by migrations `202608260001` through `202608260041`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 041 makes service-role SQL guards compatible with legacy JWT claims, PostgREST JSON claims, and opaque Supabase secret-key requests.
 
 ## Important runtime configuration
 
@@ -51,27 +51,30 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npx tsc --noEmit — passed
-Tests:       112/112 passed across 15 test files
+Tests:       115/115 passed across 16 test files
 Lint:        0 errors; 3 existing warnings (ESLint export, TanStack Table, and React Hook Form compatibility)
 Build:       npm run build with placeholder public Supabase variables — passed
-Migration check: 40 files contiguous and `supabase/full_schema.sql` synchronized
-```
+Migration check: 41 files contiguous and `supabase/full_schema.sql` synchronized — passed
 
-Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, and responsive table layout issues.
+The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
-The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. A pre-deployment probe against `https://trace-box.vercel.app` found that the existing production deployment predates this release: `/forgot-password`, `/api/v1/milestones`, and `/api/v1/search` returned `404`, while the existing API auth boundary returned `401` as expected.
+The ignored `qa/live/` Playwright suite remains local-only. It was not fully run from this checkout because no ignored `qa/live/.env` credentials were present and the runner lacked the Chromium `libnspr4.so` dependency. Run it from a normal workstation with the deployment URL, disposable API token, and matching webhook secret configured locally.
+
+Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, sidebar layout, and responsive table layout issues.
+
+The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. Do not commit its `.env`, browser state, reports, or test-results. Earlier pre-deployment probes found an older deployment; the current public probes and the hosted GitHub PR flow now pass, while the full multi-user/API/browser suite remains outstanding.
 
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`040` in order from `supabase/full_schema.sql` or the individual files.
+2. Apply all migrations `001`–`041` in order from `supabase/full_schema.sql` or the individual files.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
 6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables.
-7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions, and App webhook at `/api/webhooks/github`.
+7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions, and App webhook at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
-9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout.
+9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.
 10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile`, and regenerate database types from the live schema if the deployed schema differs.
 
 Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `deployment.md`.

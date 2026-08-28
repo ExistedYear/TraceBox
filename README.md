@@ -48,4 +48,10 @@ GitHub Actions runs lint, typecheck, unit tests, and the production build on pul
 
 ## Live QA
 
-This checkout also has an ignored, local-only black-box suite under `qa/live/` for testing the deployed Vercel boundary, GitHub OAuth redirect, authenticated REST API, and signed GitHub webhooks. It is intentionally excluded from GitHub because it uses disposable credentials and local Playwright reports. See `qa/live/README.md` when working from this checkout.
+This checkout also has an ignored, local-only black-box suite under `qa/live/` for testing the deployed Vercel boundary, GitHub OAuth redirect, authenticated REST API, and signed GitHub webhooks. It is intentionally excluded from GitHub because it uses deployment credentials, browser state, disposable fixtures, and local Playwright reports. Never commit its `.env`, `test-results/`, or `playwright-report/`; use a separate private QA repository if the suite later needs to be shared. See `qa/live/README.md` when working from this checkout.
+
+## Verified release paths
+
+As of 2026-08-28, the hosted GitHub App flow has been manually verified with a private repository: installation callback, repository discovery, project binding, signed pull-request webhook delivery, automatic PR linking, and `Fixes <PROJECT_KEY>-<NUMBER>` resolution after merging into `main`. Issue keys use the selected TraceBox project's key (for example, `BUG-1`), not the workspace name. Migration 041 is applied to the linked Supabase project.
+
+The desktop sidebar is viewport-height and scrollable; its Settings link remains reachable on short screens or when the workspace switcher is large, and the navigation no longer renders a stray semicolon. Source quality gates pass with 115 Vitest tests across 16 files, typecheck, migration consistency, lint (three existing warnings), and the production build. The complete live Playwright suite still requires a local `qa/live/.env` and a workstation with its browser dependencies installed.
