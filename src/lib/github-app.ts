@@ -53,12 +53,14 @@ export type GithubBranchResponse = { ref: string; object?: { sha: string } };
 export class GithubApiError extends Error {
   status: number;
   responseMessage: string;
+  requestPath: string | null;
 
-  constructor(status: number, responseMessage: string) {
-    super(`GitHub API request failed with status ${status}.`);
+  constructor(status: number, responseMessage: string, requestPath: string | null = null) {
+    super(`GitHub API request failed with status ${status}${requestPath ? ` for ${requestPath}` : ""}.`);
     this.name = "GithubApiError";
     this.status = status;
     this.responseMessage = responseMessage;
+    this.requestPath = requestPath;
   }
 }
 
@@ -113,7 +115,7 @@ export async function githubApiRequest<T>(path: string, token: string | null, in
   const response = await fetch(`https://api.github.com${path}`, { ...init, headers, cache: "no-store", signal: init.signal ?? AbortSignal.timeout(10000) });
   if (!response.ok) {
     const message = (await response.text()).slice(0, 500);
-    throw new GithubApiError(response.status, message);
+    throw new GithubApiError(response.status, message, path);
   }
   if (response.status === 204) return null as T;
   return response.json() as Promise<T>;
@@ -133,7 +135,18 @@ export async function exchangeGithubUserCode(code: string) {
 }
 
 export async function getGithubInstallationForUser(userToken: string, installationId: number) {
-  return githubApiRequest<GithubInstallationResponse>(`/user/installations/${installationId}`, userToken);
+  let seen = 0;
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await githubApiRequest<{ total_count: number; installations: GithubInstallationResponse[] }>(
+      `/user/installations?per_page=100&page=${page}`,
+      userToken,
+    );
+    const installation = response.installations.find((candidate) => candidate.id === installationId);
+    if (installation) return installation;
+    seen += response.installations.length;
+    if (seen >= response.total_count || response.installations.length < 100) break;
+  }
+  throw new GithubApiError(404, "Installation is not accessible to the authenticated user.", "/user/installations");
 }
 
 export async function createGithubInstallationToken(installationId: number) {
