@@ -123,4 +123,4 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [ ] Linked migration dry-run is empty and linked SQL lint has zero errors.
 - [ ] Production smoke covers signup → workspace → project → issue → triage → collaboration → restricted access → attachment → planning → GitHub → reports/readiness → API → logout.
 
-AI/Trace Intelligence is intentionally excluded from this checklist because [`last_day_plan.md`](last_day_plan.md) is audited future scope and is not implemented or advertised in the current build.
+AI/Trace Intelligence is intentionally excluded from this checklist because [`last_day_plan.md`](last_day_plan.md) is audited future scope and is not implemented or advertised in the current build. The security and lifecycle corrections required before future implementation are recorded in [`last-day-plan-audit.md`](last-day-plan-audit.md).

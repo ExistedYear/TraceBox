@@ -78,6 +78,7 @@ tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 docs/                      active deployment, gap, and feature plans
   deployment-changes.md    concise current operator/deployment delta checklist
   feature-testing-checklist.md submission QA matrix for all implemented product surfaces
+  last-day-plan-audit.md   review of the excluded future Trace Intelligence plan
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work

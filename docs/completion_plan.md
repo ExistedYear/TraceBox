@@ -56,6 +56,8 @@ Create one non-duplicated, executable source of truth from both incomplete-featu
 
 ## Phase 1 — Repair schema, generated types, and API contracts
 
+Status: source-complete on 2026-08-28. Migration 044 unifies the browser/REST issue mutation contract, generated database types represent the linked contract through migration 078, and forward-only migrations 065–078 reconcile every subsequently discovered live-schema, authorization, query-bounding, and tenant-catalog drift. Disposable replay remains part of the external database/CI gate below.
+
 ### Scope
 
 Remove schema drift and contract ambiguity before building more UI.
@@ -376,9 +378,9 @@ The hosted installation, repository binding, PR webhook, and merge-resolution pa
 
 A maintainer can determine whether GitHub is healthy, why automation failed, what delivery caused an issue change, and whether a retry is safe.
 
-## Phase 14 — Real database, API, realtime, and browser tests (can be skipped for now)
+## Phase 14 — Real database, API, realtime, and browser verification
 
-Status: source-complete on 2026-08-29. A committed Playwright harness, production-hook realtime tests, API/webhook route tests, a 40-assertion pgTAP security suite, and a true concurrent issue allocator check are integrated with a disposable-Supabase CI job. Credential-free browser smoke passed locally (3 passed, 10 fixture-dependent journeys skipped); 199 Vitest tests, typecheck, build, migration consistency, and lint with only known compatibility warnings also pass. Local Docker-backed database execution remains external because this workstation account cannot access the Docker socket; the first CI database run and hosted multi-user journeys must still be recorded.
+Status: source-complete on 2026-08-29. A committed Playwright harness, production-hook realtime tests, API/webhook route tests, a 40-assertion pgTAP security suite, and a true concurrent issue allocator check are integrated with a disposable-Supabase CI job. Credential-free browser smoke passed locally (3 passed, 10 fixture-dependent journeys skipped); 204 Vitest tests, typecheck, build, migration consistency, and lint with only known compatibility warnings also pass. Local Docker-backed database execution remains external because this workstation account cannot access the Docker socket; the first CI database run and hosted multi-user journeys must still be recorded.
 
 ### Database and RLS
 

@@ -1,12 +1,46 @@
 # TraceBox
 
-TraceBox is a modern, database-backed developer workspace for structured issue tracking. It now covers Phases 1–20: workspaces/projects, workflow, issue lifecycle, collaboration, planning, notifications, realtime, search, dependencies, triage, attachments, analytics, readiness, templates, restricted security issues, GitHub integration, custom fields, and scoped API access.
+TraceBox is a modern reconstruction of the problem Bugzilla solves: helping engineering teams turn incomplete defect reports into structured, authorized, auditable work that can move safely through triage, implementation, and release. It keeps the useful rigor of components, workflows, dependencies, versions, and immutable history while replacing the legacy interaction model with a dense, keyboard-friendly developer workspace.
+
+**Live deployment:** [trace-box.vercel.app](https://trace-box.vercel.app/)
+
+The current submission covers workspaces/projects, configurable workflows, issue lifecycle and collaboration, planning, notifications and realtime, advanced search and saved views, dependency and duplicate triage, private attachments, reports, release readiness, restricted security issues, GitHub App/PR automation, custom fields, and a scoped REST API.
+
+## Why it is different
+
+- **Release decisions, not vanity metrics:** the backend computes an explainable 0–100 readiness score from authorized issue state, with factor drilldowns, CSV export, and immutable snapshots.
+- **Security issues stay secure:** one `can_view_issue` boundary protects issues and their comments, events, links, notifications, analytics, API results, realtime behavior, and private Storage objects.
+- **Triage is an operational workflow:** the inbox combines visible A/R/D actions, J/K keyboard navigation, inline classification, deterministic duplicate suggestions, and one atomic duplicate-resolution transaction.
+- **GitHub is verified and recoverable:** a separate GitHub App provides stable repository bindings, authoritative PR metadata and checks, signed/idempotent webhooks, derived auto-links, branch-aware resolution, retry/reconciliation, and payload-free operational visibility.
+- **Database rules remain authoritative:** privileged writes are narrow SQL RPCs under RLS, issue numbers allocate atomically, workflow graphs publish transactionally, and audit history is immutable.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser["Browser<br/>Client Components"] --> Proxy["Next.js proxy<br/>session refresh"]
+  Browser --> Routes["Next.js Server Components<br/>and route handlers"]
+  Proxy --> Auth[Supabase Auth]
+  Routes --> Auth
+  Browser --> RLS["Supabase PostgREST<br/>Authenticated RLS"]
+  Routes --> RLS
+  Routes --> Trusted[Server-only API and webhook boundary]
+  Trusted --> RPC[Security-definer RPCs]
+  RLS --> DB[("PostgreSQL<br/>RLS + audit + search")]
+  RPC --> DB
+  Browser --> Storage["Private Supabase Storage<br/>signed access"]
+  DB --> Realtime[Supabase Realtime]
+  Realtime --> Browser
+  GitHub[GitHub App + signed webhooks] --> Trusted
+```
+
+Browser mutations use authenticated RPCs; service-role access is confined to server-only API, GitHub, reconciliation, and cleanup boundaries. Cookie-backed workspace/project selection is revalidated against current memberships on every server request. See [the deployment guide](docs/deployment.md), [schema decisions](docs/schema-decisions.md), and [REST contract](docs/api.md) for the detailed boundaries.
 
 ## Stack
 
 - Next.js App Router, TypeScript, and Tailwind CSS
 - shadcn/ui-style components with Lucide icons
-- Supabase PostgreSQL, Auth, Storage, and Realtime-ready configuration
+- Supabase PostgreSQL, Auth, private Storage, and Realtime subscriptions
 - Zod and React Hook Form for validated authentication forms
 - Safe GFM rendering for issue descriptions and comments
 
@@ -39,6 +73,41 @@ npm test
 npm run build
 npm run check:migrations
 ```
+
+Current local evidence on 2026-08-29: TypeScript and the production build pass; 204 Vitest checks pass across 38 files; the 78-file migration chain and generated full schema are synchronized; credential-free Playwright smoke passes 3/3 journeys; and linked Supabase dry-run/lint report an up-to-date ledger with zero public-schema errors. The committed CI job additionally provisions disposable Supabase for migration replay, pgTAP authorization checks, true concurrent issue-number allocation, and browser smoke. Fixture-dependent multi-user journeys remain explicit hosted release checks rather than being silently replaced by mocks.
+
+## Judge demo flow
+
+This path demonstrates the core product in roughly 90 seconds with any prepared workspace/project:
+
+1. Open **Issues**, apply two filters, and save the result as a shareable project view.
+2. Create an issue with a template, component default assignee, planning metadata, and a restricted visibility grant; open the resulting `KEY-N` issue.
+3. Add a Markdown comment with a stable identity mention, then show the merged comment/audit timeline and notification inbox.
+4. Open **Triage**, classify an issue with the visible controls or J/K/A/R/D shortcuts, inspect duplicate candidates, and resolve one duplicate atomically.
+5. Open **Reports** and **Readiness** to show authoritative history, drilldowns, export, score factors, and a saved readiness snapshot.
+6. Open **GitHub integrations** to show verified repositories and operational health, then open an issue's rich PR card with relationship, branches, state, and check summary.
+7. Finish with **Security** or **Audit** to show restricted-safe access history and the immutable project event explorer.
+
+The demo does not require AI or an uncommitted local environment file. GitHub-specific steps require the documented App variables and an installed repository; the rest of the product remains usable when GitHub is unavailable.
+
+## CloneFest rubric evidence
+
+| Category | Evidence in TraceBox |
+|---|---|
+| Problem understanding and core functionality | Complete structured defect lifecycle: organizations/projects, roles, components, workflows, issues, comments, planning, assignment, notifications, search, relationships, attachments, analytics, and API access. |
+| Innovation and differentiation | Explainable release-readiness engine, restricted issue model applied across every data surface, keyboard-first triage, atomic duplicate resolution, stable mention identities, and recoverable GitHub development intelligence. |
+| Technical implementation and architecture | Next.js server/client boundaries, generated Supabase types, permanent RLS, narrow transactional RPCs, immutable audit history, atomic issue allocation, private signed Storage, forward-only migration discipline, and durable HMAC webhooks. |
+| User experience and accessibility | Dense responsive shell, explicit labels, visible non-keyboard equivalents, command palette, focus-safe shortcuts, loading/empty/error/retry states, light/dark plus independent accents, and semantic status text. |
+| Performance, reliability, and demo quality | Database-side pagination/search/filtering, indexed reporting, bounded API reads, optimistic conflict detection, realtime refetch on visibility-sensitive events, webhook leases/replay, concurrent allocator verification, and failure-aware UI cleanup. |
+| Documentation and explanation | This overview plus [operator changes](docs/deployment-changes.md), [feature QA](docs/feature-testing-checklist.md), [full deployment](docs/deployment.md), [REST API](docs/api.md), [schema decisions](docs/schema-decisions.md), and [handoff evidence](handoff.md). |
+
+## Honest limitations
+
+- In-app notification delivery is implemented; email notification delivery is intentionally not advertised or queued.
+- API tokens are organization-scoped and follow their owner's live project memberships. There is no request-history explorer or promised application-level rate limit.
+- The committed browser suite keeps multi-user/provider journeys environment-gated. Those flows must be run against the actual hosted Auth, Storage, Realtime, and GitHub configuration before submission.
+- Trace Intelligence/AI is future scope reviewed in [the last-day plan audit](docs/last-day-plan-audit.md); it is not implemented or advertised in the current product.
+- `supabase/seed.sql` is intentionally empty so clean resets never create synthetic tenant data. Demo fixtures should be created explicitly in a disposable or dedicated demo environment.
 
 ## Deploying
 

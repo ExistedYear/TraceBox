@@ -1,5 +1,7 @@
 # TraceBox Collaboration, Roles, and GitHub Dashboard Plan
 
+> **Status (2026-08-29): source-complete.** The sections below preserve the pre-implementation findings and delivery design as a historical execution record. Membership/invitation, role-aware shell, GitHub administration, developer PR, and committed verification surfaces are implemented; only the hosted/provider validation tracked as `EXTERNAL` in [`incomplete.md`](incomplete.md) remains. “Missing or incomplete” below describes the baseline that this plan closed, not the current product.
+
 ## Objective
 
 Build a complete collaboration and integration administration experience around the authorization model TraceBox already uses.

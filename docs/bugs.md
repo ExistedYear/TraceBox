@@ -45,11 +45,13 @@
 
 Source-level gates and the core hosted GitHub flow pass. The committed `playwright/` suite provides credential-free public/protection smoke and explicitly skips fixture-dependent account journeys when fixtures are absent. API and webhook tests mock GitHub boundaries and require no GitHub environment file. The older ignored `qa/live/` suite remains optional for deployment-specific checks; never commit its environment, browser state, or generated artifacts.
 
-## 5. Persistent Contributors Panel and add public contributions for repos.
+## 5. Persistent Contributors panel
 
-- **Status**: Persistent project Contributors panel is source-implemented; hosted multi-user validation and the separate public-repository contributions request remain pending.
+- **Status**: Source defect resolved. The persistent project Contributors panel and its complete RPC-backed management flow are implemented. Hosted two-user validation remains an external release check, not missing source work.
 - Add a dedicated **Contributors** panel for each project. It should remain directly accessible in the project shell rather than being hidden inside unrelated settings tabs; default it open on the project-facing screen.
 - The panel should show each contributor’s avatar/display name, organization role, project role, and access state.
 - It should provide the complete contributor workflow: invite a user, add an existing workspace member, assign/change project role, remove project access, and clearly report pending invitations or failed actions.
 - The panel must use authenticated server-side RPCs and RLS; contributors must never be managed through unrestricted browser table writes.
 - Acceptance: an owner/maintainer can open a project, see its contributors in the separate panel, invite or add a second contributor, assign a role, and remove that access. The second contributor can sign in and immediately find the project without manual SQL.
+
+The original note also said “add public contributions for repos.” Public GitHub contribution attribution is repository/commit identity and submission metadata, not a TraceBox product feature. It is therefore outside this bug; no unfinished in-product contribution feature is implied.
