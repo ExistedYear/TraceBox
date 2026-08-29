@@ -14,6 +14,18 @@ TraceBox is a focused issue-tracking workspace for engineering teams. It turns a
 
 TraceBox is built for teams that need more than a list of tickets. Each issue has an auditable history, explicit ownership, workflow rules, searchable context, and access controls that continue through comments, attachments, notifications, reports, APIs, and realtime updates.
 
+## Technology
+
+<p>
+  <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="Strict TypeScript">
+  <img src="https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth%20%7C%20Storage%20%7C%20Realtime-3ECF8E?logo=supabase&logoColor=white" alt="Supabase">
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/Vercel-production-black?logo=vercel&logoColor=white" alt="Vercel">
+</p>
+
+The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui-style primitives, Lucide, Zod, React Hook Form, Supabase PostgreSQL/Auth/Storage/Realtime, and GitHub App APIs. Vitest, Playwright, pgTAP, and GitHub Actions provide the verification layers.
+
 ## Feature matrix
 
 | Area | What is included | Product guarantee |
@@ -115,18 +127,6 @@ TraceBox is built for teams that need more than a list of tickets. Each issue ha
 - Issue numbers are allocated atomically; workflow publication and duplicate resolution are transactional; audit history is immutable.
 - Server-only service-role access is confined to API, webhook, and protected maintenance boundaries.
 - Forward-only migrations preserve deployed history. The current chain contains 79 ordered migrations and the linked Supabase project is reconciled through migration 079.
-
-## Technology
-
-<p>
-  <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white" alt="Next.js 16">
-  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="Strict TypeScript">
-  <img src="https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth%20%7C%20Storage%20%7C%20Realtime-3ECF8E?logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
-  <img src="https://img.shields.io/badge/Vercel-production-black?logo=vercel&logoColor=white" alt="Vercel">
-</p>
-
-The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui-style primitives, Lucide, Zod, React Hook Form, Supabase PostgreSQL/Auth/Storage/Realtime, and GitHub App APIs. Vitest, Playwright, pgTAP, and GitHub Actions provide the verification layers.
 
 ## Architecture
 
