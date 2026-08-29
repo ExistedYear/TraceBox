@@ -12,7 +12,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Filter, Loader2, Search, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
+import { CheckSquare, ChevronLeft, ChevronRight, Filter, Loader2, Search, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
@@ -39,10 +39,13 @@ import {
   PRIORITIES,
   SEVERITIES,
   severityLabel,
+  RESOLUTIONS,
+  humanizeEnum,
   type IssueFilters,
 } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 import type { IssueUpdateField } from "@/lib/validation/issue-update";
+import type { SavedViewRow } from "@/lib/validation/saved-views";
 import { useRealtimeIssueUpdates } from "@/hooks/use-realtime";
 
 export type TableRow = {
@@ -57,6 +60,7 @@ export type TableRow = {
   statusCategory: string;
   componentId: string | null;
   componentName: string | null;
+  milestoneName: string | null;
   assigneeId: string | null;
   assigneeLabel: string;
   updated_at: string;
@@ -83,11 +87,16 @@ type Props = {
   projectKey: string;
   projectId: string;
   canEdit: boolean;
+  canManageProject: boolean;
   currentUserId: string;
   states: FilterOption[];
   components: FilterOption[];
   members: FilterOption[];
+  versions: FilterOption[];
+  milestones: FilterOption[];
+  labels: FilterOption[];
   initialFilters: IssueFilters;
+  initialSearchQuery?: string;
 };
 
 function relativeTime(iso: string) {
@@ -102,7 +111,7 @@ function relativeTime(iso: string) {
 
 const columnHelper = createColumnHelper<TableRow>();
 
-export function IssueTable({ projectKey, projectId, canEdit, currentUserId, states, components, members, initialFilters }: Props) {
+export function IssueTable({ projectKey, projectId, canEdit, canManageProject, currentUserId, states, components, members, versions, milestones, labels, initialFilters, initialSearchQuery = "" }: Props) {
   const router = useRouter();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [sorting, setSorting] = useState<SortingState>([{ id: "updated_at", desc: true }]);
@@ -113,12 +122,16 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [savedViews, setSavedViews] = useState<Array<{ id: string; project_id: string; name: string; filters: Record<string, string>; is_shared: boolean; created_by: string }>>([]);
+  const [savedViews, setSavedViews] = useState<SavedViewRow[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [savedViewsError, setSavedViewsError] = useState(false);
   const [savedViewsNonce, setSavedViewsNonce] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkField, setBulkField] = useState<"priority" | "severity" | "assignee_id" | "component_id" | "affected_version_id" | "target_milestone_id">("priority");
+  const [bulkValue, setBulkValue] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -139,7 +152,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         return;
       }
       setSavedViewsError(false);
-      setSavedViews((data ?? []) as typeof savedViews);
+      setSavedViews((data ?? []) as unknown as SavedViewRow[]);
     })();
   }, [projectId, savedViewsNonce]);
 
@@ -160,9 +173,29 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     setLoading(true);
     setLoadError(false);
     const supabase = createClient();
+    let labelIssueIds: string[] | null = null;
+    if (filters.labelId) {
+      const { data: labelRows, error: labelError } = await supabase.from("issue_labels").select("issue_id").eq("label_id", filters.labelId);
+      if (seq !== requestSeq.current) return;
+      if (labelError) {
+        console.error("Issue label filter load failed", { code: labelError.code, message: labelError.message });
+        setLoadError(true);
+        setRows([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+      labelIssueIds = (labelRows ?? []).map((row) => row.issue_id);
+      if (labelIssueIds.length === 0) {
+        setRows([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+    }
     let query = supabase
       .from("issues")
-      .select("id, issue_number, title, type, priority, severity, visibility, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name)", { count: "exact" })
+      .select("id, issue_number, title, type, priority, severity, resolution, visibility, reporter_id, affected_version_id, target_milestone_id, created_at, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name), milestone:milestones (name)", { count: "exact" })
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -191,6 +224,15 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     if (filters.visibility) query = query.eq("visibility", filters.visibility);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
     if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
+    if (filters.reporterId) query = query.eq("reporter_id", filters.reporterId);
+    if (filters.resolution) query = query.eq("resolution", filters.resolution);
+    if (filters.versionId) query = query.eq("affected_version_id", filters.versionId);
+    if (filters.milestoneId) query = query.eq("target_milestone_id", filters.milestoneId);
+    if (filters.createdFrom) query = query.gte("created_at", `${filters.createdFrom}T00:00:00.000Z`);
+    if (filters.createdTo) query = query.lt("created_at", `${filters.createdTo}T23:59:59.999Z`);
+    if (filters.updatedFrom) query = query.gte("updated_at", `${filters.updatedFrom}T00:00:00.000Z`);
+    if (filters.updatedTo) query = query.lt("updated_at", `${filters.updatedTo}T23:59:59.999Z`);
+    if (labelIssueIds) query = query.in("id", labelIssueIds);
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
     if (sort && sortableIds.has(sort.id)) {
@@ -240,6 +282,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         statusCategory: row.status?.category ?? "",
         componentId: row.component_id,
         componentName: row.component?.name ?? null,
+        milestoneName: row.milestone?.name ?? null,
         assigneeId: row.assignee_id,
         assigneeLabel: personLabel(nameMap.get(row.assignee_id ?? "") ?? undefined, row.assignee_id),
         updated_at: row.updated_at,
@@ -252,6 +295,10 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   useEffect(() => {
     void fetchData();
   }, [fetchData, refreshNonce]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, filters, projectId]);
 
   useRealtimeIssueUpdates(
     projectId,
@@ -328,6 +375,26 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     },
     [projectKey, router],
   );
+
+  const bulkUpdate = useCallback(async () => {
+    if (!canEdit || selectedIds.size === 0 || !bulkValue) return;
+    setBulkLoading(true);
+    const { error } = await (createClient() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> }).rpc("bulk_update_issue_fields", {
+      p_project_id: projectId,
+      p_issue_ids: [...selectedIds],
+      p_updates: { [bulkField]: bulkValue === "__NULL__" ? null : bulkValue },
+    });
+    setBulkLoading(false);
+    if (error) {
+      console.error("Bulk issue update failed", { message: error.message });
+      toast.error("Bulk update rejected. No partial changes were applied.");
+      return;
+    }
+    toast.success(`${selectedIds.size} issues updated.`);
+    setSelectedIds(new Set());
+    setBulkValue("");
+    setRefreshNonce((value) => value + 1);
+  }, [bulkField, bulkValue, canEdit, projectId, selectedIds]);
 
   const columns = useMemo(() => {
     return [
@@ -444,6 +511,12 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <span className="text-xs">{info.row.original.assigneeLabel}</span>
           ),
       }),
+      columnHelper.accessor("milestoneName", {
+        id: "milestone",
+        header: "Milestone",
+        enableSorting: false,
+        cell: (info) => <span className="text-xs text-muted-foreground">{info.getValue() ?? "—"}</span>,
+      }),
       columnHelper.accessor("updated_at", {
         id: "updated_at",
         header: "Updated",
@@ -482,9 +555,10 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
       {savedViewsError && <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"><span>Saved views could not be loaded. The issue queue remains available.</span><Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSavedViewsNonce((value) => value + 1)}>Retry views</Button></div>}
       <SavedViewsBar
         projectId={projectId}
-        currentFilters={encodeIssueFilters(filters)}
+        currentFilters={{ ...encodeIssueFilters(filters), ...(searchQuery.trim() ? { q: searchQuery.trim() } : {}) }}
         savedViews={savedViews}
         currentUserId={currentUserId}
+        canManageProject={canManageProject}
         onApply={(filters) => {
           const next: Record<string, string> = {};
           for (const [k, v] of Object.entries(filters)) next[k] = v as string;
@@ -492,7 +566,11 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             stateIds: new Set(states.map((state) => state.value)),
             componentIds: new Set(components.map((component) => component.value)),
             memberIds: new Set(members.map((member) => member.value)),
+            versionIds: new Set(versions.map((version) => version.value)),
+            milestoneIds: new Set(milestones.map((milestone) => milestone.value)),
+            labelIds: new Set(labels.map((label) => label.value)),
           }));
+          setSearchQuery(typeof filters.q === "string" ? filters.q : "");
         }}
         onViewsChange={setSavedViews}
       />
@@ -522,6 +600,15 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           <FilterSelect id="issue-visibility-filter" label="Access" value={filters.visibility ?? ""} placeholder="All visibility" options={[{ value: "PROJECT", label: "Project" }, { value: "RESTRICTED", label: "Restricted" }]} onChange={(value) => setFilter("visibility", value)} />
           <FilterSelect id="issue-component-filter" label="Component" value={filters.componentId ?? ""} placeholder="All components" options={components} onChange={(value) => setFilter("componentId", value)} />
           <FilterSelect id="issue-assignee-filter" label="Assignee" value={filters.assigneeId ?? ""} placeholder="All assignees" options={members} onChange={(value) => setFilter("assigneeId", value)} />
+          <FilterSelect id="issue-reporter-filter" label="Reporter" value={filters.reporterId ?? ""} placeholder="All reporters" options={members} onChange={(value) => setFilter("reporterId", value)} />
+          <FilterSelect id="issue-resolution-filter" label="Resolution" value={filters.resolution ?? ""} placeholder="Any resolution" options={RESOLUTIONS.map((value) => ({ value, label: humanizeEnum(value) }))} onChange={(value) => setFilter("resolution", value)} />
+          <FilterSelect id="issue-version-filter" label="Version" value={filters.versionId ?? ""} placeholder="All versions" options={versions} onChange={(value) => setFilter("versionId", value)} />
+          <FilterSelect id="issue-milestone-filter" label="Milestone" value={filters.milestoneId ?? ""} placeholder="All milestones" options={milestones} onChange={(value) => setFilter("milestoneId", value)} />
+          <FilterSelect id="issue-label-filter" label="Label" value={filters.labelId ?? ""} placeholder="All labels" options={labels} onChange={(value) => setFilter("labelId", value)} />
+          <div className="min-w-[130px]"><label htmlFor="created-from" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Created from</label><Input id="created-from" type="date" className="mt-1 h-7 text-xs" value={filters.createdFrom ?? ""} onChange={(event) => setFilter("createdFrom", event.target.value)} /></div>
+          <div className="min-w-[130px]"><label htmlFor="created-to" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Created to</label><Input id="created-to" type="date" className="mt-1 h-7 text-xs" value={filters.createdTo ?? ""} onChange={(event) => setFilter("createdTo", event.target.value)} /></div>
+          <div className="min-w-[130px]"><label htmlFor="updated-from" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Updated from</label><Input id="updated-from" type="date" className="mt-1 h-7 text-xs" value={filters.updatedFrom ?? ""} onChange={(event) => setFilter("updatedFrom", event.target.value)} /></div>
+          <div className="min-w-[130px]"><label htmlFor="updated-to" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Updated to</label><Input id="updated-to" type="date" className="mt-1 h-7 text-xs" value={filters.updatedTo ?? ""} onChange={(event) => setFilter("updatedTo", event.target.value)} /></div>
           {activeFilterCount > 0 && <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setFilters({})}><X className="h-3 w-3" /> Clear {activeFilterCount}</Button>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -539,6 +626,14 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         </div>
       </div>
 
+      {canEdit && selectedIds.size > 0 && <div className="flex flex-wrap items-end gap-2 rounded-[10px] border border-primary/30 bg-primary/5 p-3" role="region" aria-label="Bulk issue actions">
+        <div className="flex items-center gap-2 text-xs font-medium"><CheckSquare className="h-3.5 w-3.5 text-primary" /> {selectedIds.size} selected on this page</div>
+        <label className="text-[10px] text-muted-foreground">Field<select className={cn(selectClass, "ml-1")} value={bulkField} onChange={(event) => { setBulkField(event.target.value as typeof bulkField); setBulkValue(""); }}><option value="priority">Priority</option><option value="severity">Severity</option><option value="assignee_id">Assignee</option><option value="component_id">Component</option><option value="affected_version_id">Version</option><option value="target_milestone_id">Milestone</option></select></label>
+        <select aria-label="Bulk value" className={selectClass} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)}><option value="">Choose value</option>{(bulkField === "priority" ? PRIORITIES.map((value) => ({ value, label: priorityLabel(value) })) : bulkField === "severity" ? SEVERITIES.map((value) => ({ value, label: severityLabel(value) })) : bulkField === "assignee_id" ? [{ value: "__NULL__", label: "Unassigned" }, ...members] : bulkField === "component_id" ? [{ value: "__NULL__", label: "None" }, ...components] : bulkField === "affected_version_id" ? [{ value: "__NULL__", label: "None" }, ...versions] : [{ value: "__NULL__", label: "None" }, ...milestones]).map((option) => <option key={option.value || "none"} value={option.value}>{option.label}</option>)}</select>
+        <Button type="button" size="sm" className="h-7 text-xs" disabled={bulkLoading || !bulkValue} onClick={() => void bulkUpdate()}>{bulkLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}Apply atomically</Button>
+        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+      </div>}
+
       <Surface>
         <div className="divide-y divide-border/70 sm:hidden">
           {rows.map((issue) => <Link key={issue.id} href={`/dashboard/issues/${formatIssueKey(projectKey, issue.issue_number)}`} className="block space-y-2 p-3 hover:bg-accent/40"><div className="flex items-start justify-between gap-2"><span className="font-mono text-xs font-semibold text-primary">{formatIssueKey(projectKey, issue.issue_number)}</span><span className={cn("rounded-full border px-2 py-0.5 text-[9px] uppercase", categoryClasses(issue.statusCategory))}>{issue.statusName}</span></div><p className="line-clamp-2 text-sm font-medium">{issue.title}</p><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">{issue.visibility === "RESTRICTED" && <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300"><ShieldAlert className="h-3 w-3" /> Restricted</span>}<span>{issueTypeLabel(issue.type)}</span><span>{priorityLabel(issue.priority)}</span><span>{severityLabel(issue.severity)}</span><span>{issue.assigneeLabel}</span></div></Link>)}
@@ -550,6 +645,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-border/80">
+                  <th scope="col" className="px-4 py-2.5"><input type="checkbox" aria-label="Select all issues on this page" checked={rows.length > 0 && rows.every((row) => selectedIds.has(row.id))} onChange={(event) => setSelectedIds((current) => { const next = new Set(current); rows.forEach((row) => event.target.checked ? next.add(row.id) : next.delete(row.id)); return next; })} /></th>
                   {headerGroup.headers.map((header) => (
                     <th key={header.id} scope="col" aria-sort={header.column.getIsSorted() ? (header.column.getIsSorted() === "asc" ? "ascending" : "descending") : "none"} className="px-4 py-2.5 text-left">
                       {header.column.getCanSort() ? (
@@ -568,6 +664,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             <tbody className="divide-y divide-border/70">
               {table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="hover:bg-accent/40">
+                  <td className="px-4 py-2"><input type="checkbox" aria-label={`Select ${formatIssueKey(projectKey, row.original.issue_number)}`} checked={selectedIds.has(row.original.id)} onChange={(event) => setSelectedIds((current) => { const next = new Set(current); if (event.target.checked) next.add(row.original.id); else next.delete(row.original.id); return next; })} /></td>
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-2 align-middle">{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                   ))}

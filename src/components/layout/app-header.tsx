@@ -16,6 +16,7 @@ import {
   Settings2,
   ShieldCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { MobileSidebar } from "@/components/layout/app-sidebar";
 import { NotificationCenter } from "@/components/layout/notification-center";
@@ -35,6 +36,7 @@ import { formatIssueKey } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 
 type AppHeaderProps = {
+  userId: string;
   email: string;
   displayName?: string | null;
   avatarUrl?: string | null;
@@ -70,15 +72,18 @@ type CommandItem = {
   href: string;
   icon?: any;
   category: "Navigation" | "Action" | "Issue" | "Project";
+  run?: () => Promise<void> | void;
 };
 
 function CommandPalette({
   projects,
   activeProjectId,
+  userId,
   onClose,
 }: {
   projects: ProjectSummary[];
   activeProjectId: string | null;
+  userId: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -89,6 +94,7 @@ function CommandPalette({
   >([]);
   const [searchingIssues, setSearchingIssues] = useState(false);
   const [matchingQuery, setMatchingQuery] = useState("");
+  const [quickStates, setQuickStates] = useState<Array<{ id: string; name: string; category: string }>>([]);
   const searchSequence = useRef(0);
 
   // Default system commands
@@ -96,6 +102,8 @@ function CommandPalette({
     () => [
       { id: "nav-overview", label: "Open overview", hint: "Workspace dashboard", href: "/dashboard", icon: LayoutDashboard, category: "Navigation" },
       { id: "nav-issues", label: "Browse issues", hint: "Filter the issue queue", href: "/dashboard/issues", icon: CircleDot, category: "Navigation" },
+      { id: "nav-my-issues", label: "My issues", hint: "Issues assigned to me", href: `/dashboard/issues?assignee=${encodeURIComponent(userId)}`, icon: CircleDot, category: "Navigation" },
+      { id: "nav-notifications", label: "Open notifications", hint: "Unread activity and mentions", href: "/dashboard/notifications", icon: Inbox, category: "Navigation" },
       { id: "nav-triage", label: "Open triage inbox", hint: "Classify incoming bugs", href: "/dashboard/triage", icon: Inbox, category: "Navigation" },
       { id: "nav-readiness", label: "View release readiness", hint: "Blockers and release score", href: "/dashboard/readiness", icon: ShieldCheck, category: "Navigation" },
       { id: "nav-reports", label: "View reports & velocity", hint: "Metrics, MTTR, age", href: "/dashboard/reports", icon: BarChart3, category: "Navigation" },
@@ -103,7 +111,7 @@ function CommandPalette({
       { id: "nav-projects", label: "View projects", hint: "All projects in this workspace", href: "/dashboard/projects", icon: FolderKanban, category: "Navigation" },
       { id: "nav-settings", label: "Open project settings", hint: "Components, workflow, labels, versions", href: "/dashboard/settings", icon: Settings2, category: "Navigation" },
     ],
-    [],
+    [userId],
   );
 
   // Debounced issue search when typing in palette
@@ -118,6 +126,8 @@ function CommandPalette({
         const supabase = createClient();
         const activeProj = projects.find((p) => p.id === activeProjectId);
         const projectKey = activeProj?.key || "ISSUE";
+        const { data: stateRows } = await supabase.from("workflow_states").select("id, name, category").eq("project_id", activeProjectId).order("position");
+        if (sequence === searchSequence.current) setQuickStates(stateRows ?? []);
         const numMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(trimmed);
         const escaped = trimmed.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
         let q = supabase.from("issues").select("id, issue_number, title").eq("project_id", activeProjectId).limit(5);
@@ -148,6 +158,11 @@ function CommandPalette({
     );
     items.push(...filteredBase);
 
+    for (const project of projects) {
+      const projectItem = { id: `project-${project.id}`, label: `Open ${project.name}`, hint: `${project.key} project issues`, href: `/dashboard/issues?project=${encodeURIComponent(project.id)}`, icon: FolderKanban, category: "Project" as const };
+      if (`${projectItem.label} ${projectItem.hint}`.toLowerCase().includes(query.toLowerCase())) items.push(projectItem);
+    }
+
     // Matching issues
     if (matchingQuery === query.trim()) {
       for (const issue of matchingIssues) {
@@ -159,15 +174,35 @@ function CommandPalette({
           icon: CircleDot,
           category: "Issue",
         });
+        for (const state of quickStates.filter((candidate) => candidate.category !== "TRIAGE")) {
+          items.push({
+            id: `status-${state.id}-${issue.id}`,
+            label: `${state.name}: ${issue.key}`,
+            hint: `Quick status action · ${issue.title}`,
+            href: `/dashboard/issues/${issue.key}`,
+            icon: CircleDot,
+            category: "Action",
+            run: async () => {
+              const { error } = await createClient().rpc("transition_issue", { p_issue_id: issue.id, p_to_state_id: state.id });
+              if (error) { toast.error("Could not update issue status."); return; }
+              toast.success(`${issue.key} moved to ${state.name}.`);
+              router.push(`/dashboard/issues/${issue.key}`);
+            },
+          });
+        }
       }
     }
 
     return items;
-  }, [baseCommands, query, matchingQuery, matchingIssues]);
+  }, [baseCommands, projects, query, matchingQuery, matchingIssues, quickStates, router]);
 
-  function go(href: string) {
+  function go(item: CommandItem) {
     onClose();
-    router.push(href);
+    if (item.id.startsWith("project-")) {
+      document.cookie = `tb_project=${item.id.slice("project-".length)}; path=/; max-age=31536000; samesite=lax`;
+    }
+    if (item.run) { void item.run(); return; }
+    router.push(item.href);
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
@@ -179,7 +214,7 @@ function CommandPalette({
       setHighlighted((index) => (allItems.length ? (index - 1 + allItems.length) % allItems.length : 0));
     } else if (event.key === "Enter" && allItems[highlighted]) {
       event.preventDefault();
-      go(allItems[highlighted].href);
+      go(allItems[highlighted]);
     }
   }
 
@@ -222,7 +257,7 @@ function CommandPalette({
                     index === highlighted ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/50 text-muted-foreground",
                   )}
                   onMouseEnter={() => setHighlighted(index)}
-                  onClick={() => go(item.href)}
+                  onClick={() => go(item)}
                 >
                   <Icon className="h-4 w-4 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1">
@@ -262,6 +297,7 @@ export function AppHeader({
   projects,
   activeOrganizationId,
   activeProjectId,
+  userId,
 }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -393,6 +429,7 @@ export function AppHeader({
         <CommandPalette
           projects={projects}
           activeProjectId={activeProjectId}
+          userId={userId}
           onClose={() => setPaletteOpen(false)}
         />
       )}

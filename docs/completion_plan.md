@@ -262,6 +262,8 @@ An unauthorized user cannot infer a restricted issue’s existence or metadata t
 
 ## Phase 9 — Queue, advanced search, saved views, triage, and command UX
 
+Status: source-complete on 2026-08-29. Migrations 051–053 add authorized atomic bulk updates, explicit saved-view visibility/lifecycle, and transactional duplicate resolution. The queue, saved-view bar, triage shortcuts, and command palette implement the complete source workflow; pgTAP execution and hosted keyboard/multi-user/browser validation remain external.
+
 ### Issue queue
 
 Add resolution, reporter, version, milestone, label, created-date, updated-date, and restricted filters; add the milestone column, bulk selection, and authorized bulk updates.

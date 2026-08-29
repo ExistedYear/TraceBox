@@ -69,6 +69,10 @@ export function eventSummary(
       return { heading: "changed component", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "RESOLUTION_CHANGED":
       return { heading: "set resolution", detail: label(event.new_value) };
+    case "VERSION_CHANGED":
+      return { heading: "changed affected version", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
+    case "MILESTONE_CHANGED":
+      return { heading: "changed target milestone", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "TITLE_CHANGED":
       return { heading: "renamed the issue", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "COMMENT_ADDED":
@@ -84,6 +88,8 @@ export function eventSummary(
         detail:
           typeof meta.relationship === "string" && typeof event.new_value === "string"
             ? `${meta.relationship.toLowerCase().replaceAll("_", " ")} ${event.new_value}`
+            : typeof meta.relationship === "string" && event.new_value && typeof event.new_value === "object" && "canonical_issue_number" in event.new_value && typeof event.new_value.canonical_issue_number === "number"
+              ? `${meta.relationship.toLowerCase().replaceAll("_", " ")} issue #${event.new_value.canonical_issue_number}`
             : typeof event.new_value === "string"
               ? event.new_value
               : undefined,
@@ -203,6 +209,15 @@ export type IssueFilters = {
   visibility?: "PROJECT" | "RESTRICTED";
   componentId?: string;
   assigneeId?: string;
+  reporterId?: string;
+  resolution?: Resolution;
+  versionId?: string;
+  milestoneId?: string;
+  labelId?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
 };
 
 
@@ -211,6 +226,15 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
   if (filters.statusId) result.status = filters.statusId;
   if (filters.componentId) result.component = filters.componentId;
   if (filters.assigneeId) result.assignee = filters.assigneeId;
+  if (filters.reporterId) result.reporter = filters.reporterId;
+  if (filters.resolution) result.resolution = filters.resolution;
+  if (filters.versionId) result.version = filters.versionId;
+  if (filters.milestoneId) result.milestone = filters.milestoneId;
+  if (filters.labelId) result.label = filters.labelId;
+  if (filters.createdFrom) result.created_from = filters.createdFrom;
+  if (filters.createdTo) result.created_to = filters.createdTo;
+  if (filters.updatedFrom) result.updated_from = filters.updatedFrom;
+  if (filters.updatedTo) result.updated_to = filters.updatedTo;
   if (filters.priority) result.priority = filters.priority;
   if (filters.severity) result.severity = filters.severity;
   if (filters.type) result.type = filters.type;
@@ -220,7 +244,7 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
 
 export function decodeIssueSearchParams(
   params: Record<string, string | string[] | undefined>,
-  valid: { stateIds: Set<string>; componentIds: Set<string>; memberIds?: Set<string> },
+  valid: { stateIds: Set<string>; componentIds: Set<string>; memberIds?: Set<string>; versionIds?: Set<string>; milestoneIds?: Set<string>; labelIds?: Set<string> },
 ): IssueFilters {
   const pick = (...names: string[]) => {
     for (const name of names) {
@@ -232,10 +256,24 @@ export function decodeIssueSearchParams(
   const statusId = pick("status", "statusId");
   const componentId = pick("component", "componentId");
   const assigneeId = pick("assignee", "assigneeId");
+  const reporterId = pick("reporter", "reporterId");
+  const versionId = pick("version", "versionId");
+  const milestoneId = pick("milestone", "milestoneId");
+  const labelId = pick("label", "labelId");
   const priority = PRIORITIES.find((value) => value === pick("priority"));
   const severity = SEVERITIES.find((value) => value === pick("severity"));
   const type = ISSUE_TYPES.find((value) => value === pick("type"));
   const visibility = (["PROJECT", "RESTRICTED"] as const).find((value) => value === pick("visibility"));
+  const resolution = RESOLUTIONS.find((value) => value === pick("resolution"));
+  const date = (value: string | undefined) => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value ? undefined : value;
+  };
+  const createdFrom = date(pick("created_from", "createdFrom"));
+  const createdTo = date(pick("created_to", "createdTo"));
+  const updatedFrom = date(pick("updated_from", "updatedFrom"));
+  const updatedTo = date(pick("updated_to", "updatedTo"));
   return {
     statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
     priority,
@@ -244,6 +282,15 @@ export function decodeIssueSearchParams(
     visibility,
     componentId: componentId && valid.componentIds.has(componentId) ? componentId : undefined,
     assigneeId: assigneeId && (!valid.memberIds || valid.memberIds.has(assigneeId)) ? assigneeId : undefined,
+    reporterId: reporterId && (!valid.memberIds || valid.memberIds.has(reporterId)) ? reporterId : undefined,
+    resolution,
+    versionId: versionId && (!valid.versionIds || valid.versionIds.has(versionId)) ? versionId : undefined,
+    milestoneId: milestoneId && (!valid.milestoneIds || valid.milestoneIds.has(milestoneId)) ? milestoneId : undefined,
+    labelId: labelId && (!valid.labelIds || valid.labelIds.has(labelId)) ? labelId : undefined,
+    createdFrom: createdFrom && createdTo && createdFrom > createdTo ? undefined : createdFrom,
+    createdTo: createdFrom && createdTo && createdFrom > createdTo ? undefined : createdTo,
+    updatedFrom: updatedFrom && updatedTo && updatedFrom > updatedTo ? undefined : updatedFrom,
+    updatedTo: updatedFrom && updatedTo && updatedFrom > updatedTo ? undefined : updatedTo,
   };
 }
 

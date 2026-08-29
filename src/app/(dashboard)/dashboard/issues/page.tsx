@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
 import { createClient } from "@/lib/supabase/server";
 import { decodeIssueSearchParams } from "@/lib/issues";
+import { isSavedViewId } from "@/lib/validation/saved-views";
 import { personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
 import { getWorkspaceContext } from "@/lib/workspace-context";
@@ -33,9 +34,12 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.rpc("project_role", { p_project_id: projectId }),
+    supabase.from("versions").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
+    supabase.from("milestones").select("id, name").eq("project_id", projectId).order("name"),
+    supabase.from("labels").select("id, name").eq("project_id", projectId).order("name"),
   ]);
-  const [{ data: states, error: statesError }, { data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: role, error: roleError }] = results;
-  const queryError = statesError ?? componentsError ?? memberError ?? adminsError ?? roleError;
+  const [{ data: states, error: statesError }, { data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: role, error: roleError }, { data: versions, error: versionsError }, { data: milestones, error: milestonesError }, { data: labels, error: labelsError }] = results;
+  const queryError = statesError ?? componentsError ?? memberError ?? adminsError ?? roleError ?? versionsError ?? milestonesError ?? labelsError;
   if (queryError) {
     console.error("Issue queue metadata query failed", { code: queryError.code, message: queryError.message });
     return <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><Surface className="space-y-3 border-destructive/30 p-8 text-center"><h1 className="text-lg font-semibold">Issues unavailable</h1><p className="text-sm text-muted-foreground">The issue queue could not load its project metadata. No empty result was inferred.</p><Link href="/dashboard/issues" className="text-sm font-medium text-primary underline underline-offset-4">Retry</Link></Surface></main>;
@@ -43,10 +47,23 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
 
   const candidates = [...(memberRows ?? []), ...(adminRows ?? [])];
   const names = await displayNameMap(candidates.map((row) => row.user_id));
-  const filters = decodeIssueSearchParams(rawParams, {
+  const requestedViewId = typeof rawParams.view === "string" && isSavedViewId(rawParams.view) ? rawParams.view : undefined;
+  let filterParams = rawParams;
+  if (requestedViewId) {
+    const { data: requestedView, error: viewError } = await supabase.from("saved_views").select("project_id, filters").eq("id", requestedViewId).maybeSingle();
+    if (viewError) {
+      console.error("Saved view link load failed", { code: viewError.code, message: viewError.message });
+    } else if (requestedView?.project_id === projectId && requestedView.filters && typeof requestedView.filters === "object") {
+      filterParams = Object.fromEntries(Object.entries(requestedView.filters as Record<string, unknown>).filter(([, value]) => typeof value === "string")) as Record<string, string>;
+    }
+  }
+  const filters = decodeIssueSearchParams(filterParams, {
     stateIds: new Set((states ?? []).map((state) => state.id)),
     componentIds: new Set((components ?? []).map((component) => component.id)),
     memberIds: new Set(candidates.map((row) => row.user_id)),
+    versionIds: new Set((versions ?? []).map((version) => version.id)),
+    milestoneIds: new Set((milestones ?? []).map((milestone) => milestone.id)),
+    labelIds: new Set((labels ?? []).map((label) => label.id)),
   });
 
   return (
@@ -80,11 +97,16 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           projectKey={context.activeProject.key}
           projectId={projectId}
           canEdit={role === "DEVELOPER" || role === "MAINTAINER"}
+          canManageProject={role === "MAINTAINER"}
           currentUserId={context.userId}
           states={(states ?? []).map((state) => ({ value: state.id, label: state.name }))}
           components={(components ?? []).map((component) => ({ value: component.id, label: component.name }))}
           members={[...new Map(candidates.map((row) => [row.user_id, { value: row.user_id, label: personLabel(names.get(row.user_id), row.user_id) }])).values()]}
+          versions={(versions ?? []).map((version) => ({ value: version.id, label: version.name }))}
+          milestones={(milestones ?? []).map((milestone) => ({ value: milestone.id, label: milestone.name }))}
+          labels={(labels ?? []).map((label) => ({ value: label.id, label: label.name }))}
           initialFilters={filters}
+          initialSearchQuery={typeof filterParams.q === "string" ? filterParams.q : ""}
         />
       )}
     </main>

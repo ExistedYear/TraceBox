@@ -37,7 +37,7 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- Migrations `202608260041` through `202608260050` complete the current service-role, GitHub reliability, membership, issue-editing, notification, workflow, and restricted-security work; apply the full chain `202608260001` through `202608260050` to the linked Supabase project.
+- Migrations `202608260041` through `202608260053` complete the current service-role, GitHub reliability, membership, issue-editing, notification, workflow, restricted-security, advanced queue/saved-view, and duplicate-triage work; apply the full chain `202608260001` through `202608260053` to the linked Supabase project.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
 - Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, reconciliation cron, and broader multi-user/RLS behavior.
 

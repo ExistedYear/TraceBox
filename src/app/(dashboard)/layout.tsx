@@ -34,6 +34,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
+          userId={context.userId}
           email={context.email}
           displayName={context.profile?.display_name}
           avatarUrl={context.profile?.avatar_url}

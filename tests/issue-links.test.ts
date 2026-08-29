@@ -78,6 +78,11 @@ describe("Phase 11: Dependencies & Duplicates", () => {
     const linkedSummary = eventSummary(linkedEvent);
     expect(linkedSummary.heading).toBe("linked issue");
     expect(linkedSummary.detail).toBe("blocks AUTH-42");
+    expect(eventSummary({
+      event_type: "ISSUE_LINKED",
+      new_value: { canonical_issue_id: "11111111-1111-4111-8111-111111111111", canonical_issue_number: 42 },
+      metadata: { relationship: "DUPLICATE_OF" },
+    }).detail).toBe("duplicate of issue #42");
 
     const unlinkedEvent = {
       event_type: "ISSUE_UNLINKED",

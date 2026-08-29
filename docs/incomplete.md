@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–8 are source-implemented as of 2026-08-28. Migrations 045–050, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–9 are source-implemented as of 2026-08-29. Migrations 045–053, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -92,8 +92,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-003
 - Owner area: Issue queue / Search
-- Status: OPEN
-- Evidence: `src/components/issues/issue-table.tsx`; `src/lib/issues.ts`; roadmap queue requirements around `docs/archive/tracebox-main-plan.md:1618-1644`
+- Status: EXTERNAL
+- Evidence: migration `202608260051_phase9_queue_bulk.sql`; `src/components/issues/issue-table.tsx`; `src/lib/issues.ts`; `tests/phase9-issue-queue.test.ts`; `supabase/tests/issue_queue_phase9.test.sql`
 - Acceptance: Queue supports resolution, reporter, version, milestone, label, created/updated dates, and all existing filters; exposes milestone and planned useful columns; and provides authorized bulk selection/update with clear partial-failure results. Filtered empty and error states are distinct.
 - Verification: Codec/table tests for every filter and pagination combination; authorization tests for bulk RPCs; browser filter, sort, bulk, and URL-state journey.
 
@@ -102,8 +102,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-008
 - Owner area: Search / Saved views
-- Status: OPEN
-- Evidence: migration `202608260018_phase10_search_saved_views.sql`; `src/components/issues/saved-views-bar.tsx`
+- Status: EXTERNAL
+- Evidence: migrations `202608260018_phase10_search_saved_views.sql` and `202608260052_phase9_saved_views.sql`; `src/components/issues/saved-views-bar.tsx`; `src/lib/validation/saved-views.ts`; `tests/saved-views-phase9.test.ts`; `supabase/tests/saved_views_phase9.test.sql`
 - Acceptance: Saved views implement the documented PRIVATE, PROJECT, and ORGANIZATION visibility model (or explicitly revise the contract), support create/rename/edit/delete, persist all advanced filters, produce stable share URLs, and report clipboard failures safely.
 - Verification: RLS and visibility matrix tests across organizations/projects; browser create/edit/share/open/copy-failure journey.
 
@@ -112,8 +112,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-008
 - Owner area: Triage / Keyboard UX
-- Status: OPEN
-- Evidence: `src/components/triage/triage-inbox.tsx`; triage requirements around `docs/archive/tracebox-main-plan.md:1671-1692`
+- Status: EXTERNAL
+- Evidence: `src/components/triage/triage-inbox.tsx`; `tests/phase9-triage-command.test.ts`; canonical J/K/O/P/S/C/E/U/A/R/D shortcuts with focus guards and visible button/select equivalents
 - Acceptance: J/K navigation, A/R/D/O, priority, severity, component, edit, and Enter actions match one documented meaning, respect focus/text-entry guards, and expose accessible non-keyboard equivalents. The meaning of `A` is canonical and consistent with UI copy.
 - Verification: Keyboard/component tests for every action, focus guard, and authorization denial; browser triage journey with classification and recovery errors.
 
@@ -122,8 +122,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-003, TB-010
 - Owner area: Triage / Issue links
-- Status: OPEN
-- Evidence: `src/components/triage/triage-inbox.tsx`; migration `202608260019_phase11_issue_links.sql`
+- Status: EXTERNAL
+- Evidence: migration `202608260053_phase9_triage_command_ux.sql`; `src/components/triage/triage-inbox.tsx`; `tests/phase9-triage-command.test.ts`; atomic link/status/resolution/audit result with canonical-issue toast navigation
 - Acceptance: Duplicate resolution identifies the canonical issue, performs the link/resolution transaction, records visible activity, shows the resulting status, and navigates or links to the canonical issue. Failures are recoverable and do not leave contradictory UI.
 - Verification: RPC authorization/transaction tests and browser triage resolution journey including failure and retry.
 
@@ -212,8 +212,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-003, TB-006, TB-008
 - Owner area: Navigation / Keyboard UX
-- Status: OPEN
-- Evidence: command palette and global shortcut components; Phase 16 status in the roadmap audits
+- Status: EXTERNAL
+- Evidence: `src/components/layout/app-header.tsx`; `tests/phase9-triage-command.test.ts`; palette destinations for My Issues, notifications, projects, issue creation/search, and authorized workflow transitions
 - Acceptance: Palette exposes committed My Issues, notifications, issue search, and quick status actions with authorization, keyboard/focus behavior, loading, empty, and failure states; actions use the same mutation contract as the issue UI.
 - Verification: Component/keyboard tests and browser navigation/action journey with permission and failure cases.
 
@@ -223,7 +223,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: none
 - Owner area: Database tooling / TypeScript
 - Status: IN PROGRESS
-- Evidence: migrations `202608260040`–`202608260050`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
+- Evidence: migrations `202608260040`–`202608260053`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
 - Acceptance: A disposable replay of migrations 001–041 succeeds; regenerated types include GitHub App tables/fields/RPCs, issue-link additions, and all current API/custom-field contracts; avoidable GitHub `any` casts are removed. `check:migrations` verifies only, `sync:migrations` regenerates the bundle, and `supabase db reset` executes locally.
 - Verification: Fresh local Supabase replay, `npm run db:types`, typecheck, `npm run check:migrations`, and schema/type catalog comparison.
 

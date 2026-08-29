@@ -123,7 +123,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
     }
   }, [activeIssue, canManage, removeActiveIssue, router]);
 
-  async function classify(field: "type" | "priority" | "severity" | "component_id", value: string) {
+  const classify = useCallback(async (field: "type" | "priority" | "severity" | "component_id", value: string) => {
     if (!canManage || !activeIssue || loadingAction) return;
     const updates = { [field]: field === "component_id" ? value || null : value };
     const previous = activeIssue;
@@ -140,7 +140,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
     } finally {
       setLoadingAction(null);
     }
-  }
+  }, [activeIssue, canManage, components, loadingAction]);
 
   const handleConfirmDuplicate = async (candidateKey?: string) => {
     const key = (candidateKey ?? targetDuplicateKey).trim();
@@ -157,12 +157,21 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
         toast.error(`Target issue ${key} was not found.`);
         return;
       }
-      const { error: linkError } = await supabase.rpc("add_issue_link", { p_source_issue_id: activeIssue.id, p_target_issue_id: target.id, p_relationship: "DUPLICATE_OF" });
-      if (linkError) {
-        toast.error("Could not link duplicate issue.");
+      const { data, error } = await supabase.rpc("resolve_duplicate_issue", {
+        p_duplicate_issue_id: activeIssue.id,
+        p_canonical_issue_id: target.id,
+      });
+      if (error || !data?.[0]) {
+        toast.error(error?.code === "P0002" ? `Target issue ${key} was not found.` : "Could not resolve duplicate issue. No changes were saved.");
         return;
       }
-      toast.success(`${activeIssue.keyLabel} marked as duplicate of ${key}.`);
+      const canonicalKey = formatIssueKey(projectKey, data[0].canonical_issue_number);
+      toast.success(`${activeIssue.keyLabel} marked as duplicate of ${canonicalKey}.`, {
+        action: {
+          label: `Open ${canonicalKey}`,
+          onClick: () => router.push(`/dashboard/issues/${canonicalKey}`),
+        },
+      });
       setDuplicateModalOpen(false);
       setTargetDuplicateKey("");
       removeActiveIssue(activeIssue.id);
@@ -192,7 +201,8 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (["INPUT", "TEXTAREA", "SELECT"].includes((event.target as HTMLElement)?.tagName) || duplicateModalOpen) return;
+      const target = event.target as HTMLElement | null;
+      if (duplicateModalOpen || target?.isContentEditable || target?.closest("input, textarea, select, button, a, [role='button']")) return;
       const key = event.key.toLowerCase();
       if (key === "j" || event.key === "ArrowDown") setSelectedIndex((index) => Math.min(index + 1, Math.max(0, issues.length - 1)));
       else if (key === "k" || event.key === "ArrowUp") setSelectedIndex((index) => Math.max(0, index - 1));
@@ -200,10 +210,17 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
       else if (canManage && key === "r" && !duplicateModalOpen) void transition(closedStateId, "WONT_FIX", "reject", `${activeIssue?.keyLabel ?? "Issue"} rejected.`);
       else if (canManage && key === "d" && !duplicateModalOpen) setDuplicateModalOpen(true);
       else if (key === "o" && activeIssue) router.push(`/dashboard/issues/${activeIssue.keyLabel}`);
+      else if (canManage && key === "p" && activeIssue) void classify("priority", TRIAGE_PRIORITIES[(TRIAGE_PRIORITIES.indexOf(activeIssue.priority) + 1) % TRIAGE_PRIORITIES.length]);
+      else if (canManage && key === "s" && activeIssue) void classify("severity", TRIAGE_SEVERITIES[(TRIAGE_SEVERITIES.indexOf(activeIssue.severity) + 1) % TRIAGE_SEVERITIES.length]);
+      else if (canManage && key === "c" && activeIssue) {
+        const next = components[(Math.max(-1, components.findIndex((item) => item.id === activeIssue.componentId)) + 1) % (components.length + 1)];
+        void classify("component_id", next?.id ?? "");
+      } else if (key === "e" && activeIssue) router.push(`/dashboard/issues/${activeIssue.keyLabel}?edit=1`);
+      else if (canManage && key === "u" && activeIssue) document.querySelector<HTMLSelectElement>('select[aria-label="Assign engineer"]')?.focus();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeIssue, canManage, closedStateId, duplicateModalOpen, issues.length, openStateId, router, transition]);
+  }, [activeIssue, canManage, classify, closedStateId, components, duplicateModalOpen, issues.length, openStateId, router, transition]);
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
@@ -213,7 +230,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Triage & Classification</h1>
           <p className="mt-1 text-xs text-muted-foreground">Review incoming issues, identify duplicates, and classify work.</p>
         </div>
-        <div className="hidden items-center gap-2 rounded-lg border border-border/70 px-3 py-1.5 font-mono text-[11px] text-muted-foreground sm:flex"><Keyboard className="h-3.5 w-3.5 text-primary" /><span>J/K navigate</span><span>A accept</span><span>R reject</span><span>D duplicate</span><span>O open</span></div>
+        <div aria-label="Triage keyboard shortcuts" className="hidden items-center gap-2 rounded-lg border border-border/70 px-3 py-1.5 font-mono text-[11px] text-muted-foreground sm:flex"><Keyboard className="h-3.5 w-3.5 text-primary" /><span>J/K navigate</span><span>P priority</span><span>S severity</span><span>C component</span><span>E edit</span><span>A accept</span><span>R reject</span><span>U assign</span><span>D duplicate</span><span>O open</span></div>
       </div>
 
       {issues.length === 0 ? (

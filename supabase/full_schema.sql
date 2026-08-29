@@ -11549,3 +11549,360 @@ grant execute on function public.list_notifications(timestamptz, uuid, boolean, 
 -- Notification rows are dispatcher-owned. Marking read remains available via
 -- the dedicated RPCs, whose functions run with the table owner's privileges.
 revoke insert, update, delete on public.notifications from public, anon, authenticated;
+-- Phase 9: issue queue filtering, indexes, and authorized bulk updates.
+-- Queue reads remain RLS-backed. Bulk writes are RPC-only and lock the project
+-- before issues in UUID order so a multi-row operation is atomic and observable.
+
+create index if not exists issues_queue_reporter_created_idx
+  on public.issues (project_id, reporter_id, created_at desc, id);
+create index if not exists issues_queue_version_idx
+  on public.issues (project_id, affected_version_id, updated_at desc, id);
+create index if not exists issues_queue_milestone_idx
+  on public.issues (project_id, target_milestone_id, updated_at desc, id);
+create index if not exists issue_labels_issue_label_idx
+  on public.issue_labels (issue_id, label_id);
+
+create or replace function public.bulk_update_issue_fields(
+  p_project_id uuid,
+  p_issue_ids uuid[],
+  p_updates jsonb
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_role text;
+  v_archived boolean;
+  v_issue record;
+  v_count integer := 0;
+  v_expected integer;
+  v_core jsonb;
+  v_version uuid;
+  v_milestone uuid;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED' using errcode = '42501';
+  end if;
+  if p_project_id is null or p_issue_ids is null or coalesce(array_length(p_issue_ids, 1), 0) = 0 then
+    raise exception 'VALIDATION: Select at least one issue' using errcode = '22023';
+  end if;
+  if array_length(p_issue_ids, 1) > 100 then
+    raise exception 'VALIDATION: Bulk updates are limited to 100 issues' using errcode = '22023';
+  end if;
+  if p_updates is null or jsonb_typeof(p_updates) <> 'object' or p_updates = '{}'::jsonb then
+    raise exception 'VALIDATION: An update object with at least one supported field is required' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from jsonb_object_keys(p_updates) key(name)
+    where name not in ('priority', 'severity', 'type', 'assignee_id', 'component_id', 'affected_version_id', 'target_milestone_id')
+  ) then
+    raise exception 'VALIDATION: Unsupported bulk issue update field' using errcode = '22023';
+  end if;
+
+  select p.is_archived into v_archived
+  from public.projects p
+  where p.id = p_project_id
+  for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_role := public.project_role(p_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  select count(*)::integer, count(distinct issue_id)::integer
+    into v_expected, v_count
+  from unnest(p_issue_ids) issue_id;
+  if v_expected <> v_count then
+    raise exception 'VALIDATION: Duplicate issue selection' using errcode = '22023';
+  end if;
+  select count(*)::integer into v_count
+  from public.issues i
+  where i.project_id = p_project_id
+    and i.id = any(p_issue_ids)
+    and public.can_view_issue(i.id);
+  if v_count <> v_expected then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  if p_updates ? 'priority' and (jsonb_typeof(p_updates->'priority') <> 'string' or p_updates->>'priority' not in ('P0','P1','P2','P3','P4')) then
+    raise exception 'VALIDATION: Invalid priority' using errcode = '22023';
+  end if;
+  if p_updates ? 'severity' and (jsonb_typeof(p_updates->'severity') <> 'string' or p_updates->>'severity' not in ('BLOCKER','CRITICAL','MAJOR','MINOR','TRIVIAL')) then
+    raise exception 'VALIDATION: Invalid severity' using errcode = '22023';
+  end if;
+  if p_updates ? 'type' and (jsonb_typeof(p_updates->'type') <> 'string' or p_updates->>'type' not in ('BUG','ENHANCEMENT','TASK','SECURITY','PERFORMANCE','REGRESSION')) then
+    raise exception 'VALIDATION: Invalid issue type' using errcode = '22023';
+  end if;
+  begin
+    if p_updates ? 'assignee_id' and jsonb_typeof(p_updates->'assignee_id') <> 'null' then v_version := (p_updates->>'assignee_id')::uuid; end if;
+    if p_updates ? 'component_id' and jsonb_typeof(p_updates->'component_id') <> 'null' then v_version := (p_updates->>'component_id')::uuid; end if;
+    if p_updates ? 'affected_version_id' and jsonb_typeof(p_updates->'affected_version_id') <> 'null' then v_version := (p_updates->>'affected_version_id')::uuid; end if;
+    if p_updates ? 'target_milestone_id' and jsonb_typeof(p_updates->'target_milestone_id') <> 'null' then v_milestone := (p_updates->>'target_milestone_id')::uuid; end if;
+  exception when invalid_text_representation then
+    raise exception 'VALIDATION: Invalid UUID' using errcode = '22023';
+  end;
+  if p_updates ? 'component_id' and jsonb_typeof(p_updates->'component_id') <> 'null' and not exists (select 1 from public.components c where c.id = (p_updates->>'component_id')::uuid and c.project_id = p_project_id and not c.is_archived) then
+    raise exception 'INVALID_COMPONENT' using errcode = '23503';
+  end if;
+  if p_updates ? 'assignee_id' and jsonb_typeof(p_updates->'assignee_id') <> 'null' and not (
+    exists (select 1 from public.project_members m where m.project_id = p_project_id and m.user_id = (p_updates->>'assignee_id')::uuid)
+    or exists (select 1 from public.projects p join public.organizations o on o.id = p.organization_id left join public.organization_members om on om.organization_id = o.id and om.user_id = (p_updates->>'assignee_id')::uuid where p.id = p_project_id and (o.owner_id = (p_updates->>'assignee_id')::uuid or om.role in ('OWNER','ADMIN')))
+  ) then raise exception 'INVALID_ASSIGNEE' using errcode = '23503'; end if;
+  if p_updates ? 'affected_version_id' and jsonb_typeof(p_updates->'affected_version_id') <> 'null' and not exists (select 1 from public.versions v where v.id = (p_updates->>'affected_version_id')::uuid and v.project_id = p_project_id and not v.is_archived) then
+    raise exception 'INVALID_VERSION' using errcode = '23503';
+  end if;
+  if p_updates ? 'target_milestone_id' and jsonb_typeof(p_updates->'target_milestone_id') <> 'null' and not exists (select 1 from public.milestones m where m.id = (p_updates->>'target_milestone_id')::uuid and m.project_id = p_project_id) then
+    raise exception 'INVALID_MILESTONE' using errcode = '23503';
+  end if;
+
+  v_core := p_updates - 'affected_version_id' - 'target_milestone_id';
+  for v_issue in
+    select i.id, i.affected_version_id, i.target_milestone_id
+    from public.issues i
+    where i.project_id = p_project_id and i.id = any(p_issue_ids)
+    order by i.id
+    for update
+  loop
+    if v_core <> '{}'::jsonb then perform public.update_issue_fields(v_issue.id, v_core); end if;
+    if p_updates ? 'affected_version_id' and v_issue.affected_version_id is distinct from nullif(p_updates->>'affected_version_id', '')::uuid then
+      update public.issues set affected_version_id = nullif(p_updates->>'affected_version_id', '')::uuid where id = v_issue.id;
+      insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value) values (v_issue.id, v_user, 'VERSION_CHANGED', 'affected_version_id', to_jsonb(v_issue.affected_version_id::text), to_jsonb(nullif(p_updates->>'affected_version_id', '')));
+    end if;
+    if p_updates ? 'target_milestone_id' and v_issue.target_milestone_id is distinct from nullif(p_updates->>'target_milestone_id', '')::uuid then
+      update public.issues set target_milestone_id = nullif(p_updates->>'target_milestone_id', '')::uuid where id = v_issue.id;
+      insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value) values (v_issue.id, v_user, 'MILESTONE_CHANGED', 'target_milestone_id', to_jsonb(v_issue.target_milestone_id::text), to_jsonb(nullif(p_updates->>'target_milestone_id', '')));
+    end if;
+  end loop;
+  return v_expected;
+end;
+$$;
+
+revoke execute on function public.bulk_update_issue_fields(uuid, uuid[], jsonb) from anon, public;
+grant execute on function public.bulk_update_issue_fields(uuid, uuid[], jsonb) to authenticated;
+-- Phase 9: saved-view lifecycle, explicit sharing visibility, and stable links.
+-- PRIVATE is owner-only, PROJECT is visible to project members, and
+-- ORGANIZATION is visible to members of the owning workspace who can access
+-- the project. Saved-view writes are RPC-only.
+
+drop function if exists public.create_saved_view(uuid, text, jsonb, boolean);
+drop function if exists public.update_saved_view_sharing(uuid, boolean);
+
+alter table public.saved_views add column if not exists visibility text;
+update public.saved_views
+   set visibility = case when is_shared then 'PROJECT' else 'PRIVATE' end
+ where visibility is null;
+alter table public.saved_views alter column visibility set default 'PRIVATE';
+alter table public.saved_views alter column visibility set not null;
+alter table public.saved_views drop constraint if exists saved_views_visibility_check;
+alter table public.saved_views add constraint saved_views_visibility_check
+  check (visibility in ('PRIVATE', 'PROJECT', 'ORGANIZATION'));
+alter table public.saved_views drop column if exists is_shared;
+
+create index if not exists saved_views_visibility_project_idx
+  on public.saved_views (project_id, visibility, created_at desc);
+
+drop policy if exists "Project members can read saved views" on public.saved_views;
+drop policy if exists "Project members can create saved views" on public.saved_views;
+drop policy if exists "Owners can update/delete their saved views" on public.saved_views;
+drop policy if exists "Owners can update their saved views" on public.saved_views;
+drop policy if exists "Owners can delete their saved views" on public.saved_views;
+
+create policy "Authorized members can read saved views"
+  on public.saved_views for select to authenticated
+  using (
+    public.is_project_member(project_id)
+    and (
+      (visibility = 'PRIVATE' and created_by = (select auth.uid()))
+      or visibility = 'PROJECT'
+      or (
+        visibility = 'ORGANIZATION'
+        and exists (
+          select 1 from public.projects p
+          join public.organization_members om on om.organization_id = p.organization_id
+         where p.id = saved_views.project_id
+           and om.user_id = (select auth.uid())
+        )
+      )
+    )
+  );
+
+create or replace function public.create_saved_view(
+  p_project_id uuid,
+  p_name text,
+  p_filters jsonb default '{}'::jsonb,
+  p_visibility text default 'PRIVATE'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_view_id uuid;
+  v_name text := nullif(trim(coalesce(p_name, '')), '');
+  v_visibility text := upper(trim(coalesce(p_visibility, 'PRIVATE')));
+  v_archived boolean;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if v_name is null or char_length(v_name) > 80 then raise exception 'VALIDATION: Saved view name must be 1–80 characters' using errcode = '22023'; end if;
+  if p_filters is null or jsonb_typeof(p_filters) <> 'object' then raise exception 'VALIDATION: Saved view filters must be an object' using errcode = '22023'; end if;
+  if v_visibility not in ('PRIVATE', 'PROJECT', 'ORGANIZATION') then raise exception 'VALIDATION: Invalid saved view visibility' using errcode = '22023'; end if;
+  select is_archived into v_archived from public.projects where id = p_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.is_project_member(p_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if v_visibility = 'ORGANIZATION' and not public.can_manage_project(p_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  insert into public.saved_views (project_id, created_by, name, filters, visibility)
+  values (p_project_id, v_user, v_name, p_filters, v_visibility)
+  returning id into v_view_id;
+  return v_view_id;
+end;
+$$;
+
+create or replace function public.rename_saved_view(p_view_id uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_user uuid := auth.uid(); v_name text := nullif(trim(coalesce(p_name, '')), '');
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if v_name is null or char_length(v_name) > 80 then raise exception 'VALIDATION: Saved view name must be 1–80 characters' using errcode = '22023'; end if;
+  update public.saved_views sv set name = v_name, updated_at = now()
+   where sv.id = p_view_id and sv.created_by = v_user
+     and public.is_project_member(sv.project_id)
+     and exists (select 1 from public.projects p where p.id = sv.project_id and not p.is_archived);
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+end;
+$$;
+
+create or replace function public.update_saved_view_filters(p_view_id uuid, p_filters jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_user uuid := auth.uid();
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if p_filters is null or jsonb_typeof(p_filters) <> 'object' then raise exception 'VALIDATION: Saved view filters must be an object' using errcode = '22023'; end if;
+  update public.saved_views sv set filters = p_filters, updated_at = now()
+   where sv.id = p_view_id and sv.created_by = v_user
+     and public.is_project_member(sv.project_id)
+     and exists (select 1 from public.projects p where p.id = sv.project_id and not p.is_archived);
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+end;
+$$;
+
+create or replace function public.update_saved_view_visibility(p_view_id uuid, p_visibility text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_project_id uuid;
+  v_archived boolean;
+  v_visibility text := upper(trim(coalesce(p_visibility, 'PRIVATE')));
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if v_visibility not in ('PRIVATE', 'PROJECT', 'ORGANIZATION') then raise exception 'VALIDATION: Invalid saved view visibility' using errcode = '22023'; end if;
+  select sv.project_id, p.is_archived into v_project_id, v_archived
+    from public.saved_views sv join public.projects p on p.id = sv.project_id
+   where sv.id = p_view_id and sv.created_by = v_user;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if not public.is_project_member(v_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if v_visibility = 'ORGANIZATION' and not public.can_manage_project(v_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  update public.saved_views set visibility = v_visibility, updated_at = now() where id = p_view_id;
+end;
+$$;
+
+create or replace function public.delete_saved_view(p_view_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_user uuid := auth.uid();
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  delete from public.saved_views sv
+   where sv.id = p_view_id and sv.created_by = v_user
+     and public.is_project_member(sv.project_id)
+     and exists (select 1 from public.projects p where p.id = sv.project_id and not p.is_archived);
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+end;
+$$;
+
+revoke execute on function public.create_saved_view(uuid, text, jsonb, text), public.rename_saved_view(uuid, text), public.update_saved_view_filters(uuid, jsonb), public.update_saved_view_visibility(uuid, text), public.delete_saved_view(uuid) from public, anon;
+grant execute on function public.create_saved_view(uuid, text, jsonb, text), public.rename_saved_view(uuid, text), public.update_saved_view_filters(uuid, jsonb), public.update_saved_view_visibility(uuid, text), public.delete_saved_view(uuid) to authenticated;
+-- Migration 053: Phase 9 triage command UX contracts.
+-- Duplicate resolution is deliberately one RPC so link, lifecycle, and audit
+-- events commit together or are all rolled back.
+
+create or replace function public.resolve_duplicate_issue(
+  p_duplicate_issue_id uuid,
+  p_canonical_issue_id uuid
+)
+returns table (duplicate_issue_id uuid, canonical_issue_id uuid, canonical_issue_number bigint)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid(); v_project_id uuid; v_archived boolean; v_role text;
+  v_canonical_number bigint; v_resolved_state uuid; v_link_id uuid;
+  v_old_state uuid; v_old_resolution text; v_now timestamptz := timezone('utc'::text, now());
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if p_duplicate_issue_id is null or p_canonical_issue_id is null or p_duplicate_issue_id = p_canonical_issue_id then
+    raise exception 'VALIDATION: Choose a different canonical issue' using errcode = '22023';
+  end if;
+  select i.project_id into v_project_id from public.issues i where i.id = p_duplicate_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select p.is_archived into v_archived from public.projects p where p.id = v_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_role := public.project_role(v_project_id);
+  if v_role not in ('DEVELOPER', 'MAINTAINER') then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if not public.can_view_issue(p_duplicate_issue_id) or not exists (
+    select 1 from public.issues i where i.id = p_canonical_issue_id and i.project_id = v_project_id and public.can_view_issue(i.id)
+  ) then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  -- Stable issue ordering prevents two concurrent duplicate actions deadlocking.
+  perform 1 from public.issues i where i.id in (p_duplicate_issue_id, p_canonical_issue_id) order by i.id for update;
+  select i.issue_number into v_canonical_number from public.issues i where i.id = p_canonical_issue_id;
+  select i.status_id, i.resolution into v_old_state, v_old_resolution
+  from public.issues i where i.id = p_duplicate_issue_id;
+  select ws.id into v_resolved_state from public.workflow_states ws where ws.project_id = v_project_id and ws.category = 'RESOLVED' order by ws.position limit 1;
+  if v_resolved_state is null then raise exception 'INVALID_STATE' using errcode = '23503'; end if;
+  -- Keep link, resolution, and their observable activity in this transaction.
+  insert into public.issue_links(source_issue_id, target_issue_id, relationship, created_by)
+  values (p_duplicate_issue_id, p_canonical_issue_id, 'DUPLICATE_OF', v_user)
+  returning id into v_link_id;
+  insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, metadata, new_value)
+  values (p_duplicate_issue_id, v_user, 'ISSUE_LINKED', null, null,
+    jsonb_build_object('target_id', p_canonical_issue_id, 'relationship', 'DUPLICATE_OF'),
+    jsonb_build_object('canonical_issue_id', p_canonical_issue_id, 'canonical_issue_number', v_canonical_number));
+  update public.issues
+  set status_id = v_resolved_state, resolution = 'DUPLICATE', resolved_at = coalesce(resolved_at, v_now), closed_at = null, updated_at = v_now
+  where id = p_duplicate_issue_id;
+  if v_old_state is distinct from v_resolved_state then
+    insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value, metadata)
+    values (p_duplicate_issue_id, v_user, 'STATUS_CHANGED', 'status_id', to_jsonb(v_old_state::text), to_jsonb(v_resolved_state::text), jsonb_build_object('new_category', 'RESOLVED', 'resolution', 'DUPLICATE'));
+  end if;
+  if v_old_resolution is distinct from 'DUPLICATE' then
+    insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value)
+    values (p_duplicate_issue_id, v_user, 'RESOLUTION_CHANGED', 'resolution', to_jsonb(v_old_resolution), to_jsonb('DUPLICATE'::text));
+  end if;
+  return query select p_duplicate_issue_id, p_canonical_issue_id, v_canonical_number;
+end;
+$$;
+
+revoke execute on function public.resolve_duplicate_issue(uuid, uuid) from anon, public;
+grant execute on function public.resolve_duplicate_issue(uuid, uuid) to authenticated;

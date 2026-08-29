@@ -1578,30 +1578,30 @@ export type Database = {
           created_by: string
           filters: Json
           id: string
-          is_shared: boolean
           name: string
           project_id: string
           updated_at: string
+          visibility: "PRIVATE" | "PROJECT" | "ORGANIZATION"
         }
         Insert: {
           created_at?: string
           created_by: string
           filters?: Json
           id?: string
-          is_shared?: boolean
           name: string
           project_id: string
           updated_at?: string
+          visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
         }
         Update: {
           created_at?: string
           created_by?: string
           filters?: Json
           id?: string
-          is_shared?: boolean
           name?: string
           project_id?: string
           updated_at?: string
+          visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
         }
         Relationships: [
           {
@@ -1852,6 +1852,14 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_duplicate_issue: {
+        Args: { p_canonical_issue_id: string; p_duplicate_issue_id: string }
+        Returns: {
+          canonical_issue_id: string
+          canonical_issue_number: number
+          duplicate_issue_id: string
+        }[]
+      }
       api_add_comment: {
         Args: { p_body: string; p_issue_id: string; p_token_hash: string }
         Returns: string
@@ -2018,9 +2026,9 @@ export type Database = {
       create_saved_view: {
         Args: {
           p_filters?: Json
-          p_is_shared?: boolean
           p_name: string
           p_project_id: string
+          p_visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
         }
         Returns: string
       }
@@ -2045,6 +2053,9 @@ export type Database = {
       }
       delete_label: { Args: { p_label_id: string }; Returns: undefined }
       delete_saved_view: { Args: { p_view_id: string }; Returns: undefined }
+      rename_saved_view: { Args: { p_name: string; p_view_id: string }; Returns: undefined }
+      update_saved_view_filters: { Args: { p_filters: Json; p_view_id: string }; Returns: undefined }
+      update_saved_view_visibility: { Args: { p_view_id: string; p_visibility: "PRIVATE" | "PROJECT" | "ORGANIZATION" }; Returns: undefined }
       dispatch_issue_notification: {
         Args: {
           p_actor_id: string
@@ -2352,10 +2363,6 @@ export type Database = {
           p_name: string
           p_status?: string
         }
-        Returns: undefined
-      }
-      update_saved_view_sharing: {
-        Args: { p_is_shared: boolean; p_view_id: string }
         Returns: undefined
       }
       update_version: {
