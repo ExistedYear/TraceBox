@@ -61,17 +61,22 @@ export default async function MilestoneDetailPage({ params }: { params: Params }
     notFound();
   }
 
-  const { data: issues, error: issuesError } = await supabase
-    .from("issues")
-    .select("id, issue_number, title, type, priority, severity, assignee_id, updated_at, status:workflow_states (name, category)")
-    .eq("target_milestone_id", milestoneId)
-    .eq("project_id", milestone.project.id)
-    .order("updated_at", { ascending: false });
+  const [{ data: issues, error: issuesError }, { data: projectRole, error: roleError }] = await Promise.all([
+    supabase
+      .from("issues")
+      .select("id, issue_number, title, type, priority, severity, assignee_id, updated_at, status:workflow_states (name, category)")
+      .eq("target_milestone_id", milestoneId)
+      .eq("project_id", milestone.project.id)
+      .order("updated_at", { ascending: false }),
+    supabase.rpc("project_role", { p_project_id: milestone.project.id }),
+  ]);
 
-  if (issuesError) {
-    console.error("Milestone issues load failed", { code: issuesError.code, message: issuesError.message });
+  if (issuesError || roleError) {
+    const error = issuesError ?? roleError;
+    console.error("Milestone issues load failed", { code: error?.code, message: error?.message });
     return <LoadErrorPage title="Milestone issues unavailable" description="We could not load the complete issue list. No partial progress is being shown." retryHref={`/dashboard/milestones/${milestoneId}`} />;
   }
+  const canCreateIssue = projectRole === "REPORTER" || projectRole === "DEVELOPER" || projectRole === "MAINTAINER";
 
   const totalCount = issues?.length ?? 0;
   let resolvedCount = 0;
@@ -191,9 +196,9 @@ export default async function MilestoneDetailPage({ params }: { params: Params }
         <Surface>
           <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
             <h2 className="text-sm font-semibold">Issues in Milestone ({totalCount})</h2>
-            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-              <Link href="/dashboard/issues/new">Add issue</Link>
-            </Button>
+            {canCreateIssue && context.activeProject?.id === milestone.project.id ? <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+              <Link href="/dashboard/issues/new">New issue</Link>
+            </Button> : null}
           </div>
 
           {totalCount === 0 ? (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 import { GithubLinkValidationError, validateGithubLink } from "@/lib/github-link-validation";
 
@@ -16,11 +17,14 @@ export async function POST(request: NextRequest) {
   if (!UUID_RE.test(issueId) || !UUID_RE.test(projectId) || !linkType || !repoName || !url.trim()) return NextResponse.json({ error: "Issue, project, link type, repository, and URL are required." }, { status: 400 });
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError && !isMissingAuthSession(userError)) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  const { data: issue } = await supabase.from("issues").select("id, project_id").eq("id", issueId).eq("project_id", projectId).maybeSingle();
+  const { data: issue, error: issueError } = await supabase.from("issues").select("id, project_id").eq("id", issueId).eq("project_id", projectId).maybeSingle();
+  if (issueError) return NextResponse.json({ error: "Could not load the issue." }, { status: 500 });
   if (!issue) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: issue.project_id });
+  const { data: role, error: roleError } = await supabase.rpc("project_role", { p_project_id: issue.project_id });
+  if (roleError) return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can add GitHub links." }, { status: 403 });
 
   try {

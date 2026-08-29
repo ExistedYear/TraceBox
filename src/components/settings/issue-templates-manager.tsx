@@ -29,6 +29,7 @@ export function IssueTemplatesManager({ projectId, canManage, initialTemplates, 
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [preview, setPreview] = useState<TemplateRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
 
   function openEditor(template?: TemplateRow) {
     setEditorOpen(true);
@@ -84,17 +85,25 @@ export function IssueTemplatesManager({ projectId, canManage, initialTemplates, 
   }
 
   async function toggleArchive(template: TemplateRow) {
-    const { error } = await (createClient() as any).rpc("set_issue_template_archived", { p_template_id: template.id, p_archived: !template.is_archived });
-    if (error) { toast.error("Could not update template status."); return; }
-    setTemplates((current) => current.map((item) => item.id === template.id ? { ...item, is_archived: !template.is_archived } : item));
-    toast.success(template.is_archived ? "Template restored." : "Template archived.");
+    if (busyTemplateId) return;
+    setBusyTemplateId(template.id);
+    try {
+      const { error } = await createClient().rpc("set_issue_template_archived", { p_template_id: template.id, p_archived: !template.is_archived });
+      if (error) { toast.error("Could not update template status."); return; }
+      setTemplates((current) => current.map((item) => item.id === template.id ? { ...item, is_archived: !template.is_archived } : item));
+      toast.success(template.is_archived ? "Template restored." : "Template archived.");
+    } catch { toast.error("Could not reach the server."); } finally { setBusyTemplateId(null); }
   }
 
   async function duplicate(template: TemplateRow) {
-    const { data, error } = await (createClient() as any).rpc("duplicate_issue_template", { p_template_id: template.id, p_name: `${template.name} copy` });
-    if (error) { toast.error("Could not duplicate template."); return; }
-    setTemplates((current) => [...current, { ...template, id: String(data), name: `${template.name} copy`, is_archived: false }]);
-    toast.success("Template duplicated.");
+    if (busyTemplateId) return;
+    setBusyTemplateId(template.id);
+    try {
+      const { data, error } = await createClient().rpc("duplicate_issue_template", { p_template_id: template.id, p_name: `${template.name} copy` });
+      if (error || !data) { toast.error("Could not duplicate template."); return; }
+      setTemplates((current) => [...current, { ...template, id: String(data), name: `${template.name} copy`, is_archived: false }]);
+      toast.success("Template duplicated.");
+    } catch { toast.error("Could not reach the server."); } finally { setBusyTemplateId(null); }
   }
 
 

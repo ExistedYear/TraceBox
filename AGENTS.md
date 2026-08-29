@@ -57,6 +57,7 @@ src/components/
   settings/*members-manager.tsx  workspace invitations, ownership, and project contributors
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
+  supabase/auth-errors.ts   shared anonymous-session classifier for server auth boundaries
   validation/auth.ts       zod schemas + inferred LoginValues/SignupValues
   validation/workspace.ts  workspaceSchema (name+slug) / projectSchema (name+KEY+description)
   validation/issue.ts      issueCreateSchema (title/type/component + advanced fields)
@@ -71,7 +72,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (74 ordered), pgTAP tests/, seed.sql (empty)
+supabase/                  config.toml, migrations/ (78 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, gap, and feature plans
@@ -141,7 +142,10 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Personal accounts**: `/dashboard/account` owns profile, avatar, email, password, recovery, notification, and global-session controls. Profile writes use `update_current_profile`; new avatars must already exist in the owner-scoped public `profile-avatars` bucket, while Auth-sensitive changes stay in Supabase Auth.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions own privileged/transactional writes, including membership/invitations, atomic issue creation/editing, notification preferences/read state, project lifecycle/workflow publication, restricted grants, components, comments, and planning. Clients call `supabase.rpc(...)`; direct browser writes to protected tables and audit history remain revoked.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract and hosted ledger are reconciled through migration 074. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **Server authentication errors**: Supabase's `AuthSessionMissingError` is the normal anonymous state, not an infrastructure failure. Use `isMissingAuthSession` at middleware/page/route boundaries so anonymous users redirect or receive 401 while genuine Auth lookup failures fail closed with safe logging.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract and hosted ledger are reconciled through migration 078. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **Tenant directories and integration catalogs**: profile SELECT is limited to self and users sharing a workspace. GitHub installation/repository SELECT is limited to organization catalog managers or repositories bound to a project the caller belongs to; server routes must preserve the same project-scoped catalog boundary.
+- **Public API reads**: issue list/search authorization, filtering, counting, and bounds execute inside service-role-only SQL wrappers before rows reach Next.js. API routes distinguish database failures from empty/not-found results and never scan a whole project in application memory.
 - **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
 - **Issue editing and realtime**: full issue creation is one `create_issue_complete` transaction covering template defaults, required custom values, visibility, grants, labels, watchers, and audit. Detail edits use the optimistic `updated_at` overload and never overwrite a dirty draft on realtime changes. Filter/visibility-sensitive queue events always refetch through RLS; newly restricted rows are removed before refetch.
 - **Notifications**: the full inbox and header preview share the cursor/exact-count feed. Preference and read mutations are RPC-only; retained categories are mentions, assignments, comments, status, watched updates, links, labels, planning, and milestones. Restricted notification rows are returned only while `can_view_issue` remains true; title/actor/payload are redacted while key/number preserve an authorized link.
@@ -258,6 +262,9 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260072_function_volatility_contracts.sql` | Correct volatility declarations for data-reading and redaction functions |
 | `supabase/migrations/202608260073_invitation_context_and_github_automation.sql` | Context-bearing invitation acceptance for cookie-backed project landing and persisted GitHub automation edits |
 | `supabase/migrations/202608260074_github_repository_confidentiality.sql` | Project-scoped Developer visibility for GitHub installations, repositories, and operational deliveries |
+| `supabase/migrations/202608260075_api_query_bounding.sql`–`202608260076_fix_api_search_expression.sql` | Service-role-only, database-bounded REST issue listing/search and forward-only deployed expression correction |
+| `supabase/migrations/202608260077_tenant_catalog_privacy.sql` | Shared-workspace profile visibility and role/project-scoped GitHub installation/repository RLS |
+| `supabase/migrations/202608260078_api_project_membership_boundary.sql` | Live token-owner project membership boundary for REST issue list/search wrappers |
 | `src/app/(dashboard)/dashboard/settings/integrations/operations/page.tsx` / `src/components/settings/github-operations-dashboard.tsx` | Project-scoped GitHub health, repository sync, safe delivery history, affected-issue, and retry UI |
 | `src/app/api/github/retry/route.ts` | Authenticated Maintainer boundary for queuing an eligible delivery through the database retry contract |
 | `src/components/audit/audit-explorer.tsx` / `src/app/(dashboard)/dashboard/audit/page.tsx` | Restricted-safe, paginated project audit explorer with actor/action/date/issue filters and CSV export |

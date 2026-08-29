@@ -46,6 +46,7 @@ type AppHeaderProps = {
   projects: ProjectSummary[];
   activeOrganizationId: string;
   activeProjectId: string | null;
+  activeProjectRole: string | null;
 };
 
 const pageNames: Record<string, string> = {
@@ -81,11 +82,15 @@ function CommandPalette({
   activeProjectId,
   userId,
   onClose,
+  canCreateIssue,
+  canTransitionIssues,
 }: {
   projects: ProjectSummary[];
   activeProjectId: string | null;
   userId: string;
   onClose: () => void;
+  canCreateIssue: boolean;
+  canTransitionIssues: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -94,6 +99,7 @@ function CommandPalette({
     Array<{ id: string; issueNumber: number; title: string; key: string }>
   >([]);
   const [searchingIssues, setSearchingIssues] = useState(false);
+  const [issueSearchError, setIssueSearchError] = useState(false);
   const [matchingQuery, setMatchingQuery] = useState("");
   const [quickStates, setQuickStates] = useState<Array<{ id: string; name: string; category: string }>>([]);
   const searchSequence = useRef(0);
@@ -108,11 +114,11 @@ function CommandPalette({
       { id: "nav-triage", label: "Open triage inbox", hint: "Classify incoming bugs", href: "/dashboard/triage", icon: Inbox, category: "Navigation" },
       { id: "nav-readiness", label: "View release readiness", hint: "Blockers and release score", href: "/dashboard/readiness", icon: ShieldCheck, category: "Navigation" },
       { id: "nav-reports", label: "View reports & velocity", hint: "Metrics, MTTR, age", href: "/dashboard/reports", icon: BarChart3, category: "Navigation" },
-      { id: "act-new", label: "File new issue", hint: "Report a bug or task", href: "/dashboard/issues/new", icon: Plus, category: "Action" },
+      ...(canCreateIssue ? [{ id: "act-new", label: "File new issue", hint: "Report a bug or task", href: "/dashboard/issues/new", icon: Plus, category: "Action" as const }] : []),
       { id: "nav-projects", label: "View projects", hint: "All projects in this workspace", href: "/dashboard/projects", icon: FolderKanban, category: "Navigation" },
       { id: "nav-settings", label: "Open project settings", hint: "Components, workflow, labels, versions", href: "/dashboard/settings", icon: Settings2, category: "Navigation" },
     ],
-    [userId],
+    [userId, canCreateIssue],
   );
 
   // Debounced issue search when typing in palette
@@ -127,19 +133,25 @@ function CommandPalette({
         const supabase = createClient();
         const activeProj = projects.find((p) => p.id === activeProjectId);
         const projectKey = activeProj?.key || "ISSUE";
-        const { data: stateRows } = await supabase.from("workflow_states").select("id, name, category").eq("project_id", activeProjectId).order("position");
-        if (sequence === searchSequence.current) setQuickStates(stateRows ?? []);
+        if (canTransitionIssues) {
+          const { data: stateRows, error: stateError } = await supabase.from("workflow_states").select("id, name, category").eq("project_id", activeProjectId).order("position");
+          if (stateError) throw stateError;
+          if (sequence === searchSequence.current) setQuickStates(stateRows ?? []);
+        } else if (sequence === searchSequence.current) setQuickStates([]);
         const numMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(trimmed);
         const escaped = trimmed.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
         let q = supabase.from("issues").select("id, issue_number, title").eq("project_id", activeProjectId).limit(5);
         if (numMatch && numMatch[1].toUpperCase() === projectKey.toUpperCase()) q = q.or(`issue_number.eq.${numMatch[2]},title.ilike.%${escaped}%`);
         else q = q.ilike("title", `%${escaped}%`);
-        const { data } = await q;
+        const { data, error } = await q;
+        if (error) throw error;
         if (sequence !== searchSequence.current) return;
+        setIssueSearchError(false);
         setMatchingQuery(trimmed);
         setMatchingIssues((data ?? []).map((i) => ({ id: i.id, issueNumber: i.issue_number, title: i.title, key: formatIssueKey(projectKey, i.issue_number) })));
       } catch {
         if (sequence === searchSequence.current) {
+          setIssueSearchError(true);
           setMatchingQuery("");
           setMatchingIssues([]);
         }
@@ -147,8 +159,11 @@ function CommandPalette({
         if (sequence === searchSequence.current) setSearchingIssues(false);
       }
     }, 200);
-    return () => clearTimeout(timer);
-  }, [query, activeProjectId, projects]);
+    return () => {
+      clearTimeout(timer);
+      if (searchSequence.current === sequence) searchSequence.current += 1;
+    };
+  }, [query, activeProjectId, projects, canTransitionIssues]);
 
   const allItems = useMemo(() => {
     const items: CommandItem[] = [];
@@ -184,10 +199,14 @@ function CommandPalette({
             icon: CircleDot,
             category: "Action",
             run: async () => {
-              const { error } = await createClient().rpc("transition_issue", { p_issue_id: issue.id, p_to_state_id: state.id });
-              if (error) { toast.error("Could not update issue status."); return; }
-              toast.success(`${issue.key} moved to ${state.name}.`);
-              router.push(`/dashboard/issues/${issue.key}`);
+              try {
+                const { error } = await createClient().rpc("transition_issue", { p_issue_id: issue.id, p_to_state_id: state.id });
+                if (error) { toast.error("Could not update issue status."); return; }
+                toast.success(`${issue.key} moved to ${state.name}.`);
+                router.push(`/dashboard/issues/${issue.key}`);
+              } catch {
+                toast.error("Could not reach the server.");
+              }
             },
           });
         }
@@ -244,6 +263,7 @@ function CommandPalette({
           />
         </div>
         <div id="command-palette-results" role="listbox" className="max-h-80 overflow-y-auto p-2">
+          {issueSearchError && query.trim() ? <p role="status" className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-200">Issue search is temporarily unavailable. Navigation commands still work.</p> : null}
           {allItems.length ? (
             allItems.map((item, index) => {
               const Icon = item.icon || Command;
@@ -271,7 +291,7 @@ function CommandPalette({
             })
           ) : (
             <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-              {searchingIssues ? "Searching..." : "No commands or issues found."}
+              {searchingIssues && query.trim() && activeProjectId ? "Searching..." : "No commands or issues found."}
             </p>
           )}
         </div>
@@ -298,12 +318,15 @@ export function AppHeader({
   projects,
   activeOrganizationId,
   activeProjectId,
+  activeProjectRole,
   userId,
 }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const canCreateIssue = activeProjectRole === "REPORTER" || activeProjectRole === "DEVELOPER" || activeProjectRole === "MAINTAINER";
+  const canTransitionIssues = activeProjectRole === "DEVELOPER" || activeProjectRole === "MAINTAINER";
 
   // Global keyboard shortcuts (Cmd+K, g+i, g+t, g+r, g+a, g+s, c, ?)
   useEffect(() => {
@@ -329,7 +352,7 @@ export function AppHeader({
         return;
       }
 
-      if (event.key === "c" && !event.metaKey && !event.ctrlKey) {
+      if (canCreateIssue && event.key === "c" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         router.push("/dashboard/issues/new");
         return;
@@ -373,7 +396,7 @@ export function AppHeader({
       window.removeEventListener("keydown", onKeyDown);
       clearTimeout(gTimer);
     };
-  }, [pathname, router]);
+  }, [pathname, router, canCreateIssue]);
 
   return (
     <>
@@ -384,6 +407,7 @@ export function AppHeader({
             projects={projects}
             activeOrganizationId={activeOrganizationId}
             activeProjectId={activeProjectId}
+            canCreateIssue={canCreateIssue}
           />
           <div className="flex min-w-0 items-center gap-2 font-medium">
             <span className="hidden text-muted-foreground md:inline">{workspaceName ?? "Workspace"}</span>
@@ -431,6 +455,8 @@ export function AppHeader({
           projects={projects}
           activeProjectId={activeProjectId}
           userId={userId}
+          canCreateIssue={canCreateIssue}
+          canTransitionIssues={canTransitionIssues}
           onClose={() => setPaletteOpen(false)}
         />
       )}
@@ -455,10 +481,10 @@ export function AppHeader({
                   <span>Open command palette & search</span>
                   <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px]">⌘K / Ctrl+K</kbd>
                 </div>
-                <div className="flex justify-between">
+                {canCreateIssue ? <div className="flex justify-between">
                   <span>Create new issue</span>
                   <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px]">C</kbd>
-                </div>
+                </div> : null}
                 <div className="flex justify-between">
                   <span>Show keyboard shortcuts</span>
                   <kbd className="rounded border px-1.5 py-0.5 font-mono text-[10px]">?</kbd>

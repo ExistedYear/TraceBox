@@ -93,7 +93,15 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     setProfileBusy(true);
     setProfileMessage(null);
     setProfileMessageKind(null);
-    const error = await updateProfile(parsed.data.displayName, avatarUrl);
+    let error;
+    try {
+      error = await updateProfile(parsed.data.displayName, avatarUrl);
+    } catch {
+      setProfileBusy(false);
+      setProfileMessageKind("error");
+      setProfileMessage("We could not reach the server. Please try again.");
+      return;
+    }
     setProfileBusy(false);
     if (error) {
       console.error("Profile update failed", { code: error.code, message: error.message });
@@ -126,42 +134,65 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
 
     setAvatarBusy(true);
     setProfileMessage(null);
-    const supabase = createClient();
     const path = `${userId}/${crypto.randomUUID()}.${avatarExtension(file.type)}`;
     const oldPath = storagePathFromUrl(avatarUrl, userId);
-    const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, { cacheControl: "3600", contentType: file.type, upsert: false });
-    if (uploadError) {
-      console.error("Avatar upload failed", { code: uploadError.name, message: uploadError.message });
-      setAvatarBusy(false);
-      toast.error("We could not upload that avatar. Please try again.");
-      return;
-    }
+    let supabase: ReturnType<typeof createClient> | null = null;
+    let uploaded = false;
+    let profileCommitted = false;
+    try {
+      supabase = createClient();
+      const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, { cacheControl: "3600", contentType: file.type, upsert: false });
+      if (uploadError) {
+        console.error("Avatar upload failed", { code: uploadError.name, message: uploadError.message });
+        toast.error("We could not upload that avatar. Please try again.");
+        return;
+      }
+      uploaded = true;
 
-    const publicUrl = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
-    const profileError = await updateProfile(savedName.data.displayName, publicUrl);
-    if (profileError) {
-      console.error("Profile avatar update failed", { code: profileError.code, message: profileError.message });
-      const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([path]);
-      if (cleanupError) setCleanupPath(path);
-      setAvatarBusy(false);
-      toast.error("We could not save that avatar. Your previous image is still active.");
-      return;
-    }
+      const publicUrl = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl;
+      const profileError = await updateProfile(savedName.data.displayName, publicUrl);
+      if (profileError) {
+        console.error("Profile avatar update failed", { code: profileError.code, message: profileError.message });
+        const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+        if (cleanupError) setCleanupPath(path);
+        else uploaded = false;
+        toast.error("We could not save that avatar. Your previous image is still active.");
+        return;
+      }
 
-    setAvatarUrl(publicUrl);
-    setAvatarBusy(false);
-    router.refresh();
-    if (oldPath && oldPath !== path) {
-      const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]);
-      if (cleanupError) {
-        setCleanupPath(oldPath);
-        toast.success("Avatar updated. Old image cleanup is pending.");
+      uploaded = false;
+      profileCommitted = true;
+      setAvatarUrl(publicUrl);
+      router.refresh();
+      if (oldPath && oldPath !== path) {
+        const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]);
+        if (cleanupError) {
+          setCleanupPath(oldPath);
+          toast.success("Avatar updated. Old image cleanup is pending.");
+        } else {
+          setCleanupPath(null);
+          toast.success("Avatar updated.");
+        }
       } else {
-        setCleanupPath(null);
         toast.success("Avatar updated.");
       }
-    } else {
-      toast.success("Avatar updated.");
+    } catch {
+      if (profileCommitted) {
+        if (oldPath) setCleanupPath(oldPath);
+        toast.success(oldPath ? "Avatar updated. Old image cleanup is pending." : "Avatar updated.");
+      } else if (uploaded && supabase) {
+        try {
+          const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+          if (cleanupError) setCleanupPath(path);
+        } catch {
+          setCleanupPath(path);
+        }
+        toast.error("We could not reach the server. Please try again.");
+      } else {
+        toast.error("We could not reach the server. Please try again.");
+      }
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
@@ -176,42 +207,58 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     setAvatarBusy(true);
     setProfileMessage(null);
     const oldPath = storagePathFromUrl(avatarUrl, userId);
-    const profileError = await updateProfile(savedName.data.displayName, null);
-    if (profileError) {
-      console.error("Avatar removal profile update failed", { code: profileError.code, message: profileError.message });
-      setAvatarBusy(false);
-      toast.error("We could not remove your avatar. Please try again.");
-      return;
-    }
+    let profileCommitted = false;
+    try {
+      const profileError = await updateProfile(savedName.data.displayName, null);
+      if (profileError) {
+        console.error("Avatar removal profile update failed", { code: profileError.code, message: profileError.message });
+        toast.error("We could not remove your avatar. Please try again.");
+        return;
+      }
 
-    setAvatarUrl(null);
-    setAvatarBusy(false);
-    router.refresh();
-    if (oldPath) {
-      const { error: cleanupError } = await createClient().storage.from(AVATAR_BUCKET).remove([oldPath]);
-      if (cleanupError) {
-        setCleanupPath(oldPath);
-        toast.success("Avatar removed. Old image cleanup is pending.");
+      setAvatarUrl(null);
+      profileCommitted = true;
+      router.refresh();
+      if (oldPath) {
+        const { error: cleanupError } = await createClient().storage.from(AVATAR_BUCKET).remove([oldPath]);
+        if (cleanupError) {
+          setCleanupPath(oldPath);
+          toast.success("Avatar removed. Old image cleanup is pending.");
+        } else {
+          setCleanupPath(null);
+          toast.success("Avatar removed.");
+        }
       } else {
-        setCleanupPath(null);
         toast.success("Avatar removed.");
       }
-    } else {
-      toast.success("Avatar removed.");
+    } catch {
+      if (profileCommitted) {
+        if (oldPath) setCleanupPath(oldPath);
+        toast.success(oldPath ? "Avatar removed. Old image cleanup is pending." : "Avatar removed.");
+      } else {
+        toast.error("We could not reach the server. Please try again.");
+      }
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
   async function retryCleanup() {
     if (!cleanupPath || avatarBusy) return;
     setAvatarBusy(true);
-    const { error } = await createClient().storage.from(AVATAR_BUCKET).remove([cleanupPath]);
-    setAvatarBusy(false);
-    if (error) {
-      toast.error("Old avatar cleanup is still unavailable. Try again later.");
-      return;
+    try {
+      const { error } = await createClient().storage.from(AVATAR_BUCKET).remove([cleanupPath]);
+      if (error) {
+        toast.error("Old avatar cleanup is still unavailable. Try again later.");
+        return;
+      }
+      setCleanupPath(null);
+      toast.success("Old avatar cleaned up.");
+    } catch {
+      toast.error("We could not reach the server. Try cleanup again later.");
+    } finally {
+      setAvatarBusy(false);
     }
-    setCleanupPath(null);
-    toast.success("Old avatar cleaned up.");
   }
 
   async function changeEmail(event: React.FormEvent<HTMLFormElement>) {
@@ -230,7 +277,15 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     setEmailBusy(true);
     setEmailMessage(null);
     setEmailMessageKind(null);
-    const { error } = await createClient().auth.updateUser({ email: parsed.data.email }, { emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/account` });
+    let error;
+    try {
+      ({ error } = await createClient().auth.updateUser({ email: parsed.data.email }, { emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard/account` }));
+    } catch {
+      setEmailBusy(false);
+      setEmailMessageKind("error");
+      setEmailMessage("We could not reach the server. Please try again.");
+      return;
+    }
     setEmailBusy(false);
     if (error) {
       console.error("Email update failed", { code: error.code, message: error.message });
@@ -253,7 +308,15 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     setPasswordBusy(true);
     setPasswordMessage(null);
     setPasswordMessageKind(null);
-    const { error } = await createClient().auth.updateUser({ password: parsed.data.password });
+    let error;
+    try {
+      ({ error } = await createClient().auth.updateUser({ password: parsed.data.password }));
+    } catch {
+      setPasswordBusy(false);
+      setPasswordMessageKind("error");
+      setPasswordMessage("We could not reach the server. Please try again.");
+      return;
+    }
     setPasswordBusy(false);
     if (error) {
       console.error("Password update failed", { code: error.code, message: error.message });
@@ -270,7 +333,14 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
   async function signOutEverywhere() {
     if (!window.confirm("Sign out of every active TraceBox session?")) return;
     setSignOutBusy(true);
-    const { error } = await createClient().auth.signOut({ scope: "global" });
+    let error;
+    try {
+      ({ error } = await createClient().auth.signOut({ scope: "global" }));
+    } catch {
+      setSignOutBusy(false);
+      toast.error("We could not reach the server. Please try again.");
+      return;
+    }
     if (error) {
       console.error("Global sign out failed", { code: error.code, message: error.message });
       setSignOutBusy(false);

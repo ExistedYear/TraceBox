@@ -53,6 +53,7 @@ export function NewIssueForm({
   const router = useRouter();
   const [showAdvanced, setShowAdvanced] = useState(requiredCustomFields.length > 0);
   const [duplicateCandidates, setDuplicateCandidates] = useState<Array<{ issue_number: number; title: string }>>([]);
+  const [duplicateSearchError, setDuplicateSearchError] = useState(false);
   const form = useForm<IssueCreateValues>({
     resolver: zodResolver(issueCreateSchema),
     defaultValues: {
@@ -83,25 +84,29 @@ export function NewIssueForm({
     const title = watchedTitle?.trim();
     if (!title || title.length < 6) {
       setDuplicateCandidates([]);
+      setDuplicateSearchError(false);
       return;
     }
     const seq = ++duplicateSeq.current;
     const handle = setTimeout(async () => {
-      const supabase = createClient();
-      function escapeIlike(s: string): string {
-        return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.rpc("find_duplicate_candidates", { p_project_id: projectId, p_title: title, p_limit: 5 });
+        if (seq !== duplicateSeq.current) return;
+        if (error) throw error;
+        setDuplicateSearchError(false);
+        setDuplicateCandidates((data ?? []).map((candidate) => ({ issue_number: Number(candidate.issue_number), title: candidate.title })));
+      } catch {
+        if (seq === duplicateSeq.current) {
+          setDuplicateCandidates([]);
+          setDuplicateSearchError(true);
+        }
       }
-      const safe = title.split(/\s+/).slice(0, 3).map(escapeIlike).join("%");
-      const { data } = await supabase
-        .from("issues")
-        .select("issue_number, title")
-        .eq("project_id", projectId)
-        .ilike("title", `%${safe}%`)
-        .limit(5);
-      if (seq !== duplicateSeq.current) return;
-      if (data) setDuplicateCandidates(data);
     }, 450);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      if (duplicateSeq.current === seq) duplicateSeq.current += 1;
+    };
   }, [watchedTitle, projectId]);
   function applyTemplate(templateId: string) {
     const tmpl = templates.find((t) => t.id === templateId);
@@ -199,6 +204,7 @@ export function NewIssueForm({
                   <Link
                     href={`/dashboard/issues/${formatIssueKey(projectKey, c.issue_number)}`}
                     target="_blank"
+                    rel="noreferrer"
                     className="font-mono text-primary hover:underline"
                   >
                     {formatIssueKey(projectKey, c.issue_number)}
@@ -209,6 +215,7 @@ export function NewIssueForm({
             </ul>
           </div>
         )}
+        {duplicateSearchError ? <p role="status" className="text-xs text-muted-foreground">Duplicate suggestions are temporarily unavailable. You can still create this issue.</p> : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-2">

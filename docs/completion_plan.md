@@ -406,7 +406,7 @@ A clean clone can run all non-secret test layers. Critical security denials and 
 
 ## Phase 15 — Hosted validation and documentation closure
 
-Status: in progress on 2026-08-29. The target Supabase project was audited before mutation, migrations 044–074 were applied, historical drift and later contract/security findings were repaired only with forward migrations, linked SQL lint reports zero errors, and linked database types were regenerated. Local source gates pass. Docker-backed pgTAP/concurrency execution, Auth/provider URLs, Vercel/GitHub secrets, and the complete hosted multi-user/browser flow remain external; no GitHub environment file is required by the committed test suite.
+Status: in progress on 2026-08-29. The target Supabase project was audited before mutation, migrations 044–078 were applied, historical drift and later contract/security findings were repaired only with forward migrations, linked SQL lint reports zero errors, the final dry-run is up to date, and linked database types were regenerated. Local source gates pass. Docker-backed pgTAP/concurrency execution, Auth/provider URLs, Vercel/GitHub secrets, and the complete hosted multi-user/browser flow remain external; no GitHub environment file is required by the committed test suite.
 
 ### Work
 

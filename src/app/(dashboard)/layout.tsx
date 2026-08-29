@@ -31,6 +31,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         projects={context.projects}
         activeOrganizationId={context.activeOrganization.id}
         activeProjectId={context.activeProject?.id ?? null}
+        canCreateIssue={context.activeProjectRole === "REPORTER" || context.activeProjectRole === "DEVELOPER" || context.activeProjectRole === "MAINTAINER"}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <AppHeader
@@ -44,6 +45,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           projects={context.projects}
           activeOrganizationId={context.activeOrganization.id}
           activeProjectId={context.activeProject?.id ?? null}
+          activeProjectRole={context.activeProjectRole}
         />
         <div className="flex-1">{children}</div>
       </div>

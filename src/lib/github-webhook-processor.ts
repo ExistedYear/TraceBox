@@ -363,9 +363,19 @@ function operationalFailureCategory(kind: ReturnType<typeof classifyGithubApiErr
 export async function processGithubWebhookDelivery(deliveryId: string) {
   const admin = createAdminClient() as any;
   const { data: claimed, error: claimError } = await admin.rpc("claim_github_webhook_delivery", { p_delivery_id: deliveryId, p_lease_seconds: 300 });
-  if (claimError || !claimed) return false;
+  if (claimError) {
+    console.error("GitHub webhook claim failed", { deliveryId, code: claimError.code, message: claimError.message });
+    return false;
+  }
+  if (!claimed) return false;
   const { data: delivery, error: deliveryError } = await admin.from("github_webhook_deliveries").select("delivery_id, event_name, action, payload, attempt_count").eq("delivery_id", deliveryId).maybeSingle();
-  if (deliveryError || !delivery) return false;
+  if (deliveryError || !delivery) {
+    console.error("GitHub webhook claimed delivery load failed", { deliveryId, code: deliveryError?.code, message: deliveryError?.message });
+    const retryAt = new Date(Date.now() + retryDelay(1) * 1000).toISOString();
+    const { error: releaseError } = await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "FAILED", p_error: "Delivery could not be loaded; TraceBox will retry.", p_retry_at: retryAt, p_failure_category: "PROCESSING" });
+    if (releaseError) console.error("GitHub webhook failed claim release failed", { deliveryId, code: releaseError.code, message: releaseError.message });
+    return false;
+  }
   try {
     const result = await processGithubWebhookPayload(admin, delivery.payload ?? {}, delivery.event_name, delivery.action, deliveryId);
     const { error } = await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "PROCESSED", p_error: null, p_retry_at: null });
@@ -379,7 +389,8 @@ export async function processGithubWebhookDelivery(deliveryId: string) {
     if (Number.isSafeInteger(installationId) && installationId > 0 && ["AUTH_REVOKED", "PERMISSION_MISSING"].includes(kind)) invalidateGithubInstallationToken(installationId);
     const retryAt = attempt >= MAX_GITHUB_WEBHOOK_ATTEMPTS ? null : new Date(Date.now() + retryDelay(attempt) * 1000).toISOString();
     console.error("GitHub webhook processing failed", { deliveryId, event: delivery.event_name, error: error instanceof Error ? error.message : "unknown" });
-    await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "FAILED", p_error: "Processing failed; TraceBox will retry.", p_retry_at: retryAt, p_failure_category: operationalFailureCategory(kind) });
+    const { error: markError } = await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "FAILED", p_error: "Processing failed; TraceBox will retry.", p_retry_at: retryAt, p_failure_category: operationalFailureCategory(kind) });
+    if (markError) console.error("GitHub webhook failure persistence failed", { deliveryId, code: markError.code, message: markError.message });
     return false;
   }
 }

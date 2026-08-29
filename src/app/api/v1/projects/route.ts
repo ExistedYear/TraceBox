@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Could not load projects." }, { status: 500 });
   const projects = data ?? [];
-  const accessible = await getApiAccessibleProjectIds(auth.client, auth.context, projects.map((project) => project.id));
+  let accessible: Set<string>;
+  try {
+    accessible = await getApiAccessibleProjectIds(auth.client, auth.context, projects.map((project) => project.id));
+  } catch {
+    return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
+  }
   return NextResponse.json({ data: projects.filter((project) => accessible.has(project.id)) });
 }

@@ -21,5 +21,5 @@ export async function GET(request: NextRequest) {
     synced += result.synced;
     failed += result.failed;
   }
-  return NextResponse.json({ success: true, installations: installations?.length ?? 0, synced, failed, webhookReplay, payloadsCleared: Number(payloadsCleared ?? 0) });
+  return NextResponse.json({ success: failed === 0 && !cleanupError, installations: installations?.length ?? 0, synced, failed, webhookReplay, payloadsCleared: Number(payloadsCleared ?? 0), cleanupFailed: Boolean(cleanupError) });
 }

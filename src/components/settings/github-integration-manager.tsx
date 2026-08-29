@@ -201,8 +201,10 @@ export function GithubIntegrationManager({ projectId, canManage, initialLegacyRe
     try {
       const response = await fetch("/api/github/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project_id: projectId }) });
       if (!response.ok) throw new Error("Could not refresh GitHub repositories.");
+      const result = await response.json() as { success?: boolean; synced?: number; failed?: number };
       await reload();
-      toast.success("GitHub repositories synced.");
+      if ((result.failed ?? 0) > 0 || result.success === false) toast.warning(`GitHub sync completed with ${result.failed ?? 1} failed operation${(result.failed ?? 1) === 1 ? "" : "s"}. Review the attention queue.`);
+      else toast.success("GitHub repositories synced.");
     } catch { toast.error("Could not sync GitHub repositories."); } finally { setBusy(null); }
   }
 

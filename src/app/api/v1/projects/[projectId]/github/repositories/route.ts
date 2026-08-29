@@ -13,10 +13,14 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
   if (!UUID_RE.test(projectId)) return NextResponse.json({ error: "Invalid project ID." }, { status: 400 });
 
   const db = auth.client;
-  const { data: project } = await db.from("projects").select("id, organization_id").eq("id", projectId).eq("is_archived", false).maybeSingle();
+  const { data: project, error: projectError } = await db.from("projects").select("id, organization_id").eq("id", projectId).eq("organization_id", auth.context.organizationId).eq("is_archived", false).maybeSingle();
+  if (projectError) return NextResponse.json({ error: "Could not load the project." }, { status: 500 });
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
-  if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
-  if (!await canApiAccessProject(db, auth.context, project.id)) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  try {
+    if (!await canApiAccessProject(db, auth.context, project.id)) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  } catch {
+    return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
+  }
 
   const { data: installations, error: installationError } = await db
     .from("github_installations")

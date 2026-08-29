@@ -32,7 +32,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { projectSchema, type ProjectValues } from "@/lib/validation/workspace";
 
-export type WorkspaceSummary = { id: string; name: string; slug: string };
+export type WorkspaceSummary = { id: string; name: string; slug: string; role?: string };
 export type ProjectSummary = { id: string; key: string; name: string };
 
 type WorkspaceSwitcherProps = {
@@ -57,6 +57,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
   const router = useRouter();
   const activeOrganization = organizations.find((organization) => organization.id === activeOrganizationId);
   const activeProject = projects.find((project) => project.id === activeProjectId);
+  const canCreateProject = activeOrganization?.role === "OWNER" || activeOrganization?.role === "ADMIN";
   const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   return (
@@ -111,13 +112,12 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
               {project.id === activeProjectId && <Check className="h-3.5 w-3.5 text-primary" />}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setNewProjectOpen(true)}><Plus className="mr-2 h-4 w-4" />New project</DropdownMenuItem>
+          {canCreateProject ? <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => setNewProjectOpen(true)}><Plus className="mr-2 h-4 w-4" />New project</DropdownMenuItem></> : null}
         </DropdownMenuContent>
       </DropdownMenu>
       </div>
 
-      <NewProjectDialog
+      {canCreateProject ? <NewProjectDialog
         open={newProjectOpen}
         onOpenChange={setNewProjectOpen}
         organizationId={activeOrganizationId}
@@ -126,7 +126,7 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
           router.push("/dashboard/issues");
           router.refresh();
         }}
-      />
+      /> : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { classifyGithubApiError, createGithubInstallationToken, invalidateGithubInstallationToken, listGithubPullRequests, GithubApiError } from "@/lib/github-app";
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,21 +16,31 @@ export async function GET(request: NextRequest) {
   if (!projectId || !UUID_RE.test(projectId) || !repositoryId || !UUID_RE.test(repositoryId)) return NextResponse.json({ error: "Valid project_id and repository_id are required." }, { status: 400 });
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError && !isMissingAuthSession(userError)) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  const { data: project } = await supabase.from("projects").select("id, is_archived").eq("id", projectId).maybeSingle();
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: projectId });
+  const [{ data: project, error: projectError }, { data: role, error: roleError }] = await Promise.all([
+    supabase.from("projects").select("id, is_archived").eq("id", projectId).maybeSingle(),
+    supabase.rpc("project_role", { p_project_id: projectId }),
+  ]);
+  if (projectError || roleError) {
+    console.error("GitHub pull request authorization lookup failed", { projectCode: projectError?.code, roleCode: roleError?.code, projectId });
+    return NextResponse.json({ error: "Could not verify GitHub access." }, { status: 500 });
+  }
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot use GitHub." }, { status: 409 });
   if (role !== "VIEWER" && role !== "REPORTER" && role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "You do not have access to this project." }, { status: 403 });
 
   const db = supabase as any;
-  const { data: binding } = await db.from("project_github_repositories").select("github_repository_id").eq("project_id", projectId).eq("github_repository_id", repositoryId).maybeSingle();
+  const { data: binding, error: bindingError } = await db.from("project_github_repositories").select("github_repository_id").eq("project_id", projectId).eq("github_repository_id", repositoryId).maybeSingle();
+  if (bindingError) return NextResponse.json({ error: "Could not load the repository binding." }, { status: 500 });
   if (!binding) return NextResponse.json({ error: "That repository is not bound to this project." }, { status: 403 });
-  const { data: repository } = await db.from("github_repositories").select("id, installation_id, full_name, is_accessible, archived").eq("id", repositoryId).maybeSingle();
+  const { data: repository, error: repositoryError } = await db.from("github_repositories").select("id, installation_id, full_name, is_accessible, archived").eq("id", repositoryId).maybeSingle();
+  if (repositoryError) return NextResponse.json({ error: "Could not load the GitHub repository." }, { status: 500 });
   if (!repository) return NextResponse.json({ error: "Repository not found." }, { status: 404 });
   if (!repository.is_accessible || repository.archived) return NextResponse.json({ error: "That repository is unavailable to the GitHub App." }, { status: 409 });
-  const { data: installation } = await db.from("github_installations").select("github_installation_id, status").eq("id", repository.installation_id).maybeSingle();
+  const { data: installation, error: installationError } = await db.from("github_installations").select("github_installation_id, status").eq("id", repository.installation_id).maybeSingle();
+  if (installationError) return NextResponse.json({ error: "Could not load the GitHub installation." }, { status: 500 });
   if (!installation || installation.status !== "ACTIVE") return NextResponse.json({ error: "The GitHub installation needs attention before pull requests can be loaded." }, { status: 409 });
 
   const [owner, name] = repository.full_name.split("/");

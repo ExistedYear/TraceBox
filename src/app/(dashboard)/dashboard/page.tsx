@@ -94,6 +94,8 @@ export default async function DashboardPage() {
       projects={context.projects}
       metrics={metrics}
       recentIssues={recentIssues}
+      canCreateIssue={context.activeProjectRole === "REPORTER" || context.activeProjectRole === "DEVELOPER" || context.activeProjectRole === "MAINTAINER"}
+      canCreateProject={context.activeOrganization.role === "OWNER" || context.activeOrganization.role === "ADMIN"}
     />
   );
 }

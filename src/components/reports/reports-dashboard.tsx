@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, BarChart3, CheckCircle2, Clock, Download, RefreshCw, TrendingUp } from "lucide-react";
 
@@ -45,16 +45,23 @@ export function ReportsDashboard({ projectName, projectKey, projectId, initialMe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
+  const mounted = useRef(false);
 
   useEffect(() => {
     const days = ranges.find((range) => range.value === timeRange)?.days ?? 30;
-    if (days === initial.window_days && retryNonce === 0) return;
+    if (!mounted.current) { mounted.current = true; return; }
     let active = true;
-    void createClient().rpc("get_issue_reports", { p_project_id: projectId, p_window_days: days }).then(({ data, error: rpcError }) => {
-      if (!active) return;
-      if (rpcError || !data) setError(true); else setMetrics(normalizeReportMetrics(data));
-      setLoading(false);
-    });
+    void (async () => {
+      try {
+        const { data, error: rpcError } = await createClient().rpc("get_issue_reports", { p_project_id: projectId, p_window_days: days });
+        if (!active) return;
+        if (rpcError || !data) setError(true); else setMetrics(normalizeReportMetrics(data));
+      } catch {
+        if (active) setError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
     return () => { active = false; };
   }, [initial, initial.window_days, projectId, retryNonce, timeRange]);
 

@@ -2139,9 +2139,38 @@ export type Database = {
         Args: { p_payload: Json; p_token_hash: string }
         Returns: number
       }
+      api_list_issues: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_priority?: string
+          p_project_id: string
+          p_status_id?: string
+          p_token_hash: string
+          p_type?: string
+        }
+        Returns: Json
+      }
       api_remove_github_link: {
         Args: { p_link_id: string; p_token_hash: string }
         Returns: undefined
+      }
+      api_search_issues: {
+        Args: {
+          p_limit?: number
+          p_project_id: string
+          p_query: string
+          p_token_hash: string
+        }
+        Returns: Json
+      }
+      api_token_can_access_project: {
+        Args: {
+          p_organization_id: string
+          p_project_id: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       api_update_issue: {
         Args: { p_issue_id: string; p_token_hash: string; p_updates: Json }
@@ -2196,7 +2225,20 @@ export type Database = {
         Args: { p_issue_id: string; p_to_state_id: string }
         Returns: boolean
       }
+      can_view_github_catalog: {
+        Args: { p_organization_id: string }
+        Returns: boolean
+      }
+      can_view_github_installation: {
+        Args: { p_installation_id: string }
+        Returns: boolean
+      }
+      can_view_github_repository: {
+        Args: { p_repository_id: string }
+        Returns: boolean
+      }
       can_view_issue: { Args: { p_issue_id: string }; Returns: boolean }
+      can_view_profile: { Args: { p_user_id: string }; Returns: boolean }
       claim_github_webhook_delivery: {
         Args: { p_delivery_id: string; p_lease_seconds?: number }
         Returns: boolean

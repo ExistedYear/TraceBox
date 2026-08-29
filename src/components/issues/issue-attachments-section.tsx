@@ -134,20 +134,30 @@ export function IssueAttachmentsSection({
     let uploaded = 0;
     try {
       const supabase = createClient();
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = session.session?.access_token;
+      if (sessionError || !accessToken) throw new Error("Attachment session unavailable");
       for (const task of tasks) {
         const file = task.file;
         const extension = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
         const storagePath = `${issueId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}${extension}`;
-        const { data: session } = await supabase.auth.getSession();
         const controller = new AbortController();
         uploadControllers.current.set(task.id, controller);
-        try { await uploadObject(storagePath, file, session.session?.access_token ?? "", (progress) => setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, progress } : item)), controller.signal); }
+        try { await uploadObject(storagePath, file, accessToken, (progress) => setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, progress } : item)), controller.signal); }
         catch (error) { setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, status: "failed", error: error instanceof DOMException ? "Cancelled" : "Upload failed" } : item)); continue; }
         finally { uploadControllers.current.delete(task.id); }
-        const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", { p_issue_id: issueId, p_filename: file.name, p_storage_path: storagePath, p_mime_type: file.type, p_size_bytes: file.size });
-        if (rpcError) { await supabase.storage.from("issue-attachments").remove([storagePath]); setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, status: "failed", error: "Could not register" } : item)); continue; }
+        let attachmentId: string | null = null;
+        try {
+          const result = await supabase.rpc("add_attachment", { p_issue_id: issueId, p_filename: file.name, p_storage_path: storagePath, p_mime_type: file.type, p_size_bytes: file.size });
+          if (result.error || !result.data) throw result.error ?? new Error("Attachment registration returned no ID");
+          attachmentId = String(result.data);
+        } catch {
+          try { await supabase.storage.from("issue-attachments").remove([storagePath]); } catch { /* The reconciliation job removes unregistered objects. */ }
+          setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, status: "failed", error: "Could not register" } : item));
+          continue;
+        }
         setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, progress: 100, status: "done" } : item));
-        setAttachments((previous) => [...previous, { id: String(attachmentId), issue_id: issueId, uploader_id: currentUserId, filename: file.name, storage_path: storagePath, mime_type: file.type || null, size_bytes: file.size, created_at: new Date().toISOString() }]);
+        setAttachments((previous) => [...previous, { id: attachmentId, issue_id: issueId, uploader_id: currentUserId, filename: file.name, storage_path: storagePath, mime_type: file.type || null, size_bytes: file.size, created_at: new Date().toISOString() }]);
         uploaded++;
       }
       if (uploaded) toast.success(`${uploaded} attachment${uploaded === 1 ? "" : "s"} uploaded.`);
@@ -180,14 +190,13 @@ export function IssueAttachmentsSection({
   const handlePreviewImage = async (attachment: AttachmentItem) => {
     try {
       const supabase = createClient();
-      const { data } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from("issue-attachments")
         .createSignedUrl(attachment.storage_path, 300);
 
-      if (data?.signedUrl) {
-        setPreviewUrl(data.signedUrl);
-        setPreviewTitle(attachment.filename);
-      }
+      if (error || !data?.signedUrl) { toast.error("Could not preview image."); return; }
+      setPreviewUrl(data.signedUrl);
+      setPreviewTitle(attachment.filename);
     } catch {
       toast.error("Could not preview image.");
     }

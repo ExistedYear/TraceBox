@@ -290,6 +290,7 @@ export function ProjectSettings({
         toast.success("Label updated.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     } else {
       try {
@@ -308,6 +309,7 @@ export function ProjectSettings({
         toast.success("Label created.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     }
     setLabelModalOpen(false);
@@ -368,6 +370,7 @@ export function ProjectSettings({
         toast.success("Version updated.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     } else {
       try {
@@ -387,6 +390,7 @@ export function ProjectSettings({
         toast.success("Version created.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     }
     setVersionModalOpen(false);
@@ -452,6 +456,7 @@ export function ProjectSettings({
         toast.success("Milestone updated.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     } else {
       try {
@@ -471,6 +476,7 @@ export function ProjectSettings({
         toast.success("Milestone created.");
       } catch {
         toast.error("Could not reach the server.");
+        return;
       }
     }
     setMilestoneModalOpen(false);

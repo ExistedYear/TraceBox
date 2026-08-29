@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { authenticateApiRequest } from "@/lib/api-auth";
+import { authenticateApiRequest, getApiMutationErrorStatus } from "@/lib/api-auth";
 import { findApiIssue } from "@/lib/api-github-issue";
 import { GITHUB_LINK_TYPES, GithubLinkValidationError, validateGithubLink } from "@/lib/github-link-validation";
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     });
     if (error || !id) {
       console.error("GitHub API link creation failed", { code: error?.code, message: error?.message });
-      return NextResponse.json({ error: "Could not add GitHub link." }, { status: 400 });
+      return NextResponse.json({ error: "Could not add GitHub link." }, { status: error ? getApiMutationErrorStatus(error) : 500 });
     }
     return NextResponse.json({ data: { id, repo_name: verified.repoName, link_type: body.linkType, number: verified.number, url: verified.url, title: verified.title, status: verified.status } }, { status: 201 });
   } catch (error) {

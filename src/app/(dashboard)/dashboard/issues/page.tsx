@@ -91,7 +91,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
         </div>
         <div className="flex items-center gap-2">
           <Button asChild size="sm" variant="outline" className="h-8 gap-1.5 text-xs"><Link href="/dashboard/settings/contributors"><Users className="h-3.5 w-3.5" /> Contributors</Link></Button>
-          <Button asChild size="sm" className="gap-2"><Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link></Button>
+          {role === "REPORTER" || role === "DEVELOPER" || role === "MAINTAINER" ? <Button asChild size="sm" className="gap-2"><Link href="/dashboard/issues/new"><Plus className="h-3.5 w-3.5" /> New issue</Link></Button> : null}
         </div>
       </div>
 

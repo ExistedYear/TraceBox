@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { classifyGithubApiError, createGithubInstallationToken, getGithubPullRequest, getGithubPullRequestChecks, invalidateGithubInstallationToken, GithubApiError, summarizeGithubChecks } from "@/lib/github-app";
 import { createAdminClient } from "@/lib/api-auth";
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,18 +19,29 @@ export async function POST(request: NextRequest) {
   if (!UUID_RE.test(issueId) || !UUID_RE.test(projectId) || !UUID_RE.test(repositoryId) || !Number.isSafeInteger(number) || number < 1 || !RELATIONSHIPS.has(relationship)) return NextResponse.json({ error: "Issue, project, repository, number, and relationship are required." }, { status: 400 });
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError && !isMissingAuthSession(userError)) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  const { data: issue } = await supabase.from("issues").select("id, project_id").eq("id", issueId).eq("project_id", projectId).maybeSingle();
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: projectId });
+  const [{ data: issue, error: issueError }, { data: role, error: roleError }] = await Promise.all([
+    supabase.from("issues").select("id, project_id").eq("id", issueId).eq("project_id", projectId).maybeSingle(),
+    supabase.rpc("project_role", { p_project_id: projectId }),
+  ]);
+  if (issueError || roleError) {
+    console.error("GitHub PR link authorization lookup failed", { issueCode: issueError?.code, roleCode: roleError?.code, issueId, projectId });
+    return NextResponse.json({ error: "Could not verify GitHub access." }, { status: 500 });
+  }
   if (!issue) return NextResponse.json({ error: "Issue not found." }, { status: 404 });
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can link pull requests." }, { status: 403 });
   const db = supabase as any;
-  const { data: binding } = await db.from("project_github_repositories").select("github_repository_id").eq("project_id", projectId).eq("github_repository_id", repositoryId).maybeSingle();
-  const { data: repository } = await db.from("github_repositories").select("id, installation_id, full_name, is_accessible, archived").eq("id", repositoryId).maybeSingle();
+  const [{ data: binding, error: bindingError }, { data: repository, error: repositoryError }] = await Promise.all([
+    db.from("project_github_repositories").select("github_repository_id").eq("project_id", projectId).eq("github_repository_id", repositoryId).maybeSingle(),
+    db.from("github_repositories").select("id, installation_id, full_name, is_accessible, archived").eq("id", repositoryId).maybeSingle(),
+  ]);
+  if (bindingError || repositoryError) return NextResponse.json({ error: "Could not load the GitHub repository binding." }, { status: 500 });
   if (!binding || !repository) return NextResponse.json({ error: "That repository is not bound to this project." }, { status: 403 });
   if (!repository.is_accessible || repository.archived) return NextResponse.json({ error: "That repository is unavailable to the GitHub App." }, { status: 409 });
-  const { data: installation } = await db.from("github_installations").select("github_installation_id, status").eq("id", repository.installation_id).maybeSingle();
+  const { data: installation, error: installationError } = await db.from("github_installations").select("github_installation_id, status").eq("id", repository.installation_id).maybeSingle();
+  if (installationError) return NextResponse.json({ error: "Could not load the GitHub installation." }, { status: 500 });
   if (!installation || installation.status !== "ACTIVE") return NextResponse.json({ error: "The GitHub installation needs attention before it can be used." }, { status: 409 });
   const [owner, name] = repository.full_name.split("/");
   if (!owner || !name) return NextResponse.json({ error: "Repository metadata is invalid." }, { status: 502 });
@@ -73,7 +85,13 @@ export async function POST(request: NextRequest) {
       console.error("GitHub PR checks fetch failed", { repositoryId, number, kind });
     }
     const admin = createAdminClient() as any;
-    if (checks) await admin.rpc("upsert_github_pr_check_summary", { p_github_artifact_id: artifactId, p_state: checks.state, p_total_count: checks.totalCount, p_completed_count: checks.completedCount, p_successful_count: checks.successfulCount, p_failed_count: checks.failedCount, p_pending_count: checks.pendingCount, p_checks: checks.checks, p_error: null });
+    if (checks) {
+      const { error: checksError } = await admin.rpc("upsert_github_pr_check_summary", { p_github_artifact_id: artifactId, p_state: checks.state, p_total_count: checks.totalCount, p_completed_count: checks.completedCount, p_successful_count: checks.successfulCount, p_failed_count: checks.failedCount, p_pending_count: checks.pendingCount, p_checks: checks.checks, p_error: checks.state === "UNKNOWN" ? "Could not load GitHub checks." : null });
+      if (checksError) {
+        console.error("GitHub PR check summary persistence failed", { code: checksError.code, message: checksError.message, artifactId });
+        return NextResponse.json({ error: "Could not save the pull request check summary." }, { status: 500 });
+      }
+    }
     const { data: linkId, error: linkError } = await admin.rpc("link_github_artifact", { p_issue_id: issueId, p_github_artifact_id: artifactId, p_relationship: relationship, p_source: "MANUAL" });
     if (linkError || !linkId) {
       console.error("GitHub PR link failed", { code: linkError?.code, message: linkError?.message, issueId, artifactId });

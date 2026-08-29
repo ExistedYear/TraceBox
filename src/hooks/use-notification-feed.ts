@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   notificationPageFromRows,
@@ -27,22 +27,37 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState(false);
   const [realtimeError, setRealtimeError] = useState(false);
+  const requestSequence = useRef(0);
+  const countSequence = useRef(0);
 
   const refreshCount = useCallback(async () => {
-    const { data, error: countError } = await createClient().rpc("get_unread_notifications_count");
-    if (countError || typeof data !== "number") {
-      console.error("Unread notification count failed", countError ?? { message: "invalid response" });
-      return;
+    const sequence = ++countSequence.current;
+    try {
+      const { data, error: countError } = await createClient().rpc("get_unread_notifications_count");
+      if (sequence !== countSequence.current) return;
+      if (countError || typeof data !== "number") {
+        console.error("Unread notification count failed", countError ?? { message: "invalid response" });
+        return;
+      }
+      setUnreadCount(data);
+    } catch (error) {
+      if (sequence === countSequence.current) console.error("Unread notification count request failed", error);
     }
-    setUnreadCount(data);
   }, []);
 
   const fetchPage = useCallback(async (nextCursor: NotificationCursor | null, append: boolean) => {
-    if (append) setLoadingMore(true);
+    const sequence = ++requestSequence.current;
+    if (append) {
+      setLoadingMore(true);
+      setLoadMoreError(false);
+    }
     else {
       setLoading(true);
+      setLoadingMore(false);
       setError(null);
+      setLoadMoreError(false);
     }
     try {
       const supabase = createClient();
@@ -56,9 +71,11 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
         }),
       ]);
       if (authError || !authData.user) throw authError ?? new Error("Notification user unavailable");
+      if (sequence !== requestSequence.current) return;
       setUserId(authData.user.id);
       if (pageError) throw pageError;
       const page = notificationPageFromRows((data ?? []) as unknown as Array<Record<string, unknown>>);
+      if (sequence !== requestSequence.current) return;
       setItems((previous) => append
         ? [...previous, ...page.items.filter((item) => !previous.some((old) => old.id === item.id))]
         : page.items);
@@ -66,9 +83,12 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
       setHasMore(page.hasMore);
       setError(null);
     } catch (cause) {
+      if (sequence !== requestSequence.current) return;
       console.error("Notification feed load failed", cause);
-      if (!append) setError("Notifications are unavailable right now.");
+      if (append) setLoadMoreError(true);
+      else setError("Notifications are unavailable right now.");
     } finally {
+      if (sequence !== requestSequence.current) return;
       // Keep the badge exact even when history is temporarily unavailable.
       await refreshCount();
       if (append) setLoadingMore(false);
@@ -81,6 +101,10 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
     setCursor(null);
     setHasMore(false);
     void fetchPage(null, false);
+    return () => {
+      requestSequence.current += 1;
+      countSequence.current += 1;
+    };
   }, [fetchPage]);
 
   const refresh = useCallback(() => fetchPage(null, false), [fetchPage]);
@@ -122,6 +146,7 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
     realtimeError,
     refresh,
     loadMore: () => cursor ? fetchPage(cursor, true) : undefined,
+    loadMoreError,
     markRead,
     markAllRead,
   };

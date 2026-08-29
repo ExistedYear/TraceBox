@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 async function getAuthenticatedClient() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user ? supabase : null;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error && !isMissingAuthSession(error)) {
+    console.error("GitHub repository binding authentication lookup failed", { code: error.code, message: error.message });
+    return { supabase: null, authFailed: true };
+  }
+  return { supabase: user ? supabase : null, authFailed: false };
 }
 
 async function readBody(request: NextRequest, requireAutomation = false) {
@@ -25,11 +30,13 @@ async function readBody(request: NextRequest, requireAutomation = false) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await getAuthenticatedClient();
+  const { supabase, authFailed } = await getAuthenticatedClient();
+  if (authFailed) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!supabase) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid GitHub repository binding." }, { status: 400 });
-  const { data: role } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  const { data: role, error: roleError } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  if (roleError) return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
   if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can manage repository bindings." }, { status: 403 });
   const { error } = await (supabase as any).rpc("bind_github_repository", {
     p_project_id: body.projectId,
@@ -46,11 +53,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await getAuthenticatedClient();
+  const { supabase, authFailed } = await getAuthenticatedClient();
+  if (authFailed) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!supabase) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Invalid GitHub repository binding." }, { status: 400 });
-  const { data: role } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  const { data: role, error: roleError } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  if (roleError) return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
   if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can manage repository bindings." }, { status: 403 });
   const { error } = await (supabase as any).rpc("unbind_github_repository", { p_project_id: body.projectId, p_github_repository_id: body.repositoryId });
   if (error) {
@@ -61,11 +70,13 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const supabase = await getAuthenticatedClient();
+  const { supabase, authFailed } = await getAuthenticatedClient();
+  if (authFailed) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!supabase) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   const body = await readBody(request, true);
   if (!body) return NextResponse.json({ error: "Invalid GitHub automation settings." }, { status: 400 });
-  const { data: role } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  const { data: role, error: roleError } = await (supabase as any).rpc("project_role", { p_project_id: body.projectId });
+  if (roleError) return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
   if (role !== "MAINTAINER") return NextResponse.json({ error: "Only Maintainers can manage repository bindings." }, { status: 403 });
 
   const { data: binding, error: bindingError } = await (supabase as any)

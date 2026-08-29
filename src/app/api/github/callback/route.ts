@@ -37,8 +37,14 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || user.id !== statePayload.userId) return redirectToSettings(request, "error");
 
-    const { data: project } = await supabase.from("projects").select("id, organization_id, is_archived").eq("id", statePayload.projectId).eq("organization_id", statePayload.organizationId).maybeSingle();
-    const { data: role } = await supabase.rpc("project_role", { p_project_id: statePayload.projectId });
+    const [{ data: project, error: projectError }, { data: role, error: roleError }] = await Promise.all([
+      supabase.from("projects").select("id, organization_id, is_archived").eq("id", statePayload.projectId).eq("organization_id", statePayload.organizationId).maybeSingle(),
+      supabase.rpc("project_role", { p_project_id: statePayload.projectId }),
+    ]);
+    if (projectError || roleError) {
+      console.error("GitHub callback authorization lookup failed", { projectCode: projectError?.code, roleCode: roleError?.code, projectId: statePayload.projectId });
+      return redirectToSettings(request, "error");
+    }
     if (!project || project.is_archived || role !== "MAINTAINER") return redirectToSettings(request, "error");
 
     // GitHub setup parameters are untrusted. The user access token proves that

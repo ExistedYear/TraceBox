@@ -243,7 +243,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             isMaintainerOrDev={canEditAnyComment}
             initialAttachments={attachmentRows ?? []}
           />
-          <IssueCustomFieldsSection key={`custom-${issue.id}`}
+          <IssueCustomFieldsSection key={`custom-${issue.id}-${issue.updated_at}`}
             issueId={issue.id}
             fields={(customFieldRows ?? []) as any}
             initialValues={(customValueRows ?? []) as any}
@@ -283,7 +283,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
 
           <Surface className="p-4">
             <h2 className="mb-3 text-sm font-semibold">Planning & labels</h2>
-            <IssuePlanningSection key={`planning-${issue.id}`}
+            <IssuePlanningSection key={`planning-${issue.id}-${issue.updated_at}`}
               issueId={issue.id}
               canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
               assignedLabelIds={(assignedLabelRows ?? []).map((r) => r.label_id)}
@@ -303,7 +303,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
               initialLinks={(githubLinkRows ?? []) as any}
             />
           </Surface>
-          <IssueSecuritySection key={`security-${issue.id}`}
+          <IssueSecuritySection key={`security-${issue.id}-${issue.updated_at}`}
             issueId={issue.id}
             canEdit={canEditIssue}
             initialVisibility={issue.visibility}

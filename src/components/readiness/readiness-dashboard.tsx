@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserX,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,7 @@ export function ReadinessDashboard({
       });
       if (!historyError && rows) {
         setHistory(rows.map((row) => ({ id: row.id, milestoneId: row.milestone_id, versionId: row.version_id, score: row.score, status: row.status, breakdown: (row.breakdown ?? {}) as Record<string, unknown>, createdAt: row.created_at })));
+        toast.success("Readiness snapshot saved.");
       } else {
         setHistory((current) => [{ id: data, milestoneId: selectedMilestoneId === "all" ? null : selectedMilestoneId, versionId: selectedVersionId === "all" ? null : selectedVersionId, score: displayedAnalysis.score, status: displayedAnalysis.status, breakdown: { total: displayedAnalysis.total, score: displayedAnalysis.score, status: displayedAnalysis.status }, createdAt: new Date().toISOString() }, ...current]);
         setQueryError("Snapshot saved, but history could not be refreshed.");

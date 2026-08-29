@@ -36,12 +36,17 @@ function formatDate(iso: string) {
 }
 
 async function loadCommentMentions(commentId: string): Promise<CommentMention[]> {
-  const { data, error } = await createClient().from("comment_mentions").select("comment_id, user_id, display_label, mention_token").eq("comment_id", commentId);
-  if (error) {
-    console.error("Comment mention lookup failed:", error);
+  try {
+    const { data, error } = await createClient().from("comment_mentions").select("comment_id, user_id, display_label, mention_token").eq("comment_id", commentId);
+    if (error) {
+      console.error("Comment mention lookup failed:", error);
+      return [];
+    }
+    return data as CommentMention[];
+  } catch (error) {
+    console.error("Comment mention request failed:", error);
     return [];
   }
-  return data as CommentMention[];
 }
 
 function CommentBody({ body, mentions }: { body: string; mentions?: readonly CommentMention[] }) {

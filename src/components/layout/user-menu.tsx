@@ -24,7 +24,14 @@ export function UserMenu({ email, displayName, avatarUrl }: UserMenuProps) {
 
   async function signOut() {
     setIsSigningOut(true);
-    const { error } = await createClient().auth.signOut();
+    let error;
+    try {
+      ({ error } = await createClient().auth.signOut());
+    } catch {
+      toast.error("We could not reach the server. Please try again.");
+      setIsSigningOut(false);
+      return;
+    }
     if (error) {
       toast.error("We could not log you out. Please try again.");
       setIsSigningOut(false);

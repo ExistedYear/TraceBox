@@ -69,6 +69,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
   const [targetDuplicateKey, setTargetDuplicateKey] = useState("");
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([]);
   const [findingDuplicates, setFindingDuplicates] = useState(false);
+  const [duplicateSearchError, setDuplicateSearchError] = useState(false);
   const activeIssue = issues[selectedIndex] ?? null;
 
   useEffect(() => {
@@ -78,10 +79,13 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
       setFindingDuplicates(true);
       void (async () => {
         try {
-          const { data } = await createClient().rpc("find_duplicate_candidates", { p_project_id: projectId, p_title: activeIssue.title, p_limit: 4 });
-          if (current) setDuplicateCandidates((data ?? []).filter((candidate) => candidate.issue_id !== activeIssue.id));
+          const { data, error } = await createClient().rpc("find_duplicate_candidates", { p_project_id: projectId, p_title: activeIssue.title, p_limit: 4 });
+          if (!current) return;
+          if (error) throw error;
+          setDuplicateSearchError(false);
+          setDuplicateCandidates((data ?? []).filter((candidate) => candidate.issue_id !== activeIssue.id));
         } catch {
-          if (current) setDuplicateCandidates([]);
+          if (current) { setDuplicateCandidates([]); setDuplicateSearchError(true); }
         } finally {
           if (current) setFindingDuplicates(false);
         }
@@ -184,7 +188,8 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
   };
 
   const handleAssign = async (assigneeId: string) => {
-    if (!canManage || !activeIssue) return;
+    if (!canManage || !activeIssue || loadingAction) return;
+    setLoadingAction("assign");
     try {
       const { error } = await createClient().rpc("assign_issue", { p_issue_id: activeIssue.id, p_assignee_id: assigneeId || undefined });
       if (error) {
@@ -196,7 +201,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
       toast.success(`Assigned to ${member?.displayName ?? "engineer"}.`);
     } catch {
       toast.error("Could not reach the server.");
-    }
+    } finally { setLoadingAction(null); }
   };
 
   useEffect(() => {
@@ -239,7 +244,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
         <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
           <Surface className="overflow-hidden"><div className="flex items-center justify-between border-b border-border/80 px-3.5 py-2.5"><span className="font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unreviewed Queue ({issues.length})</span><span className="font-mono text-[10px] text-amber-400">{selectedIndex + 1} of {issues.length}</span></div><div className="max-h-[calc(100vh-280px)] divide-y divide-border/60 overflow-y-auto">{issues.map((issue, index) => <button key={issue.id} type="button" onClick={() => setSelectedIndex(index)} className={cn("flex w-full flex-col gap-1 p-3 text-left", index === selectedIndex ? "border-l-2 border-primary bg-primary/10" : "hover:bg-muted/40")}><div className="flex items-center justify-between gap-2"><span className="font-mono text-xs font-semibold text-primary">{issue.keyLabel}</span><span className={cn("rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase", categoryClasses(issue.statusCategory))}>{issue.severity}</span></div><p className="truncate text-xs font-medium">{issue.title}</p><span className="font-mono text-[10px] text-muted-foreground/70">{issue.type} · {issue.componentName ?? "No component"}</span></button>)}</div></Surface>
 
-          {activeIssue && <div className="space-y-4"><Surface className="p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void transition(openStateId, undefined, "accept", `${activeIssue.keyLabel} accepted.`)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 bg-emerald-600 text-xs text-white"><CheckCircle2 className="h-3.5 w-3.5" />Accept (A)</Button><Button size="sm" variant="outline" onClick={() => setDuplicateModalOpen(true)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 text-xs text-amber-400"><Copy className="h-3.5 w-3.5" />Duplicate (D)</Button><Button size="sm" variant="ghost" onClick={() => void transition(closedStateId, "WONT_FIX", "reject", `${activeIssue.keyLabel} rejected.`)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Reject (R)</Button></div><div className="flex items-center gap-2"><select aria-label="Assign engineer" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.assigneeId ?? ""} onChange={(event) => void handleAssign(event.target.value)} disabled={!canManage}><option value="">Assign engineer...</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.userId.slice(0, 8)}</option>)}</select><Button asChild size="sm" variant="outline" className="h-8 gap-1 text-xs"><Link href={`/dashboard/issues/${activeIssue.keyLabel}`} target="_blank">Open <ExternalLink className="h-3 w-3" /></Link></Button></div></div></Surface>
+          {activeIssue && <div className="space-y-4"><Surface className="p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void transition(openStateId, undefined, "accept", `${activeIssue.keyLabel} accepted.`)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 bg-emerald-600 text-xs text-white"><CheckCircle2 className="h-3.5 w-3.5" />Accept (A)</Button><Button size="sm" variant="outline" onClick={() => setDuplicateModalOpen(true)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 text-xs text-amber-400"><Copy className="h-3.5 w-3.5" />Duplicate (D)</Button><Button size="sm" variant="ghost" onClick={() => void transition(closedStateId, "WONT_FIX", "reject", `${activeIssue.keyLabel} rejected.`)} disabled={!canManage || loadingAction !== null} className="h-8 gap-1.5 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Reject (R)</Button></div><div className="flex items-center gap-2"><select aria-label="Assign engineer" className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={activeIssue.assigneeId ?? ""} onChange={(event) => void handleAssign(event.target.value)} disabled={!canManage || loadingAction !== null}><option value="">Assign engineer...</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.userId.slice(0, 8)}</option>)}</select><Button asChild size="sm" variant="outline" className="h-8 gap-1 text-xs"><Link href={`/dashboard/issues/${activeIssue.keyLabel}`} target="_blank" rel="noreferrer">Open <ExternalLink className="h-3 w-3" /></Link></Button></div></div></Surface>
             <Surface className="p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Inline classification</p>
               <div className="grid gap-2 sm:grid-cols-4">
@@ -250,7 +255,7 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
               </div>
             </Surface>
 
-            {findingDuplicates ? <div className="flex items-center gap-2 rounded-lg border border-border/70 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />Scanning for similar issues...</div> : duplicateCandidates.length > 0 ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"><div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400"><AlertTriangle className="h-3.5 w-3.5" />Possible duplicates</div><div className="mt-2 grid gap-2 sm:grid-cols-2">{duplicateCandidates.map((candidate) => <div key={candidate.issue_id} className="flex items-center justify-between gap-2 rounded border border-amber-500/20 bg-background/80 p-2 text-xs"><div className="min-w-0"><span className="font-mono font-semibold text-primary">{formatIssueKey(projectKey, candidate.issue_number)}</span><p className="truncate text-muted-foreground">{candidate.title}</p></div><Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => void handleConfirmDuplicate(formatIssueKey(projectKey, candidate.issue_number))} disabled={!canManage}>Mark duplicate</Button></div>)}</div></div> : null}
+            {findingDuplicates ? <div className="flex items-center gap-2 rounded-lg border border-border/70 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />Scanning for similar issues...</div> : duplicateSearchError ? <div role="status" className="rounded-lg border border-border/70 p-3 text-xs text-muted-foreground">Duplicate suggestions are temporarily unavailable. Manual duplicate resolution still works.</div> : duplicateCandidates.length > 0 ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"><div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400"><AlertTriangle className="h-3.5 w-3.5" />Possible duplicates</div><div className="mt-2 grid gap-2 sm:grid-cols-2">{duplicateCandidates.map((candidate) => <div key={candidate.issue_id} className="flex items-center justify-between gap-2 rounded border border-amber-500/20 bg-background/80 p-2 text-xs"><div className="min-w-0"><span className="font-mono font-semibold text-primary">{formatIssueKey(projectKey, candidate.issue_number)}</span><p className="truncate text-muted-foreground">{candidate.title}</p></div><Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => void handleConfirmDuplicate(formatIssueKey(projectKey, candidate.issue_number))} disabled={!canManage}>Mark duplicate</Button></div>)}</div></div> : null}
 
             <Surface className="p-4 sm:p-5"><div className="mb-4 border-b border-border/70 pb-3"><span className="font-mono text-xs font-semibold text-primary">{activeIssue.keyLabel}</span><h2 className="text-lg font-semibold">{activeIssue.title}</h2><div className="mt-2 flex flex-wrap gap-2 font-mono text-[10px] text-muted-foreground"><span>{activeIssue.type}</span><span>{activeIssue.priority}</span><span>{activeIssue.severity}</span><span>{activeIssue.componentName ?? "No component"}</span></div></div><div className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-card/40 p-3 text-xs sm:grid-cols-4"><div><span className="text-muted-foreground">Reporter</span><p className="font-medium">{activeIssue.reporterLabel}</p></div><div><span className="text-muted-foreground">Assignee</span><p className="font-medium">{activeIssue.assigneeLabel}</p></div><div><span className="text-muted-foreground">Created</span><p className="font-medium">{new Date(activeIssue.createdAt).toLocaleDateString()}</p></div><div><span className="text-muted-foreground">Status</span><p className="font-medium">{activeIssue.statusName}</p></div></div><div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</h3><p className="mt-1 whitespace-pre-wrap rounded border border-border/60 bg-background/50 p-3 text-xs leading-relaxed">{activeIssue.description ?? "No description provided."}</p></div>{activeIssue.environment && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Environment</h3><p className="mt-1 font-mono text-xs text-muted-foreground">{activeIssue.environment}</p></div>}</Surface>
           </div>}

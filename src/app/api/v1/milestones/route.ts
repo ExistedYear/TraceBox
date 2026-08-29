@@ -9,9 +9,14 @@ export async function GET(request: NextRequest) {
   if ("response" in auth) return auth.response;
   const projectId = request.nextUrl.searchParams.get("project_id");
   if (!projectId || !UUID_RE.test(projectId)) return NextResponse.json({ error: "Valid project_id is required." }, { status: 400 });
-  const { data: project } = await auth.client.from("projects").select("id").eq("id", projectId).eq("organization_id", auth.context.organizationId).eq("is_archived", false).maybeSingle();
+  const { data: project, error: projectError } = await auth.client.from("projects").select("id").eq("id", projectId).eq("organization_id", auth.context.organizationId).eq("is_archived", false).maybeSingle();
+  if (projectError) return NextResponse.json({ error: "Could not load the project." }, { status: 500 });
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
-  if (!await canApiAccessProject(auth.client, auth.context, project.id)) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  try {
+    if (!await canApiAccessProject(auth.client, auth.context, project.id)) return NextResponse.json({ error: "Project not found." }, { status: 404 });
+  } catch {
+    return NextResponse.json({ error: "Could not verify project access." }, { status: 500 });
+  }
   const { data, error } = await auth.client.from("milestones").select("id, project_id, name, description, status, due_at, created_at, updated_at").eq("project_id", project.id).order("due_at");
   if (error) return NextResponse.json({ error: "Could not load milestones." }, { status: 500 });
   return NextResponse.json({ data: data ?? [] });

@@ -51,6 +51,8 @@ type DashboardOverviewProps = {
   projects: ProjectSummary[];
   metrics: OverviewMetrics;
   recentIssues: OverviewIssue[];
+  canCreateIssue: boolean;
+  canCreateProject: boolean;
 };
 
 function relativeTime(iso: string) {
@@ -71,6 +73,8 @@ export function DashboardOverview({
   projects,
   metrics,
   recentIssues,
+  canCreateIssue,
+  canCreateProject,
 }: DashboardOverviewProps) {
   const router = useRouter();
   function selectProjectAndOpen(projectId: string) {
@@ -103,15 +107,15 @@ export function DashboardOverview({
                   <CircleDot className="h-3.5 w-3.5" /> View issue queue
                 </Link>
               </Button>
-              <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
+              {canCreateIssue ? <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
                 <Link href="/dashboard/issues/new">
                   <Plus className="h-3.5 w-3.5" /> New issue
                 </Link>
-              </Button>
+              </Button> : null}
             </>
-          ) : (
+          ) : canCreateProject ? (
             <NewProjectButton organizationId={organizationId} />
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -122,10 +126,10 @@ export function DashboardOverview({
           </span>
           <h2 className="text-base font-semibold">No projects yet</h2>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Create your first project in {workspaceName} to start tracking issues, components, and workflows.
+            {canCreateProject ? `Create your first project in ${workspaceName} to start tracking issues, components, and workflows.` : `Ask a workspace administrator to create the first project in ${workspaceName}.`}
           </p>
           <div className="mt-5 flex justify-center">
-            <NewProjectButton organizationId={organizationId} />
+            {canCreateProject ? <NewProjectButton organizationId={organizationId} /> : null}
           </div>
         </Surface>
       ) : (

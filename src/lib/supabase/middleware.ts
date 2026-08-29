@@ -1,6 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import type { Database } from "@/types/database";
 
 export async function updateSession(request: NextRequest) {
@@ -23,9 +25,18 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: User | null = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error && !isMissingAuthSession(error)) {
+      console.error("Session refresh lookup failed", { code: error.code, message: error.message });
+      return response;
+    }
+    user = data.user;
+  } catch (error) {
+    console.error("Session refresh request failed", { error: error instanceof Error ? error.message : "unknown" });
+    return response;
+  }
   const pathname = request.nextUrl.pathname;
   const isProtectedRoute = pathname.startsWith("/dashboard") || pathname === "/onboarding";
   const isAuthRoute = pathname === "/login" || pathname === "/signup";

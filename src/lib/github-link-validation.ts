@@ -30,13 +30,16 @@ export async function validateGithubLink(db: SupabaseClient<Database>, input: { 
   const repositoryFullName = `${owner}/${repositoryName}`.toLowerCase();
   if (requestedRepository !== repositoryFullName) throw new GithubLinkValidationError("Repository must match the GitHub URL.");
 
-  const { data: bindings } = await db.from("project_github_repositories").select("github_repository_id").eq("project_id", input.projectId);
+  const { data: bindings, error: bindingsError } = await db.from("project_github_repositories").select("github_repository_id").eq("project_id", input.projectId);
+  if (bindingsError) throw new GithubLinkValidationError("Could not load connected GitHub repositories.", 500);
   const repositoryIds = (bindings ?? []).map((binding: { github_repository_id: string }) => binding.github_repository_id);
-  const { data: connectedRepositories } = repositoryIds.length ? await db.from("github_repositories").select("id, installation_id, full_name, private, is_accessible").in("id", repositoryIds) : { data: [] };
+  const { data: connectedRepositories, error: repositoriesError } = repositoryIds.length ? await db.from("github_repositories").select("id, installation_id, full_name, private, is_accessible").in("id", repositoryIds) : { data: [], error: null };
+  if (repositoriesError) throw new GithubLinkValidationError("Could not load connected GitHub repositories.", 500);
   const connectedRepository = (connectedRepositories ?? []).find((repository: { full_name: string; is_accessible: boolean }) => repository.full_name.toLowerCase() === repositoryFullName && repository.is_accessible);
   let installationToken: string | null = null;
   if (connectedRepository) {
-    const { data: installation } = await db.from("github_installations").select("github_installation_id, status").eq("id", connectedRepository.installation_id).maybeSingle();
+    const { data: installation, error: installationError } = await db.from("github_installations").select("github_installation_id, status").eq("id", connectedRepository.installation_id).maybeSingle();
+    if (installationError) throw new GithubLinkValidationError("Could not load the connected GitHub installation.", 500);
     if (installation?.status !== "ACTIVE") throw new GithubLinkValidationError("The connected GitHub installation is not active.", 409);
     try {
       const token = await createGithubInstallationToken(installation.github_installation_id);

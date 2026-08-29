@@ -27,5 +27,5 @@ export default async function TemplatesSettingsPage() {
   const labelMap = new Map<string, string[]>();
   for (const row of templateLabels ?? []) labelMap.set(row.template_id, [...(labelMap.get(row.template_id) ?? []), row.label_id]);
   const enriched = (templates ?? []).map((template: { id: string; [key: string]: unknown }) => ({ ...template, label_ids: labelMap.get(template.id) ?? [] }));
-  return <IssueTemplatesManager projectId={context.activeProject.id} canManage={Boolean(canManage)} initialTemplates={enriched as any} components={(components ?? []) as any} labels={(labels ?? []) as any} />;
+  return <IssueTemplatesManager key={JSON.stringify(enriched)} projectId={context.activeProject.id} canManage={Boolean(canManage)} initialTemplates={enriched as any} components={(components ?? []) as any} labels={(labels ?? []) as any} />;
 }

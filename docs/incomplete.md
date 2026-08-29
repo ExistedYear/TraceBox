@@ -10,10 +10,11 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 
 ## Current snapshot
 
-- Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
+- Repository implementation is source-complete through the active completion plan; remaining items are explicitly hosted, provider, or CI validation work.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. Source-level operational visibility is implemented; hosted failure/retry, lifecycle, and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–14 are source-implemented as of 2026-08-29. Migrations 045–074, 204 unit/contract tests, a committed Playwright harness, pgTAP security coverage, and disposable-Supabase CI cover the new contracts. The hosted migration ledger, generated types, and zero-error SQL lint are reconciled through 074; Docker-backed execution and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–14 are source-implemented as of 2026-08-29. Migrations 045–078, a committed Playwright harness, pgTAP security coverage, and disposable-Supabase CI cover the new contracts. The hosted migration ledger, generated types, and zero-error SQL lint are reconciled through 078; Docker-backed execution and hosted multi-user/realtime/browser validation remain external.
+- The final main-agent source audit traced API/database authorization, RLS catalog visibility, Auth boundaries, mutations and rollback/cleanup paths, realtime races, role-gated UI entry points, webhook persistence, reports, notifications, attachments, custom fields, and account recovery. Its source defects were repaired; the remaining `EXTERNAL` items below require real provider, multi-user, Storage, Realtime, or CI environments rather than additional known source implementation.
 
 ## Authoritative items
 
@@ -223,7 +224,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: none
 - Owner area: Database tooling / TypeScript
 - Status: EXTERNAL
-- Evidence: migrations `202608260040`–`202608260074`; linked-regenerated `src/types/database.ts`; synchronized `supabase/full_schema.sql`; linked ledger through 074; zero-error linked SQL lint. Forward migration 065 repairs the historical live API-scope drift that an already-applied migration file could not repair. Docker-backed clean replay remains unavailable to this workstation account.
+- Evidence: migrations `202608260040`–`202608260078`; linked-regenerated `src/types/database.ts`; synchronized `supabase/full_schema.sql`; linked ledger through 078; zero-error linked SQL lint. Forward migrations 065 and 075–078 repair historical live drift, bound API queries, tenant-catalog privacy, and the API token owner's project boundary without editing applied history. Docker-backed clean replay remains unavailable to this workstation account.
 - Acceptance: A disposable replay of migrations 001–041 succeeds; regenerated types include GitHub App tables/fields/RPCs, issue-link additions, and all current API/custom-field contracts; avoidable GitHub `any` casts are removed. `check:migrations` verifies only, `sync:migrations` regenerates the bundle, and `supabase db reset` executes locally.
 - Verification: Fresh local Supabase replay, `npm run db:types`, typecheck, `npm run check:migrations`, and schema/type catalog comparison.
 
@@ -272,8 +273,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Low
 - Dependencies: TB-003, TB-016, TB-022
 - Owner area: Public API / Documentation
-- Status: OPEN
-- Evidence: `src/app/api/v1/`; `README.md`; `deployment.md`; audit finding for missing API documentation/explorer
+- Status: DONE
+- Evidence: `src/app/api/v1/`; `docs/api.md`; README API link; documented authentication, scopes, field schemas, ordering/pagination, error/status contract, retry/idempotency limitations, and executable curl examples
 - Acceptance: Every public route documents authentication, scopes, request/response schemas, pagination, errors, supported issue fields, idempotency, and examples; an in-product or static explorer is provided if promised. Docs match the implemented API and expose no secrets.
 - Verification: Generated/opened API contract checks, route smoke tests, and examples executed against a disposable project/token.
 
@@ -282,8 +283,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-021
 - Owner area: Product documentation / Database architecture
-- Status: OPEN
-- Evidence: `docs/archive/tracebox-main-plan.md`; migrations `001`, `017`, `018`, `028`, `030`; `supabase/seed.sql`
+- Status: DONE
+- Evidence: `docs/schema-decisions.md`; `docs/archive/tracebox-main-plan.md`; migrations `001`, `017`, `018`, `028`, `030`, and `077`; intentionally empty `supabase/seed.sql`
 - Acceptance: Each known divergence is explicitly accepted and documented, removed from the plan, or implemented: profile username, saved-view owner/scope/visibility model, notification email columns, generic integration secret reference, issue visibility values, and seed/demo-data expectations. No plan language implies an unimplemented schema contract.
 - Verification: Reviewed plan-to-migration matrix and fresh schema review; documentation diff reviewed by product and database owners.
 

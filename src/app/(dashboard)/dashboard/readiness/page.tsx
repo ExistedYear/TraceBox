@@ -19,6 +19,7 @@ export default async function ReadinessPage() {
   const supabase = await createClient();
 
   if (!context.activeProject) {
+    const canCreateProject = context.activeOrganization.role === "OWNER" || context.activeOrganization.role === "ADMIN";
     return (
       <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
         <Surface className="p-12 text-center">
@@ -27,11 +28,11 @@ export default async function ReadinessPage() {
           </span>
           <h2 className="text-base font-semibold">No project selected</h2>
           <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
-            Select or create a project to assess release readiness.
+            {canCreateProject ? "Select or create a project to assess release readiness." : "Select a project to assess release readiness."}
           </p>
-          <div className="mt-5 flex justify-center">
+          {canCreateProject ? <div className="mt-5 flex justify-center">
             <NewProjectButton organizationId={context.activeOrganization.id} />
-          </div>
+          </div> : null}
         </Surface>
       </main>
     );

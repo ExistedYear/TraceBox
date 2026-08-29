@@ -4,11 +4,11 @@ This is the short, current operator checklist for the completed TraceBox build. 
 
 ## Already applied
 
-- The linked Supabase project `tvjqgzgpgdpzkhhhrfzr` records migrations `202608260001` through `202608260074`.
+- The linked Supabase project `tvjqgzgpgdpzkhhhrfzr` records migrations `202608260001` through `202608260078`.
 - The final linked dry-run returned `upToDate: true` with no pending migrations.
 - Linked SQL lint returned zero errors.
-- `src/types/database.ts` was regenerated from the linked schema after migration 074.
-- Migration 065 forward-reconciles the API-token scope constraint that had drifted after an earlier applied migration was edited. Migrations 066–074 contain subsequent forward-only security, performance, runtime, invitation, automation, and GitHub-confidentiality repairs.
+- `src/types/database.ts` was regenerated from the linked schema after migration 078.
+- Migration 065 forward-reconciles the API-token scope constraint that had drifted after an earlier applied migration was edited. Migrations 066–074 contain subsequent forward-only security, performance, runtime, invitation, automation, and GitHub-confidentiality repairs. Migrations 075–078 add bounded API issue queries, correct the live search expression, close tenant profile/GitHub catalog disclosure paths, and enforce live project membership for API reads.
 
 Do not edit an applied migration to repair production. Supabase tracks applied versions and will not re-run changed historical files. Compare the linked ledger and live catalog, then add a new forward-only migration.
 

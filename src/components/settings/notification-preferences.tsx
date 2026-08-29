@@ -31,15 +31,21 @@ export function NotificationPreferences() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: loadError } = await createClient().rpc("get_notification_preferences");
-    if (loadError) {
-      console.error("Notification preferences load failed", { code: loadError.code, message: loadError.message });
+    try {
+      const { data, error: loadError } = await createClient().rpc("get_notification_preferences");
+      if (loadError) {
+        console.error("Notification preferences load failed", { code: loadError.code, message: loadError.message });
+        setError("Notification preferences are unavailable right now.");
+      } else {
+        const row = (data?.[0] ?? null) as NotificationPreferences | null;
+        setPreferences(row);
+      }
+    } catch (cause) {
+      console.error("Notification preferences request failed", { error: cause instanceof Error ? cause.message : "unknown" });
       setError("Notification preferences are unavailable right now.");
-    } else {
-      const row = (data?.[0] ?? null) as NotificationPreferences | null;
-      setPreferences(row);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -49,24 +55,24 @@ export function NotificationPreferences() {
     const next = { ...preferences, [key]: !preferences[key] };
     setPreferences(next);
     setSaving(true);
-    const { error: saveError } = await createClient().rpc("update_notification_preferences", {
-      p_mentions: next.mentions,
-      p_assignments: next.assignments,
-      p_comments: next.comments,
-      p_status_changes: next.status_changes,
-      p_watch_updates: next.watch_updates,
-      p_issue_links: next.issue_links,
-      p_labels: next.labels,
-      p_planning: next.planning,
-      p_milestones: next.milestones,
-    });
-    setSaving(false);
-    if (saveError) {
+    try {
+      const { error: saveError } = await createClient().rpc("update_notification_preferences", {
+        p_mentions: next.mentions,
+        p_assignments: next.assignments,
+        p_comments: next.comments,
+        p_status_changes: next.status_changes,
+        p_watch_updates: next.watch_updates,
+        p_issue_links: next.issue_links,
+        p_labels: next.labels,
+        p_planning: next.planning,
+        p_milestones: next.milestones,
+      });
+      if (saveError) throw saveError;
+      toast.success("Notification preference updated.");
+    } catch {
       setPreferences(preferences);
       toast.error("Could not save notification preferences.");
-    } else {
-      toast.success("Notification preference updated.");
-    }
+    } finally { setSaving(false); }
   }
 
   if (loading) return <div className="flex items-center gap-2 rounded-[10px] border border-border/80 bg-card/50 p-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading notification preferences</div>;

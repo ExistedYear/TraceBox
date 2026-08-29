@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { scopeGithubRepositoryCatalog } from "@/lib/github-repository-visibility";
+import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -9,10 +10,17 @@ export async function GET(request: NextRequest) {
   const projectId = request.nextUrl.searchParams.get("project_id");
   if (!projectId || !UUID_RE.test(projectId)) return NextResponse.json({ error: "Valid project_id is required." }, { status: 400 });
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError && !isMissingAuthSession(userError)) return NextResponse.json({ error: "Could not verify authentication." }, { status: 500 });
   if (!user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  const { data: project } = await supabase.from("projects").select("id, organization_id, is_archived").eq("id", projectId).maybeSingle();
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: projectId });
+  const [{ data: project, error: projectError }, { data: role, error: roleError }] = await Promise.all([
+    supabase.from("projects").select("id, organization_id, is_archived").eq("id", projectId).maybeSingle(),
+    supabase.rpc("project_role", { p_project_id: projectId }),
+  ]);
+  if (projectError || roleError) {
+    console.error("GitHub repository authorization lookup failed", { projectCode: projectError?.code, roleCode: roleError?.code, projectId });
+    return NextResponse.json({ error: "Could not verify GitHub access." }, { status: 500 });
+  }
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (role !== "DEVELOPER" && role !== "MAINTAINER") return NextResponse.json({ error: "Only Developers and Maintainers can manage GitHub." }, { status: 403 });
   if (project.is_archived) return NextResponse.json({ error: "Archived projects cannot use GitHub." }, { status: 409 });

@@ -37,7 +37,7 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- The linked project is reconciled through migration `202608260074`, including forward-only drift repairs, invited-project landing context, persisted GitHub automation settings, and project-scoped repository confidentiality. Compare the linked ledger and live catalog before every future push.
+- The linked project is reconciled through migration `202608260078`, including forward-only drift repairs, database-bounded API issue queries, tenant-scoped profile visibility, role/project-scoped GitHub catalogs, and live API token-owner project membership. Compare the linked ledger and live catalog before every future push.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
 - Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, both reconciliation paths (including protected `/api/attachments/reconcile`, which is not in the existing Vercel cron), and broader multi-user/RLS behavior. Template, custom-field, attachment, and API-token browser journeys also remain external checks.
 

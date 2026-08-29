@@ -18,11 +18,11 @@ export default async function ProjectsPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
           <p className="mt-2 text-muted-foreground">Every project in this workspace. Select one to open its issue queue.</p>
         </div>
-        <NewProjectButton organizationId={context.activeOrganization.id} />
+        {context.activeOrganization.role === "OWNER" || context.activeOrganization.role === "ADMIN" ? <NewProjectButton organizationId={context.activeOrganization.id} /> : null}
       </div>
 
       {context.projects.length === 0 ? (
-        <EmptyState icon={FolderKanban} title="No projects yet" description="Create your first project to start filing issues." />
+        <EmptyState icon={FolderKanban} title="No projects yet" description={context.activeOrganization.role === "OWNER" || context.activeOrganization.role === "ADMIN" ? "Create your first project to start filing issues." : "Ask a workspace administrator to create the first project."} />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {context.projects.map((project) => (

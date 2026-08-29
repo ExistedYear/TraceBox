@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 import type { IssueUpdateField } from "@/lib/validation/issue-update";
 import type { SavedViewRow } from "@/lib/validation/saved-views";
 import { useRealtimeIssueUpdates } from "@/hooks/use-realtime";
+import type { Json } from "@/types/database";
 
 export type TableRow = {
   id: string;
@@ -427,30 +428,35 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
   const bulkUpdate = useCallback(async () => {
     if (!canEdit || selectedIds.size === 0 || (bulkField === "custom_field" ? !bulkCustomFieldId : !bulkValue)) return;
     setBulkLoading(true);
-    if (bulkField === "custom_field") {
-      if (!bulkCustomFieldId) { toast.error("Choose a custom field."); setBulkLoading(false); return; }
-      const customField = customFields.find((field) => field.id === bulkCustomFieldId);
-      const customValue = bulkValue === "__NULL__" || bulkValue === "" ? null : customField?.field_type === "NUMBER" ? Number(bulkValue) : customField?.field_type === "BOOLEAN" ? bulkValue === "true" : customField?.field_type === "MULTI_SELECT" ? JSON.parse(bulkValue) : bulkValue;
-      const { error } = await (createClient() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> }).rpc("bulk_set_issue_custom_value", { p_issue_ids: [...selectedIds], p_custom_field_id: bulkCustomFieldId, p_value: customValue });
+    try {
+      if (bulkField === "custom_field") {
+        const customField = customFields.find((field) => field.id === bulkCustomFieldId);
+        const customValue: Json = bulkValue === "__NULL__" || bulkValue === "" ? null : customField?.field_type === "NUMBER" ? Number(bulkValue) : customField?.field_type === "BOOLEAN" ? bulkValue === "true" : customField?.field_type === "MULTI_SELECT" ? JSON.parse(bulkValue) as Json : bulkValue;
+        if (typeof customValue === "number" && !Number.isFinite(customValue)) { toast.error("Enter a valid number."); return; }
+        const { error } = await createClient().rpc("bulk_set_issue_custom_value", { p_issue_ids: [...selectedIds], p_custom_field_id: bulkCustomFieldId, p_value: customValue });
+        if (error) { toast.error("Bulk custom-field update rejected. No partial changes were applied."); return; }
+      } else {
+        const { error } = await createClient().rpc("bulk_update_issue_fields", {
+          p_project_id: projectId,
+          p_issue_ids: [...selectedIds],
+          p_updates: { [bulkField]: bulkValue === "__NULL__" ? null : bulkValue },
+        });
+        if (error) {
+          console.error("Bulk issue update failed", { message: error.message });
+          toast.error("Bulk update rejected. No partial changes were applied.");
+          return;
+        }
+      }
+      toast.success(`${selectedIds.size} issues updated.`);
+      setSelectedIds(new Set());
+      setBulkValue("");
+      setRefreshNonce((value) => value + 1);
+    } catch (error) {
+      console.error("Bulk issue update unavailable", { error: error instanceof Error ? error.message : "unknown" });
+      toast.error("Could not reach the server. No changes were applied.");
+    } finally {
       setBulkLoading(false);
-      if (error) { toast.error("Bulk custom-field update rejected. No partial changes were applied."); return; }
-      toast.success(`${selectedIds.size} issues updated.`); setSelectedIds(new Set()); setBulkValue(""); setRefreshNonce((value) => value + 1); return;
     }
-    const { error } = await (createClient() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> }).rpc("bulk_update_issue_fields", {
-      p_project_id: projectId,
-      p_issue_ids: [...selectedIds],
-      p_updates: { [bulkField]: bulkValue === "__NULL__" ? null : bulkValue },
-    });
-    setBulkLoading(false);
-    if (error) {
-      console.error("Bulk issue update failed", { message: error.message });
-      toast.error("Bulk update rejected. No partial changes were applied.");
-      return;
-    }
-    toast.success(`${selectedIds.size} issues updated.`);
-    setSelectedIds(new Set());
-    setBulkValue("");
-    setRefreshNonce((value) => value + 1);
   }, [bulkCustomFieldId, bulkField, bulkValue, canEdit, customFields, projectId, selectedIds]);
 
   const columns = useMemo(() => {
