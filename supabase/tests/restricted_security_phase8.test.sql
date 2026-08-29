@@ -1,6 +1,6 @@
 begin;
 
-select plan(21);
+select plan(22);
 
 select has_table('public', 'issue_access', 'restricted access grant table exists');
 select has_function('public', 'can_view_issue', array['uuid'], 'restricted visibility helper exists');
@@ -54,6 +54,12 @@ select is((select count(*) from storage.objects where name = '50000000-0000-4000
 select lives_ok(
   $$insert into storage.objects (bucket_id, name, owner_id, metadata) values ('issue-attachments', '50000000-0000-4000-8000-000000000001/grantee.txt', '10000000-0000-4000-8000-000000000002', '{"mimetype":"text/plain"}'::jsonb)$$,
   'authorized reporter can upload to a visible active issue'
+);
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name, owner_id) values ('issue-attachments', '50000000-0000-4000-8000-000000000001/missing-mime.txt', '10000000-0000-4000-8000-000000000002')$$,
+  '42501',
+  null,
+  'Storage upload without MIME metadata is denied'
 );
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000003', true);
