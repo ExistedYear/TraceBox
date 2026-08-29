@@ -131,7 +131,7 @@ The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
   Browser[Browser] --> Proxy[Next.js proxy]
   Proxy --> Auth[Supabase Auth]
   Browser --> App[Next.js app and route handlers]
