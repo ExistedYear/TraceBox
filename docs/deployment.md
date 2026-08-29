@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 78) via SQL Script
+### 1.3 Apply Database Migrations (1 through 79) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 78 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
+You do **not** need the Supabase CLI. You can apply all 79 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 78 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 79 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -117,6 +117,7 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 76. `202608260076_fix_api_search_expression.sql`
 77. `202608260077_tenant_catalog_privacy.sql`
 78. `202608260078_api_project_membership_boundary.sql`
+79. `202608260079_ci_contract_hardening.sql`
 
 Before every linked push, run `npx supabase migration list --linked`, `npx supabase db push --linked --dry-run`, and linked database lint. The migration ledger is version-based, so editing a file whose version is already applied does not update the hosted function, policy, or constraint. Inspect the live catalog when drift is suspected and ship the correction as the next forward-only migration.
 

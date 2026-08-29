@@ -62,7 +62,7 @@ The authenticated REST surface, token scopes, examples, and error contract are d
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds 78 ordered migrations. Migrations 042–064 cover GitHub reliability, completion-plan closure, analytics, collaboration, and operational visibility. Migrations 065–074 are forward-only live-schema reconciliations and invitation/GitHub confidentiality repairs. Migrations 075–078 move public API list/search authorization and bounding into SQL, correct the live search expression forward-only, restrict profile/GitHub catalogs to authorized tenant collaborators, and enforce the token owner's live project membership. Regenerate `supabase/full_schema.sql` after every migration change. Because Supabase does not re-run an applied version when its file changes, compare the linked ledger and live catalog before every push and repair drift with a new migration.
+`supabase/migrations/` holds 79 ordered migrations. Migrations 042–064 cover GitHub reliability, completion-plan closure, analytics, collaboration, and operational visibility. Migrations 065–074 are forward-only live-schema reconciliations and invitation/GitHub confidentiality repairs. Migrations 075–079 move public API list/search authorization and bounding into SQL, correct the live search expression forward-only, restrict profile/GitHub catalogs to authorized tenant collaborators, enforce the token owner's live project membership, make issue visibility total, and revoke residual browser DML from RPC-owned tables. Regenerate `supabase/full_schema.sql` after every migration change. Because Supabase does not re-run an applied version when its file changes, compare the linked ledger and live catalog before every push and repair drift with a new migration.
 
 ## Quality checks
 
@@ -74,7 +74,7 @@ npm run build
 npm run check:migrations
 ```
 
-Current local evidence on 2026-08-29: TypeScript and the production build pass; 204 Vitest checks pass across 38 files; the 78-file migration chain and generated full schema are synchronized; credential-free Playwright smoke passes 3/3 journeys; and linked Supabase dry-run/lint report an up-to-date ledger with zero public-schema errors. The committed CI job additionally provisions disposable Supabase for migration replay, pgTAP authorization checks, true concurrent issue-number allocation, and browser smoke. Fixture-dependent multi-user journeys remain explicit hosted release checks rather than being silently replaced by mocks.
+Current evidence on 2026-08-29: TypeScript and the production build pass; 204 Vitest checks pass across 38 files; the 79-file migration chain and generated full schema are synchronized; credential-free Playwright smoke passes 3/3 journeys; and linked Supabase dry-run/lint report an up-to-date ledger with zero public-schema errors. GitHub Actions run `33264345126` also passed a fresh disposable replay through migration 079, 231 pgTAP assertions, true concurrent issue-number allocation, the production build, and browser smoke. Fixture-dependent multi-user journeys remain explicit hosted release checks rather than being silently replaced by mocks.
 
 ## Judge demo flow
 
@@ -123,6 +123,6 @@ The committed `playwright/` harness runs public/authentication smoke without cre
 
 ## Verified release paths
 
-As of 2026-08-28, the hosted GitHub App flow has been manually verified with a private repository: installation callback, repository discovery, project binding, signed pull-request webhook delivery, automatic PR linking, and `Fixes <PROJECT_KEY>-<NUMBER>` resolution after merging into `main`. Issue keys use the selected TraceBox project's key (for example, `BUG-1`), not the workspace name. Apply migrations through 078 before using the current application contracts.
+As of 2026-08-28, the hosted GitHub App flow has been manually verified with a private repository: installation callback, repository discovery, project binding, signed pull-request webhook delivery, automatic PR linking, and `Fixes <PROJECT_KEY>-<NUMBER>` resolution after merging into `main`. Issue keys use the selected TraceBox project's key (for example, `BUG-1`), not the workspace name. Apply migrations through 079 before using the current application contracts.
 
 The desktop sidebar is viewport-height and scrollable; its Settings and Contributors links remain reachable on short screens or when the workspace switcher is large, and the navigation no longer renders a stray semicolon. Credential-free Playwright smoke is committed and locally verified; fixture-dependent multi-user journeys remain a hosted release check.

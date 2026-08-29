@@ -37,13 +37,13 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- The linked project is reconciled through migration `202608260078`, including forward-only drift repairs, database-bounded API issue queries, tenant-scoped profile visibility, role/project-scoped GitHub catalogs, and live API token-owner project membership. Compare the linked ledger and live catalog before every future push.
+- The linked project is reconciled through migration `202608260079`, including forward-only drift repairs, database-bounded API issue queries, tenant-scoped profile visibility, role/project-scoped GitHub catalogs, live API token-owner project membership, total restricted-issue visibility predicates, and RPC-only DML grants. Compare the linked ledger and live catalog before every future push.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
 - Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, both reconciliation paths (including protected `/api/attachments/reconcile`, which is not in the existing Vercel cron), and broader multi-user/RLS behavior. Template, custom-field, attachment, and API-token browser journeys also remain external checks.
 
 ## 4. Live-test limitation
 
-Source-level gates and the core hosted GitHub flow pass. The committed `playwright/` suite provides credential-free public/protection smoke and explicitly skips fixture-dependent account journeys when fixtures are absent. API and webhook tests mock GitHub boundaries and require no GitHub environment file. The older ignored `qa/live/` suite remains optional for deployment-specific checks; never commit its environment, browser state, or generated artifacts.
+Source-level gates and the core hosted GitHub flow pass. GitHub Actions run `33264345126` also passed a fresh disposable migration replay through 079, 231 pgTAP assertions, true concurrent allocation, and credential-free browser smoke. The committed `playwright/` suite explicitly skips fixture-dependent account journeys when fixtures are absent. API and webhook tests mock GitHub boundaries and require no GitHub environment file. The older ignored `qa/live/` suite remains optional for deployment-specific checks; never commit its environment, browser state, or generated artifacts.
 
 ## 5. Persistent Contributors panel
 

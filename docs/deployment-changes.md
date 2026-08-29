@@ -4,11 +4,11 @@ This is the short, current operator checklist for the completed TraceBox build. 
 
 ## Already applied
 
-- The linked Supabase project `tvjqgzgpgdpzkhhhrfzr` records migrations `202608260001` through `202608260078`.
+- The linked Supabase project `tvjqgzgpgdpzkhhhrfzr` records migrations `202608260001` through `202608260079`.
 - The final linked dry-run returned `upToDate: true` with no pending migrations.
 - Linked SQL lint returned zero errors.
-- `src/types/database.ts` was regenerated from the linked schema after migration 078.
-- Migration 065 forward-reconciles the API-token scope constraint that had drifted after an earlier applied migration was edited. Migrations 066–074 contain subsequent forward-only security, performance, runtime, invitation, automation, and GitHub-confidentiality repairs. Migrations 075–078 add bounded API issue queries, correct the live search expression, close tenant profile/GitHub catalog disclosure paths, and enforce live project membership for API reads.
+- `src/types/database.ts` was regenerated from the linked schema after migration 079; its generated content was unchanged.
+- Migration 065 forward-reconciles the API-token scope constraint that had drifted after an earlier applied migration was edited. Migrations 066–074 contain subsequent forward-only security, performance, runtime, invitation, automation, and GitHub-confidentiality repairs. Migrations 075–079 add bounded API issue queries, correct the live search expression, close tenant profile/GitHub catalog disclosure paths, enforce live project membership for API reads, make restricted visibility total, and revoke residual browser DML from RPC-owned tables.
 
 Do not edit an applied migration to repair production. Supabase tracks applied versions and will not re-run changed historical files. Compare the linked ledger and live catalog, then add a new forward-only migration.
 
@@ -88,5 +88,5 @@ After deployment, repeat the linked dry-run, probe `/`, `/login`, and anonymous 
 - Exercise Auth redirects/recovery with real email delivery.
 - Verify the Vercel variables and cron authorization in the deployed environment.
 - Record a real failed GitHub delivery retry and lifecycle recovery.
-- Run the disposable Supabase pgTAP and concurrent issue-allocation suites where Docker is available.
+- Preserve the green disposable database gate from GitHub Actions run `33264345126` (fresh 001–079 replay, 231 pgTAP assertions, and concurrent issue allocation).
 - Confirm the production deployment is serving the final `main` commit rather than an older successful build.

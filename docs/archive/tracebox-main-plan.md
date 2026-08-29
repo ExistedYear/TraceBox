@@ -2826,7 +2826,7 @@ Phases 1–20 are implemented in the repository. The next work is production val
 
 ```text
 Phase 1–20: repository implementation present; UI, integration, and hosted-validation gaps remain (see `docs/incomplete.md`)
-Database migrations: 001–078 (later completion, reliability, security, and live-schema reconciliation work is documented in `../completion_plan.md` and `../deployment-changes.md`)
+Database migrations: 001–079 (later completion, reliability, security, and live-schema reconciliation work is documented in `../completion_plan.md` and `../deployment-changes.md`)
 API routes: /api/v1/issues, /api/v1/issues/[issueKey], /api/v1/issues/[issueKey]/comments, /api/v1/projects, /api/v1/milestones, /api/v1/search, /api/v1/projects/[projectId]/github/repositories, /api/v1/issues/[issueKey]/github-links, /api/v1/issues/[issueKey]/github-links/[linkId], /api/github/connect, /api/github/callback, /api/github/repositories, /api/github/bind, /api/github/validate-link, /api/github/sync, /api/github/reconcile, /api/webhooks/github
 Production deployment: core GitHub installation, repository binding, webhook linking, and merge resolution verified; broader Supabase/Auth/Storage/Realtime/API/RLS and multi-user end-to-end validation still required
 ```

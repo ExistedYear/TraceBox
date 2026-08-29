@@ -56,7 +56,7 @@ Create one non-duplicated, executable source of truth from both incomplete-featu
 
 ## Phase 1 — Repair schema, generated types, and API contracts
 
-Status: source-complete on 2026-08-28. Migration 044 unifies the browser/REST issue mutation contract, generated database types represent the linked contract through migration 078, and forward-only migrations 065–078 reconcile every subsequently discovered live-schema, authorization, query-bounding, and tenant-catalog drift. Disposable replay remains part of the external database/CI gate below.
+Status: source-complete on 2026-08-28. Migration 044 unifies the browser/REST issue mutation contract, generated database types represent the linked contract through migration 079, and forward-only migrations 065–079 reconcile every subsequently discovered live-schema, authorization, query-bounding, tenant-catalog, issue-visibility, and RPC-only DML drift. The complete chain has passed disposable replay in CI.
 
 ### Scope
 
@@ -84,7 +84,7 @@ Remove schema drift and contract ambiguity before building more UI.
 
 ## Phase 2 — Membership, invitations, contributors, and ownership
 
-Status: source-complete on 2026-08-28. Migrations 045–046, RPC-only UI journeys, Vitest contracts, and pgTAP catalog tests are present; disposable database replay and the hosted two-account browser journey remain external validation.
+Status: source-complete on 2026-08-28. Migrations 045–046, RPC-only UI journeys, Vitest contracts, and pgTAP catalog tests are present; disposable database replay passed in CI, while the hosted two-account browser journey remains external validation.
 
 ### Scope
 
@@ -243,7 +243,7 @@ A maintainer can change project metadata and workflow without creating a graph t
 
 ## Phase 8 — Restricted security issue completion
 
-Status: source-complete on 2026-08-28. Atomic creation/grants, reporter controls, queue indicators/filtering, a dedicated security queue, immutable access history, notification/API/search hardening, realtime fail-closed behavior, and active-project Storage policies are implemented in migrations 047/050 and UI. Dedicated RLS/Storage pgTAP tests are committed but could not run in this checkout because the Docker socket is unavailable; hosted multi-user validation remains external.
+Status: source-complete on 2026-08-28. Atomic creation/grants, reporter controls, queue indicators/filtering, a dedicated security queue, immutable access history, notification/API/search hardening, realtime fail-closed behavior, and active-project Storage policies are implemented in migrations 047/050 and UI. The dedicated RLS/Storage pgTAP tests passed in disposable-Supabase CI; hosted multi-user validation remains external.
 
 ### Scope
 
@@ -314,7 +314,7 @@ Each resource supports its complete create, configure, use, update, archive/dele
 
 ## Phase 11 — Reports, readiness, dashboard, and audit explorer
 
-Status: source-complete on 2026-08-29. Migrations 058–061 provide visibility-filtered report history, readiness scoring and creator-private snapshots, operational dashboard metrics, and a restricted-safe audit feed. The report/readiness/audit UIs include drilldowns, bounded exports, explicit empty/error states, and canonical queue links; database replay and hosted multi-user/browser verification remain external.
+Status: source-complete on 2026-08-29. Migrations 058–061 provide visibility-filtered report history, readiness scoring and creator-private snapshots, operational dashboard metrics, and a restricted-safe audit feed. The report/readiness/audit UIs include drilldowns, bounded exports, explicit empty/error states, and canonical queue links; database replay passed in CI, while hosted multi-user/browser verification remains external.
 
 ### Reports
 
@@ -380,7 +380,7 @@ A maintainer can determine whether GitHub is healthy, why automation failed, wha
 
 ## Phase 14 — Real database, API, realtime, and browser verification
 
-Status: source-complete on 2026-08-29. A committed Playwright harness, production-hook realtime tests, API/webhook route tests, a 40-assertion pgTAP security suite, and a true concurrent issue allocator check are integrated with a disposable-Supabase CI job. Credential-free browser smoke passed locally (3 passed, 10 fixture-dependent journeys skipped); 204 Vitest tests, typecheck, build, migration consistency, and lint with only known compatibility warnings also pass. Local Docker-backed database execution remains external because this workstation account cannot access the Docker socket; the first CI database run and hosted multi-user journeys must still be recorded.
+Status: complete on 2026-08-29. A committed Playwright harness, production-hook realtime tests, API/webhook route tests, a 231-assertion pgTAP suite, and a true concurrent issue allocator check are integrated with a disposable-Supabase CI job. Credential-free browser smoke passed locally (3 passed, 10 fixture-dependent journeys skipped); 204 Vitest tests, typecheck, build, migration consistency, and lint with only known compatibility warnings also pass. GitHub Actions run `33264345126` passed the exact branch candidate with a fresh 001–079 replay, all pgTAP checks, true concurrent allocation, production build, and browser smoke. Fixture-dependent hosted multi-user journeys remain part of Phase 15 rather than this source/CI gate.
 
 ### Database and RLS
 
@@ -408,7 +408,7 @@ A clean clone can run all non-secret test layers. Critical security denials and 
 
 ## Phase 15 — Hosted validation and documentation closure
 
-Status: in progress on 2026-08-29. The target Supabase project was audited before mutation, migrations 044–078 were applied, historical drift and later contract/security findings were repaired only with forward migrations, linked SQL lint reports zero errors, the final dry-run is up to date, and linked database types were regenerated. Local source gates pass. Docker-backed pgTAP/concurrency execution, Auth/provider URLs, Vercel/GitHub secrets, and the complete hosted multi-user/browser flow remain external; no GitHub environment file is required by the committed test suite.
+Status: in progress on 2026-08-29. The target Supabase project was audited before mutation, migrations 044–079 were applied, historical drift and later contract/security findings were repaired only with forward migrations, linked SQL lint reports zero errors, the final dry-run is up to date, and linked database types were regenerated. Local source gates and disposable-Supabase CI pass, including 231 pgTAP assertions and true concurrent allocation. Auth/provider URLs, Vercel/GitHub secrets, and the complete hosted multi-user/browser flow remain external; no GitHub environment file is required by the committed test suite.
 
 ### Work
 
