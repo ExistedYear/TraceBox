@@ -15288,5 +15288,5 @@ revoke insert, update, delete on table
   public.custom_fields,
   public.issue_custom_values,
   public.api_tokens,
-  public.readiness_snapshots
+  public.release_readiness_snapshots
 from public, anon, authenticated;
