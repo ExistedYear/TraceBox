@@ -1,6 +1,6 @@
 # Deployment Changes and Operator Checklist
 
-This is the short, current operator checklist for the completed TraceBox build. Use [`deployment.md`](deployment.md) for first-time setup details and [`../handoff.md`](../handoff.md) for verification evidence.
+This is the archived short operator checklist for the completed TraceBox build. Use [`deployment.md`](../deployment.md) for first-time setup details and [`handoff.md`](../../handoff.md) for verification evidence.
 
 ## Already applied
 
@@ -80,7 +80,7 @@ npm run check:migrations
 npm run test:e2e
 ```
 
-After deployment, repeat the linked dry-run, probe `/`, `/login`, and anonymous `/dashboard` protection, then run the authenticated and two-user rows in [`feature-testing-checklist.md`](feature-testing-checklist.md). Fixture-gated browser journeys and Docker-backed pgTAP/concurrency tests are not proven by the credential-free smoke run.
+After deployment, repeat the linked dry-run, probe `/`, `/login`, and anonymous `/dashboard` protection, then run the authenticated and two-user rows in [`feature-testing-checklist.md`](../feature-testing-checklist.md). Fixture-gated browser journeys still require the release environment; the disposable pgTAP/concurrency gate is already covered by CI.
 
 ## Current external release work
 

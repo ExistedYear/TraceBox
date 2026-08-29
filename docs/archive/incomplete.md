@@ -1,6 +1,6 @@
 # TraceBox Completion Backlog
 
-This is the authoritative, source-level completion tracker for TraceBox. It consolidates the two source audits formerly represented by `docs/incomplete.md` and a retired duplicate audit; each gap appears once and has a stable ID. A capability is complete only when a user can discover, configure, execute, recover from failure, and observe it through an authorized product workflow.
+This is the historical source-level completion tracker for TraceBox. It consolidates the two source audits formerly represented by `docs/incomplete.md` and a retired duplicate audit; each gap appears once and has a stable ID. Current release instructions live in `../../README.md`, `../../handoff.md`, and `../feature-testing-checklist.md`.
 
 This tracker distinguishes repository completion from hosted validation. `DONE` means the stated acceptance and verification evidence is present in the repository. `EXTERNAL` means source work is not the remaining blocker, but the target Supabase/Vercel/GitHub environment still has to be exercised. “Phases 1–20 implemented” elsewhere in the repository therefore means source implementation is present, not that this backlog is empty.
 
@@ -324,7 +324,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: TB-021, TB-028
 - Owner area: Release / Supabase / Vercel / GitHub operations
 - Status: EXTERNAL
-- Evidence: `docs/bugs.md`; `handoff.md`; `deployment.md`
+- Evidence: `../archive/release-records/bugs-release-log.md`; `../../handoff.md`; `../deployment.md`
 - Acceptance: The linked/target environment has migrations, generated types, private attachment bucket/policies, Realtime publication, Auth URLs/provider settings, server-only Vercel variables, GitHub App/webhook/cron configuration, API scopes, reconciliation, and broader multi-user/RLS/API/browser flows verified. The core GitHub installation/binding/PR-link/merge path is already verified, but does not close the remaining checklist.
 - Verification: Signed release checklist with environment evidence and hosted `qa/live` results; no source-only claim substitutes for this status.
 
@@ -336,7 +336,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Status: DONE
 - Evidence: `docs/archive/plan.md` describes the completed deployment foundation and points to the Phase 20 roadmap and deployment checklist.
 - Acceptance: `docs/archive/plan.md` clearly labels the foundation plan as historical/completed and does not imply the whole product or hosted validation is complete.
-- Verification: Documentation review against `docs/completion_plan.md`, this tracker, and the roadmap wording.
+- Verification: Historical documentation review against `../archive/completion-plan.md`, this tracker, and the roadmap wording.
 
 ## Maintenance rules
 

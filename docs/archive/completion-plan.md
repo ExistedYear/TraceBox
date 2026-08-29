@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This plan converts the findings from `docs/incomplete.md` and a now-retired duplicate audit into a dependency-safe implementation sequence. A feature is complete only when users can discover, configure, execute, recover from failure, and observe it through an authorized product workflow.
+This historical plan converted the findings from the former completion backlog into a dependency-safe implementation sequence. A feature was considered complete only when users could discover, configure, execute, recover from failure, and observe it through an authorized product workflow.
 
-The audits overlapped. Phase 0 consolidated their findings into the authoritative `docs/incomplete.md` and retired the duplicate audit. Source implementation, automated verification, and external deployment validation remain separate completion states.
+The audits overlapped. Their findings were consolidated and the implementation was completed. Current verification and external release requirements live in `../../handoff.md` and `../../feature-testing-checklist.md`.
 
 ## Delivery rules
 

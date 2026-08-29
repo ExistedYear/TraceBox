@@ -75,15 +75,13 @@ src/lib/
 supabase/                  config.toml, migrations/ (79 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
-docs/                      active deployment, gap, and feature plans
-  deployment-changes.md    concise current operator/deployment delta checklist
+docs/                      active deployment, API, schema, and feature-checklist docs
   feature-testing-checklist.md submission QA matrix for all implemented product surfaces
   last_day_plan.md         excluded future Trace Intelligence proposal; not implemented
   last-day-plan-audit.md   review of the excluded future Trace Intelligence plan
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
-docs/incomplete.md         current whole-codebase UI/backend/test/plan gap audit and prioritized follow-up work
-docs/completion_plan.md    dependency-ordered completion and verification plan
+docs/archive/              historical audits, implementation plans, and release records
 ```
 
 ## Development Commands
@@ -274,7 +272,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/lib/issues.ts` / `src/components/issues/issue-table.tsx` | Canonical queue filter codec supports workflow-category, critical-severity, unresolved, and overdue dashboard drilldowns |
 | `supabase/migrations/202608260060_phase11_dashboard_metrics.sql` | Authoritative visibility-filtered operational dashboard metrics RPC |
 | `supabase/migrations/202608260061_phase11_audit_explorer.sql` | Authorized audit listing RPC with recursive cross-issue JSON redaction |
-| `docs/collaboration-github-dashboard-plan.md` | Implementation plan for invitations, role-aware collaboration UI, and the GitHub administration dashboard |
+| `docs/archive/tracebox-collaboration-github-dashboard-plan.md` | Historical implementation plan for invitations, role-aware collaboration UI, and the GitHub administration dashboard |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 
