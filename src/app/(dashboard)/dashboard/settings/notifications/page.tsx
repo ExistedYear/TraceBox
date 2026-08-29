@@ -7,4 +7,3 @@ export const metadata: Metadata = { title: "Notification preferences" };
 export default function NotificationPreferencesPage() {
   return <NotificationPreferences />;
 }
-
