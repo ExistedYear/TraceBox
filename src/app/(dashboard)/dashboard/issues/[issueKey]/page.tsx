@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, parseIssueKey, personLabel } from "@/lib/issues";
 import type { TimelineComment, TimelineEventRow } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
+import type { CommentMention } from "@/lib/comment-mentions";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 type Params = Promise<{ issueKey: string }>;
@@ -100,12 +101,29 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     supabase.from("project_members").select("user_id").eq("project_id", project.id),
     supabase.from("issue_access").select("user_id, granted_by").eq("issue_id", issue.id),
   ]);
-  const loadError = eventsError ?? commentsError ?? componentsError ?? roleError ?? workflowStatesError ?? transitionsError ?? labelsError ?? assignedLabelsError ?? versionsError ?? milestonesError ?? watchersError ?? attachmentsError ?? githubLinksError ?? customFieldsError ?? customValuesError ?? projectMembersError ?? accessError;
+  let commentMentionRows: CommentMention[] = [];
+  let mentionsError: { code: string; message: string } | null = null;
+  if (!commentsError && (comments ?? []).length > 0) {
+    const result = await supabase
+      .from("comment_mentions")
+      .select("comment_id, user_id, display_label, mention_token")
+      .in("comment_id", (comments ?? []).map((comment) => comment.id));
+    commentMentionRows = (result.data ?? []) as CommentMention[];
+    mentionsError = result.error;
+  }
+  const loadError = eventsError ?? commentsError ?? mentionsError ?? componentsError ?? roleError ?? workflowStatesError ?? transitionsError ?? labelsError ?? assignedLabelsError ?? versionsError ?? milestonesError ?? watchersError ?? attachmentsError ?? githubLinksError ?? customFieldsError ?? customValuesError ?? projectMembersError ?? accessError;
   if (loadError) {
     console.error("Issue detail dependencies failed", { code: loadError.code, message: loadError.message });
     return <LoadErrorPage title="Issue details incomplete" description="We could not safely load the complete issue, activity, access, and planning data." retryHref={`/dashboard/issues/${rawKey}`} />;
   }
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
+  const mentionsByComment = new Map<string, CommentMention[]>();
+  for (const mention of commentMentionRows) {
+    const existing = mentionsByComment.get(mention.comment_id) ?? [];
+    existing.push(mention);
+    mentionsByComment.set(mention.comment_id, existing);
+  }
+  const commentsWithMentions = (comments ?? []).map((comment) => ({ ...comment, mentions: mentionsByComment.get(comment.id) ?? [] }));
   const actorIds = (events ?? []).map((event) => event.actor_id);
   const commentAuthorIds = (comments ?? []).map((comment) => comment.author_id);
   const memberIds = (projectMemberRows ?? []).map((member) => member.user_id);
@@ -235,11 +253,12 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
 
           <CommentsSection key={`comments-${issue.id}`}
             issueId={issue.id}
+            projectId={project.id}
             projectKey={parsed.projectKey}
             currentUserId={context.userId}
             canComment={canComment}
             canEditAnyComment={canEditAnyComment}
-            comments={(comments ?? []) as unknown as TimelineComment[]}
+            comments={commentsWithMentions as unknown as TimelineComment[]}
             events={(events ?? []) as unknown as TimelineEventRow[]}
             displayNames={mergedNames}
             componentNames={componentNames}

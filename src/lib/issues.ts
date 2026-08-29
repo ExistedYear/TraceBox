@@ -138,6 +138,7 @@ export type TimelineComment = {
   body: string;
   edited_at: string | null;
   created_at: string;
+  mentions?: import("@/lib/comment-mentions").CommentMention[];
 };
 
 export type TimelineEventRow = {
@@ -169,7 +170,7 @@ export function buildTimeline(events: TimelineEventRow[], comments: TimelineComm
 // They are rendered as styled spans rather than raw HTML to avoid XSS.
 export function tokenizeCommentBody(body: string): { text: string; kind: "text" | "mention" | "issue-ref" }[] {
   const tokens: { text: string; kind: "text" | "mention" | "issue-ref" }[] = [];
-  const re = /(@[a-zA-Z0-9._-]+|[A-Z][A-Z0-9]+-\d+)/g;
+  const re = /(@[\p{L}\p{N}][\p{L}\p{N}._-]*|[A-Z][A-Z0-9]+-\d+)/gu;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = re.exec(body)) !== null) {

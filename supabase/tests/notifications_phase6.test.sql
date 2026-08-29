@@ -11,7 +11,7 @@ select ok(not has_function_privilege('anon', 'public.list_notifications(timestam
 select ok(not has_table_privilege('authenticated', 'public.notifications', 'insert,update,delete'), 'notification rows are dispatcher/RPC owned');
 select ok(not has_table_privilege('authenticated', 'public.notification_preferences', 'insert,update,delete'), 'preference rows are RPC owned');
 select has_trigger('public', 'issues', 'trg_issue_updated_notifications', 'issue changes emit preference-aware notifications');
-select has_trigger('public', 'comments', 'trg_comment_mentions_notifications', 'comment mentions emit notifications');
+select ok(not has_trigger('public', 'comments', 'trg_comment_mentions_notifications'), 'legacy text-derived mention trigger is removed');
 select has_trigger('public', 'comments', 'trg_comment_changed_notifications', 'comment changes emit notifications');
 select has_trigger('public', 'milestones', 'trg_milestone_changed_notifications', 'milestones emit notifications');
 select has_trigger('public', 'versions', 'trg_version_changed_notifications', 'versions emit notifications');

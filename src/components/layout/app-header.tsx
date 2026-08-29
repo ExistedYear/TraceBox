@@ -56,6 +56,7 @@ const pageNames: Record<string, string> = {
   "/dashboard/reports": "Reports & Analytics",
   "/dashboard/projects": "Projects",
   "/dashboard/settings": "Settings",
+  "/dashboard/account": "Account",
 };
 
 function getPageName(pathname: string) {

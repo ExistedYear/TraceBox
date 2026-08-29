@@ -336,6 +336,8 @@ Metrics are authoritative, explainable, and linked to their contributing issue s
 
 ## Phase 12 — Mentions and user account management
 
+Status: source-complete on 2026-08-29. Migration 062 replaces arbitrary text matching with issue-scoped identity autocomplete, persisted mention identities, atomic comment wrappers, and preference/visibility-safe notifications. Migration 063 and `/dashboard/account` add RPC-only profile updates, owner-scoped avatar Storage, email/password/recovery flows, notification access, and global sign-out. Hosted Auth email-change and multi-user restricted-mention journeys remain external.
+
 ### Mentions
 
 - Add member-aware mention autocomplete and keyboard selection.

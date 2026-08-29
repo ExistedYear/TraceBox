@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–11 are source-implemented as of 2026-08-29. Migrations 045–061, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–12 are source-implemented as of 2026-08-29. Migrations 045–063, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -252,8 +252,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-001, TB-006
 - Owner area: Comments / People search
-- Status: OPEN
-- Evidence: `src/components/issues/comments-section.tsx`; `src/lib/issues.ts` mention styling/tokenization helpers
+- Status: EXTERNAL
+- Evidence: migration `202608260062_phase12_mentions.sql`; `src/lib/comment-mentions.ts`; `src/components/issues/comments-section.tsx`; stable-only rendering in `src/components/tracebox/markdown-content.tsx`; `tests/comments.test.ts`; `tests/mentions-migration.test.ts`; `supabase/tests/mentions_phase12.test.sql`
 - Acceptance: Comment composition offers accessible autocomplete from authorized project identities, stores unambiguous identity references, handles no-match/loading/error states, and drives preference-aware notifications without notifying arbitrary text matches or leaking restricted users.
 - Verification: Identity search/RLS and notification tests; browser comment mention journey with keyboard selection, edit, and restricted issue cases.
 
@@ -262,8 +262,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Low
 - Dependencies: TB-001
 - Owner area: Account / Auth
-- Status: OPEN
-- Evidence: profile reads exist, but no complete user-facing account-management workflow was found in the audits.
+- Status: EXTERNAL
+- Evidence: migration `202608260063_account_management.sql`; `/dashboard/account`; `src/components/account/account-management.tsx`; user-menu entry; `src/lib/validation/account.ts`; `tests/account-management.test.ts`
 - Acceptance: Users can view/edit display name and avatar, manage account email/password and sign-out sessions as supported by Auth, and receive safe validation/recovery/error states. Organization/project identity displays remain consistent with profile updates.
 - Verification: Auth/profile RLS tests and browser account update, recovery, validation, and session journey.
 

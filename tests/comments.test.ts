@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTimeline, eventSummary, excerptBody, tokenizeCommentBody } from "../src/lib/issues";
+import { getMentionTrigger, isStableMentionToken, mentionToken, reconcileSelectedMentions, selectedMentionIds, selectedMentionsFromRows } from "../src/lib/comment-mentions";
 import { commentSchema } from "../src/lib/validation/comment";
 
 describe("commentSchema", () => {
@@ -120,5 +121,23 @@ describe("buildTimeline", () => {
   it("handles empty inputs", () => {
     expect(buildTimeline([], [])).toEqual([]);
     expect(buildTimeline([], [{ id: "c1", issue_id: "i1", author_id: "u1", body: "x", edited_at: null, created_at: "2026-01-01T00:00:00Z" }]).length).toBe(1);
+  });
+});
+
+describe("stable comment mentions", () => {
+  const rows = [{ comment_id: "c1", user_id: "u1", display_label: "Ada Lovelace" }, { comment_id: "c1", user_id: "u2", display_label: "山田 太郎" }];
+
+  it("creates compact Unicode-safe tokens and recognizes only persisted labels", () => {
+    expect(mentionToken("Ada Lovelace")).toBe("Ada-Lovelace");
+    expect(mentionToken("山田 太郎")).toBe("山田-太郎");
+    expect(isStableMentionToken("@Ada-Lovelace", rows)).toBe(true);
+    expect(isStableMentionToken("@unknown", rows)).toBe(false);
+  });
+
+  it("finds an active query and reconciles deleted mention text", () => {
+    expect(getMentionTrigger("See @Ada", 8)).toEqual({ start: 4, query: "Ada" });
+    const selected = selectedMentionsFromRows("@Ada-Lovelace @山田-太郎", rows);
+    expect(selectedMentionIds("@Ada-Lovelace", selected)).toEqual(["u1"]);
+    expect(reconcileSelectedMentions("@Ada-Lovelace", selected)).toHaveLength(1);
   });
 });

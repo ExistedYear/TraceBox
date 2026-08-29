@@ -169,6 +169,45 @@ export type Database = {
           },
         ]
       }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          display_label: string
+          mention_token: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          display_label: string
+          mention_token: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          display_label?: string
+          mention_token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_mentions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_mentions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       components: {
         Row: {
           created_at: string
@@ -1880,6 +1919,10 @@ export type Database = {
         Args: { p_body: string; p_issue_id: string }
         Returns: string
       }
+      add_comment_with_mentions: {
+        Args: { p_body: string; p_issue_id: string; p_mentioned_user_ids?: string[] | null }
+        Returns: string
+      }
       add_github_link: {
         Args: {
           p_issue_id: string
@@ -2147,6 +2190,10 @@ export type Database = {
         Args: { p_body: string; p_comment_id: string }
         Returns: undefined
       }
+      edit_comment_with_mentions: {
+        Args: { p_body: string; p_comment_id: string; p_mentioned_user_ids?: string[] | null }
+        Returns: undefined
+      }
       find_duplicate_candidates: {
         Args: { p_limit?: number; p_project_id: string; p_title: string }
         Returns: {
@@ -2265,6 +2312,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: { attachment_id: string; storage_path: string }[]
       }
+      update_current_profile: {
+        Args: { p_avatar_url: string | null; p_display_name: string }
+        Returns: {
+          id: string
+          display_name: string
+          avatar_url: string | null
+          updated_at: string
+        }[]
+      }
       update_notification_preferences: {
         Args: {
           p_mentions: boolean
@@ -2280,8 +2336,13 @@ export type Database = {
         Returns: undefined
       }
       membership_role_rank: { Args: { p_role: string }; Returns: number }
+      normalize_mention_token: { Args: { p_display_label: string }; Returns: string }
       organization_role: { Args: { p_organization_id: string; p_user_id?: string }; Returns: string }
       project_role: { Args: { p_project_id: string }; Returns: string }
+      list_project_mention_candidates: {
+        Args: { p_issue_id?: string | null; p_limit?: number; p_project_id: string; p_query?: string | null }
+        Returns: { user_id: string; display_label: string; mention_token: string }[]
+      }
       reconcile_auto_github_links: {
         Args: {
           p_desired_links?: Json
