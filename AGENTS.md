@@ -76,6 +76,7 @@ supabase/                  config.toml, migrations/ (79 ordered), pgTAP tests/, 
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, API, schema, and feature-checklist docs
+README.md                  production submission overview, complete feature catalog, architecture, setup, and verification
   feature-testing-checklist.md submission QA matrix for all implemented product surfaces
   last_day_plan.md         excluded future Trace Intelligence proposal; not implemented
   last-day-plan-audit.md   review of the excluded future Trace Intelligence plan
