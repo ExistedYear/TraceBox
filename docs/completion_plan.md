@@ -355,6 +355,8 @@ Users can manage their supported profile fields and select valid collaborators i
 
 ## Phase 13 — GitHub operational visibility and canonical model
 
+Status: source-complete on 2026-08-29. Migration 064 declares the stable-ID GitHub App installation/repository-binding model canonical while retaining `project_integrations` as a compatibility projection, adds payload-free project-scoped health/delivery read models, bounded failure categories, idempotent Maintainer retry requests, and restricted-safe delivery-to-issue audit associations. `/dashboard/settings/integrations/operations` exposes installation health, repository sync/access, delivery history, affected visible issues, retry eligibility, and secret-free recovery guidance. Existing webhook verification, matching, linking, and resolution behavior is preserved; hosted failure/retry and lifecycle validation remains external.
+
 ### Scope
 
 The hosted installation, repository binding, PR webhook, and merge-resolution path is already verified. Complete operational visibility and remove model ambiguity.

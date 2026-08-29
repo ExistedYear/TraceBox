@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Braces, FileText, Github, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Activity, Bell, Braces, FileText, Github, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,8 @@ const settingsLinks = [
   { href: "/dashboard/settings/members", label: "Workspace members", description: "Workspace roles and invitations", icon: Users },
   { href: "/dashboard/settings/contributors", label: "Contributors", description: "Project access and roles", icon: Users },
   { href: "/dashboard/settings/notifications", label: "Notifications", description: "Personal in-app delivery", icon: Bell },
-  { href: "/dashboard/settings/integrations", label: "Integrations", description: "GitHub repositories and automation", icon: Github, developerOnly: true },
+  { href: "/dashboard/settings/integrations", label: "Integrations", description: "GitHub repositories and automation", icon: Github, developerOnly: true, exact: true },
+  { href: "/dashboard/settings/integrations/operations", label: "GitHub operations", description: "Installation health and deliveries", icon: Activity, developerOnly: true },
 ];
 
 export function SettingsNavigation({ canAccessDeveloperSettings }: { canAccessDeveloperSettings: boolean }) {

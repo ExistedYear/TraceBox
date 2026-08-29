@@ -564,16 +564,20 @@ export type Database = {
           delivery_id: string
           error: string | null
           event_name: string
+          failed_at: string | null
+          failure_category: string
           github_installation_id: number | null
           github_repository_id: number | null
           id: string
           last_attempt_at: string | null
+          last_error_at: string | null
           next_retry_at: string | null
           payload: Json
           payload_cleared_at: string | null
           processed_at: string | null
           processing_started_at: string | null
           received_at: string
+          retry_requested_at: string | null
           status: string
         }
         Insert: {
@@ -582,16 +586,20 @@ export type Database = {
           delivery_id: string
           error?: string | null
           event_name: string
+          failed_at?: string | null
+          failure_category?: string
           github_installation_id?: number | null
           github_repository_id?: number | null
           id?: string
           last_attempt_at?: string | null
+          last_error_at?: string | null
           next_retry_at?: string | null
           payload?: Json
           payload_cleared_at?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           received_at?: string
+          retry_requested_at?: string | null
           status?: string
         }
         Update: {
@@ -600,19 +608,104 @@ export type Database = {
           delivery_id?: string
           error?: string | null
           event_name?: string
+          failed_at?: string | null
+          failure_category?: string
           github_installation_id?: number | null
           github_repository_id?: number | null
           id?: string
           last_attempt_at?: string | null
+          last_error_at?: string | null
           next_retry_at?: string | null
           payload?: Json
           payload_cleared_at?: string | null
           processed_at?: string | null
           processing_started_at?: string | null
           received_at?: string
+          retry_requested_at?: string | null
           status?: string
         }
         Relationships: []
+      }
+      github_webhook_delivery_issues: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          issue_event_id: string | null
+          issue_id: string
+          relationship: string
+          resolution_applied: boolean
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          issue_event_id?: string | null
+          issue_id: string
+          relationship?: string
+          resolution_applied?: boolean
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          issue_event_id?: string | null
+          issue_id?: string
+          relationship?: string
+          resolution_applied?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "github_webhook_delivery_issues_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "github_webhook_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "github_webhook_delivery_issues_issue_event_id_fkey"
+            columns: ["issue_event_id"]
+            isOneToOne: false
+            referencedRelation: "issue_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "github_webhook_delivery_issues_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      github_webhook_retry_requests: {
+        Row: {
+          delivery_id: string
+          id: string
+          request_count: number
+          requested_at: string
+          requested_by: string
+        }
+        Insert: {
+          delivery_id: string
+          id?: string
+          request_count?: number
+          requested_at?: string
+          requested_by: string
+        }
+        Update: {
+          delivery_id?: string
+          id?: string
+          request_count?: number
+          requested_at?: string
+          requested_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "github_webhook_retry_requests_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: true
+            referencedRelation: "github_webhook_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       issue_access: {
         Row: {
@@ -2015,6 +2108,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_github_webhook_payloads: { Args: never; Returns: number }
+      get_github_operations: {
+        Args: { p_project_id: string }
+        Returns: Json
+      }
       create_api_token: {
         Args: {
           p_expires_at?: string
@@ -2271,14 +2368,45 @@ export type Database = {
         Returns: string
       }
       mark_all_notifications_read: { Args: never; Returns: undefined }
-      mark_github_webhook_delivery: {
-        Args: {
-          p_delivery_id: string
-          p_error?: string
-          p_retry_at?: string
-          p_status: string
-        }
-        Returns: undefined
+      mark_github_webhook_delivery:
+        | {
+            Args: {
+              p_delivery_id: string
+              p_error?: string
+              p_retry_at?: string
+              p_status: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_delivery_id: string
+              p_error: string | null
+              p_failure_category: string | null
+              p_retry_at: string | null
+              p_status: string
+            }
+            Returns: undefined
+          }
+      list_github_webhook_deliveries: {
+        Args: { p_limit?: number; p_offset?: number; p_project_id: string }
+        Returns: {
+          delivery_id: string
+          event_name: string
+          action: string | null
+          github_installation_id: number | null
+          github_repository_id: number | null
+          received_at: string
+          last_attempt_at: string | null
+          processed_at: string | null
+          status: string
+          attempt_count: number
+          next_retry_at: string | null
+          failure_category: string
+          failed_at: string | null
+          retry_requested_at: string | null
+          payload_cleared_at: string | null
+        }[]
       }
       mark_notification_read: {
         Args: { p_notification_id: string }
@@ -2351,6 +2479,16 @@ export type Database = {
         }
         Returns: number
       }
+      record_github_webhook_delivery_issue: {
+        Args: {
+          p_delivery_id: string
+          p_issue_event_id?: string | null
+          p_issue_id: string
+          p_relationship?: string
+          p_resolution_applied?: boolean
+        }
+        Returns: undefined
+      }
       record_github_webhook: {
         Args: {
           p_issue_id: string
@@ -2378,6 +2516,20 @@ export type Database = {
       remove_github_integration: {
         Args: { p_project_id: string }
         Returns: undefined
+      }
+      request_github_webhook_retry: {
+        Args: { p_delivery_id: string; p_project_id: string }
+        Returns: {
+          request_id: string
+          delivery_id: string
+          status: string
+          requested_at: string
+          request_count: number
+        }[]
+      }
+      retry_github_webhook_delivery: {
+        Args: { p_delivery_id: string; p_project_id: string }
+        Returns: boolean
       }
       remove_github_link: { Args: { p_link_id: string }; Returns: undefined }
       remove_issue_link: { Args: { p_link_id: string }; Returns: undefined }

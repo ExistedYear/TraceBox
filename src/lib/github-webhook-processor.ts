@@ -142,7 +142,18 @@ async function upsertPullRequest(db: any, repositoryId: string, pullRequest: Git
   return String(artifactId);
 }
 
-async function processBoundEvent(db: any, payload: any, event: string, repositoryGithubId: number) {
+async function recordDeliveryIssue(db: any, deliveryId: string | undefined, issueId: string, relationship: "FIXES" | "REFERENCES", resolutionApplied = false) {
+  if (!deliveryId) return;
+  const { error } = await db.rpc("record_github_webhook_delivery_issue", {
+    p_delivery_id: deliveryId,
+    p_issue_id: issueId,
+    p_relationship: relationship,
+    p_resolution_applied: resolutionApplied,
+  });
+  if (error) throw error;
+}
+
+async function processBoundEvent(db: any, payload: any, event: string, repositoryGithubId: number, deliveryId?: string) {
   const { data: repository, error: repositoryError } = await db.from("github_repositories").select("id, full_name, installation_id").eq("github_repository_id", repositoryGithubId).maybeSingle();
   if (repositoryError) throw repositoryError;
   if (!repository) return { linked: 0, resolved: 0, hasBindings: false };
@@ -194,15 +205,20 @@ async function processBoundEvent(db: any, payload: any, event: string, repositor
       const { data: reconciled, error: reconcileError } = await db.rpc("reconcile_auto_github_links", { p_project_id: project.id, p_github_artifact_id: artifactId, p_desired_links: desiredLinks });
       if (reconcileError) throw reconcileError;
       linked += Number(reconciled ?? 0);
+      const resolvedIssues = new Set<string>();
       if (pullRequest.merged === true || Boolean(pullRequest.merged_at)) {
         for (const desired of desiredLinks.filter((link) => link.relationship === "FIXES")) {
           if (binding.auto_resolve_enabled && typeof pullRequest.base?.ref === "string" && githubBranchMatches(pullRequest.base.ref, binding.target_branches ?? [])) {
             const { data: didResolve, error: resolveError } = await db.rpc("resolve_issue_from_github", { p_project_id: project.id, p_issue_id: desired.issue_id, p_github_repository_id: repository.id, p_target_branch: pullRequest.base.ref });
             if (resolveError) throw resolveError;
-            if (didResolve) resolved += 1;
+            if (didResolve) {
+              resolved += 1;
+              resolvedIssues.add(desired.issue_id);
+            }
           }
         }
       }
+      for (const desired of desiredLinks) await recordDeliveryIssue(db, deliveryId, desired.issue_id, desired.relationship, resolvedIssues.has(desired.issue_id));
     }
     return { linked, resolved, hasBindings: true };
   }
@@ -272,12 +288,13 @@ async function processBoundEvent(db: any, payload: any, event: string, repositor
       const { data: reconciled, error } = await db.rpc("reconcile_auto_github_links", { p_project_id: project.id, p_github_artifact_id: artifactId, p_desired_links: desiredLinks });
       if (error) throw error;
       linked += Number(reconciled ?? 0);
+      for (const desired of desiredLinks) await recordDeliveryIssue(db, deliveryId, desired.issue_id, desired.relationship);
     }
   }
   return { linked, resolved, hasBindings: true };
 }
 
-async function processLegacyEvent(db: any, payload: any, event: string, repositoryName: string) {
+async function processLegacyEvent(db: any, payload: any, event: string, repositoryName: string, deliveryId?: string) {
   const { data: integrations, error: integrationsError } = await db.from("project_integrations").select("project_id, auto_resolve_enabled").eq("provider", "GITHUB").ilike("repo_full_name", repositoryName).eq("is_enabled", true);
   if (integrationsError) throw integrationsError;
   if (!integrations?.length) return { linked: 0, resolved: 0 };
@@ -304,17 +321,20 @@ async function processLegacyEvent(db: any, payload: any, event: string, reposito
       if (error) throw error;
       if (!linkId) throw new Error("Legacy GitHub link recorder returned no link id.");
       linked += 1;
+      let didResolve = false;
       if (event === "pull_request" && payload.pull_request?.merged === true && integration.auto_resolve_enabled && closingKeys.has(key)) {
-        const { data: didResolve, error: resolveError } = await db.rpc("resolve_issue_from_github", { p_project_id: project.id, p_issue_id: issue.id, p_repo_name: repositoryName });
+        const { data: resolvedNow, error: resolveError } = await db.rpc("resolve_issue_from_github", { p_project_id: project.id, p_issue_id: issue.id, p_repo_name: repositoryName });
         if (resolveError) throw resolveError;
+        didResolve = resolvedNow === true;
         if (didResolve) resolved += 1;
       }
+      await recordDeliveryIssue(db, deliveryId, issue.id, closingKeys.has(key) ? "FIXES" : "REFERENCES", didResolve);
     }
   }
   return { linked, resolved };
 }
 
-export async function processGithubWebhookPayload(db: any, payload: any, event: string, action: string | null) {
+export async function processGithubWebhookPayload(db: any, payload: any, event: string, action: string | null, deliveryId?: string) {
   if (["installation", "installation_repositories", "repository", "installation_target"].includes(event)) {
     await processLifecycleEvent(db, payload, event, action);
     return { linked: 0, resolved: 0 };
@@ -323,13 +343,21 @@ export async function processGithubWebhookPayload(db: any, payload: any, event: 
   const repositoryId = Number(payload.repository?.id);
   const normalizedRepository = typeof payload.repository?.full_name === "string" ? normalizeGithubRepository(payload.repository.full_name) : null;
   if (!normalizedRepository || !Number.isSafeInteger(repositoryId) || repositoryId < 1) return { linked: 0, resolved: 0 };
-  const result = await processBoundEvent(db, payload, event, repositoryId);
-  const legacy = result.hasBindings ? { linked: 0, resolved: 0 } : event === "pull_request" || event === "push" ? await processLegacyEvent(db, payload, event, normalizedRepository) : { linked: 0, resolved: 0 };
+  const result = await processBoundEvent(db, payload, event, repositoryId, deliveryId);
+  const legacy = result.hasBindings ? { linked: 0, resolved: 0 } : event === "pull_request" || event === "push" ? await processLegacyEvent(db, payload, event, normalizedRepository, deliveryId) : { linked: 0, resolved: 0 };
   return { linked: result.linked + legacy.linked, resolved: result.resolved + legacy.resolved };
 }
 
 function retryDelay(attemptCount: number) {
   return Math.min(24 * 60 * 60, 60 * 2 ** Math.max(attemptCount - 1, 0));
+}
+
+function operationalFailureCategory(kind: ReturnType<typeof classifyGithubApiError>) {
+  if (kind === "AUTH_REVOKED" || kind === "PERMISSION_MISSING") return "AUTHORIZATION";
+  if (kind === "RATE_LIMITED" || kind === "SECONDARY_RATE_LIMITED") return "RATE_LIMITED";
+  if (kind === "NOT_FOUND") return "REPOSITORY_ACCESS";
+  if (kind === "TEMPORARY") return "UPSTREAM";
+  return "PROCESSING";
 }
 
 export async function processGithubWebhookDelivery(deliveryId: string) {
@@ -339,7 +367,7 @@ export async function processGithubWebhookDelivery(deliveryId: string) {
   const { data: delivery, error: deliveryError } = await admin.from("github_webhook_deliveries").select("delivery_id, event_name, action, payload, attempt_count").eq("delivery_id", deliveryId).maybeSingle();
   if (deliveryError || !delivery) return false;
   try {
-    const result = await processGithubWebhookPayload(admin, delivery.payload ?? {}, delivery.event_name, delivery.action);
+    const result = await processGithubWebhookPayload(admin, delivery.payload ?? {}, delivery.event_name, delivery.action, deliveryId);
     const { error } = await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "PROCESSED", p_error: null, p_retry_at: null });
     if (error) throw error;
     console.info("GitHub webhook processed", { deliveryId, linked: result.linked, resolved: result.resolved, attempt: delivery.attempt_count });
@@ -351,7 +379,7 @@ export async function processGithubWebhookDelivery(deliveryId: string) {
     if (Number.isSafeInteger(installationId) && installationId > 0 && ["AUTH_REVOKED", "PERMISSION_MISSING"].includes(kind)) invalidateGithubInstallationToken(installationId);
     const retryAt = attempt >= MAX_GITHUB_WEBHOOK_ATTEMPTS ? null : new Date(Date.now() + retryDelay(attempt) * 1000).toISOString();
     console.error("GitHub webhook processing failed", { deliveryId, event: delivery.event_name, error: error instanceof Error ? error.message : "unknown" });
-    await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "FAILED", p_error: "Processing failed; TraceBox will retry.", p_retry_at: retryAt });
+    await admin.rpc("mark_github_webhook_delivery", { p_delivery_id: deliveryId, p_status: "FAILED", p_error: "Processing failed; TraceBox will retry.", p_retry_at: retryAt, p_failure_category: operationalFailureCategory(kind) });
     return false;
   }
 }

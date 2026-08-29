@@ -11,9 +11,9 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 ## Current snapshot
 
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
-- The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
+- The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. Source-level operational visibility is implemented; hosted failure/retry, lifecycle, and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–12 are source-implemented as of 2026-08-29. Migrations 045–063, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–13 are source-implemented as of 2026-08-29. Migrations 045–064, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -182,10 +182,10 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-004
 - Owner area: GitHub App / Integrations
-- Status: OPEN
-- Evidence: `src/components/settings/github-integration-manager.tsx`; integrations settings route; `src/app/api/github/**`; webhook route; migrations `202608260028`, `202608260033`, `202608260040`, and `202608260041`
+- Status: EXTERNAL
+- Evidence: canonical installation/repository/binding model in migrations `202608260040`–`043`; operational migration `202608260064`; `/dashboard/settings/integrations/operations`; `src/components/settings/github-operations-dashboard.tsx`; authenticated `/api/github/retry`; payload-free project-scoped health/history RPC; delivery-to-visible-issue associations recorded by `src/lib/github-webhook-processor.ts`; `tests/github-operations.test.ts`; `supabase/tests/github_operations_phase13.test.sql`
 - Acceptance: The canonical GitHub App model is clear (including treatment of legacy integrations), and users can see installation/repository health, webhook delivery history and failure detail, retry failed deliveries, rich PR/commit/CI/merge activity, and automatic-resolution audit results. Historical links survive access removal and restricted issue data never leaves TraceBox.
-- Verification: Hosted GitHub App install/bind/link/merge flow (already verified 2026-08-28) plus delivery failure/retry, lifecycle, reconciliation, and restricted-data tests.
+- Verification: Source typecheck, focused GitHub tests, migration consistency, and production build; hosted GitHub App install/bind/link/merge flow was verified 2026-08-28. Still exercise a real failed-delivery retry, installation/repository lifecycle transitions, reconciliation, and restricted-data visibility against the target environment.
 
 ### TB-018 — Attachment failure recovery and upload UX
 
