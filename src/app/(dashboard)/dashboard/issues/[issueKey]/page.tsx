@@ -14,6 +14,8 @@ import { IssueSecuritySection } from "@/components/issues/issue-security-section
 import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
 import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
 import { IssueWatchButton } from "@/components/issues/issue-watch-button";
+import { TraceAiPanel } from "@/components/intelligence/trace-ai-panel";
+import { BlastRadiusGraph } from "@/components/intelligence/blast-radius-graph";
 import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, parseIssueKey, personLabel } from "@/lib/issues";
 import type { TimelineComment, TimelineEventRow } from "@/lib/issues";
@@ -192,6 +194,27 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
             members={(projectMemberRows ?? []).map((member) => ({ id: member.user_id, label: mergedNames.get(member.user_id) ?? member.user_id.slice(0, 8) }))}
           />
+
+          <TraceAiPanel
+            key={`intelligence-${issue.id}`}
+            issueId={issue.id}
+            projectKey={parsed.projectKey}
+            reportQualityIssue={{
+              description: issue.description,
+              steps_to_reproduce: issue.steps_to_reproduce,
+              expected_behavior: issue.expected_behavior,
+              actual_behavior: issue.actual_behavior,
+              environment: issue.environment,
+              affected_version_id: issue.affected_version_id,
+              title: issue.title,
+            }}
+            attachments={(attachmentRows ?? []).map((row) => ({ filename: (row as { filename?: string }).filename ?? null, mime_type: (row as { mime_type?: string }).mime_type ?? null }))}
+            allowedComponents={(componentRows ?? []).map((row) => ({ id: (row as { id: string }).id, name: (row as { name: string }).name }))}
+            allowedAssignees={(projectMemberRows ?? []).map((row) => ({ userId: (row as { user_id: string }).user_id, displayName: mergedNames.get((row as { user_id: string }).user_id) ?? null }))}
+            duplicateCandidates={[]}
+          />
+
+          <BlastRadiusGraph key={`blast-${issue.id}`} issueId={issue.id} projectKey={parsed.projectKey} />
 
           <CommentsSection key={`comments-${issue.id}`}
             issueId={issue.id}

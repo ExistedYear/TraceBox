@@ -21,6 +21,7 @@ import {
 
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
+import { ReleaseBriefPanel } from "@/components/intelligence/release-brief";
 import { categoryClasses, formatIssueKey } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,7 @@ export type VersionOption = {
 };
 
 type Props = {
+  projectId: string;
   projectName: string;
   projectKey: string;
   issues: ReadinessIssue[];
@@ -63,6 +65,7 @@ type Props = {
 };
 
 export function ReadinessDashboard({
+  projectId,
   projectName,
   projectKey,
   issues,
@@ -292,6 +295,7 @@ export function ReadinessDashboard({
               <p className="mt-1 font-mono text-xl font-bold text-muted-foreground">{analysis.unassigned.length}</p>
             </div>
           </div>
+          <ReleaseBriefPanel projectId={projectId} milestoneId={selectedMilestoneId === "all" ? null : selectedMilestoneId} versionId={selectedVersionId === "all" ? null : selectedVersionId} />
         </div>
 
         {/* Actionable Risk List */}

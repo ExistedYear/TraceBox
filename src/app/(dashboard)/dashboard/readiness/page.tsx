@@ -98,6 +98,7 @@ export default async function ReadinessPage() {
 
   return (
     <ReadinessDashboard
+      projectId={projectId}
       projectName={projectName}
       projectKey={projectKey}
       issues={issues}

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleDot, ListFilter, Plus, Users } from "lucide-react";
 
-import { IssueTable } from "@/components/issues/issue-table";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
+import { IssuesWithNaturalSearch } from "@/components/intelligence/issues-with-natural-search";
 import { createClient } from "@/lib/supabase/server";
 import { decodeIssueSearchParams } from "@/lib/issues";
 import { personLabel } from "@/lib/issues";
@@ -69,16 +69,15 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
       {(states ?? []).length === 0 ? (
         <Surface className="p-8 text-center text-sm text-muted-foreground">This project has no workflow states yet.</Surface>
       ) : (
-        <IssueTable
-          key={projectId}
-          projectKey={context.activeProject.key}
+        <IssuesWithNaturalSearch
           projectId={projectId}
+          projectKey={context.activeProject.key}
           canEdit={role === "DEVELOPER" || role === "MAINTAINER"}
           currentUserId={context.userId}
           states={(states ?? []).map((state) => ({ value: state.id, label: state.name }))}
           components={(components ?? []).map((component) => ({ value: component.id, label: component.name }))}
           members={[...new Map(candidates.map((row) => [row.user_id, { value: row.user_id, label: personLabel(names.get(row.user_id), row.user_id) }])).values()]}
-          initialFilters={filters}
+          initialFilters={filters as unknown as Record<string, string>}
         />
       )}
     </main>
