@@ -71,7 +71,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (57 ordered), pgTAP tests/, seed.sql (empty)
+supabase/                  config.toml, migrations/ (61 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, gap, and feature plans
@@ -136,7 +136,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions own privileged/transactional writes, including membership/invitations, atomic issue creation/editing, notification preferences/read state, project lifecycle/workflow publication, restricted grants, components, comments, and planning. Clients call `supabase.rpc(...)`; direct browser writes to protected tables and audit history remain revoked.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed contract is reconciled through migration 057, but must be regenerated after replaying migrations 046–057 locally or on the linked project. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed contract is reconciled through migration 061, but must be regenerated after replaying migrations 046–061 locally or on the linked project. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
 - **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
 - **Issue editing and realtime**: full issue creation is one `create_issue_complete` transaction covering template defaults, required custom values, visibility, grants, labels, watchers, and audit. Detail edits use the optimistic `updated_at` overload and never overwrite a dirty draft on realtime changes. Filter/visibility-sensitive queue events always refetch through RLS; newly restricted rows are removed before refetch.
 - **Notifications**: the full inbox and header preview share the cursor/exact-count feed. Preference and read mutations are RPC-only; retained categories are mentions, assignments, comments, status, watched updates, links, labels, planning, and milestones. Restricted notification rows are returned only while `can_view_issue` remains true; title/actor/payload are redacted while key/number preserve an authorized link.
@@ -220,8 +220,10 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
 | `src/components/issues/issue-attachments-section.tsx` | Phase 13 private attachment upload, signed preview/download, and cleanup |
-| `src/components/reports/reports-dashboard.tsx` | Phase 14 time-window metrics, MTTR, aging, component, and priority reports |
-| `src/components/readiness/readiness-dashboard.tsx` | Phase 15 milestone/version release score and explainable risks |
+| `src/components/reports/reports-dashboard.tsx` / `src/lib/reports.ts` | Backend-authoritative report windows, historical backlog, resolution metrics, drilldowns, and CSV export |
+| `supabase/migrations/202608260058_phase11_reports.sql` | Visibility-filtered created/resolved/backlog history and report breakdown RPC |
+| `src/components/readiness/readiness-dashboard.tsx` / `src/lib/readiness.ts` | Phase 11 backend-authoritative readiness score, restricted-safe drilldowns/export, and creator-only snapshot history |
+| `supabase/migrations/202608260059_phase11_release_readiness.sql` | Visibility-filtered readiness scoring, project-owned milestone/version validation, immutable RPC-only snapshots, and creator-only history |
 | `src/lib/api-auth.ts` | Server-only API bearer token hashing, scope, membership, and visibility enforcement |
 | `src/app/api/v1/` | Scoped REST project/issue reads and writes plus comments, milestones, search, and verified GitHub resources |
 | `src/app/api/webhooks/github/` | HMAC-verified, durable GitHub App webhook ingestion; processor/replay/cleanup helpers live under `src/lib/` |
@@ -237,6 +239,10 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
 | `src/components/settings/settings-navigation.tsx` | Active-route secondary settings navigation for configuration, templates, custom fields/API, membership, contributors, and integrations |
 | `src/components/settings/workspace-members-manager.tsx` / `src/components/settings/project-members-manager.tsx` | Workspace invitations/roles, project contributor roles, access removal, and ownership controls |
+| `src/components/audit/audit-explorer.tsx` / `src/app/(dashboard)/dashboard/audit/page.tsx` | Restricted-safe, paginated project audit explorer with actor/action/date/issue filters and CSV export |
+| `src/lib/issues.ts` / `src/components/issues/issue-table.tsx` | Canonical queue filter codec supports workflow-category, critical-severity, unresolved, and overdue dashboard drilldowns |
+| `supabase/migrations/202608260060_phase11_dashboard_metrics.sql` | Authoritative visibility-filtered operational dashboard metrics RPC |
+| `supabase/migrations/202608260061_phase11_audit_explorer.sql` | Authorized audit listing RPC with recursive cross-issue JSON redaction |
 | `docs/collaboration-github-dashboard-plan.md` | Implementation plan for invitations, role-aware collaboration UI, and the GitHub administration dashboard |
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |

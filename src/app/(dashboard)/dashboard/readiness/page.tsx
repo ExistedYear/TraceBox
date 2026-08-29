@@ -3,11 +3,10 @@ import { FolderKanban } from "lucide-react";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { NewProjectButton } from "@/components/layout/workspace-switcher";
-import { ReadinessDashboard, type ReadinessIssue } from "@/components/readiness/readiness-dashboard";
+import { ReadinessDashboard, type ReadinessSnapshot } from "@/components/readiness/readiness-dashboard";
 import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
-import { formatIssueKey, personLabel } from "@/lib/issues";
-import { displayNameMap } from "@/lib/server-people";
+import { normalizeReadinessAnalysis } from "@/lib/readiness";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
 export const metadata: Metadata = {
@@ -42,7 +41,7 @@ export default async function ReadinessPage() {
   const projectName = context.activeProject.name;
   const projectKey = context.activeProject.key;
 
-  const [{ data: milestoneRows, error: milestonesError }, { data: versionRows, error: versionsError }] = await Promise.all([
+  const [{ data: milestoneRows, error: milestonesError }, { data: versionRows, error: versionsError }, { data: analysisData, error: analysisError }, { data: snapshotRows, error: snapshotsError }] = await Promise.all([
     supabase
       .from("milestones")
       .select("id, name, status, due_at")
@@ -54,42 +53,15 @@ export default async function ReadinessPage() {
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("name"),
+    supabase.rpc("calculate_release_readiness", { p_project_id: projectId, p_milestone_id: null, p_version_id: null }),
+    supabase.rpc("list_release_readiness_snapshots", { p_project_id: projectId, p_milestone_id: null, p_version_id: null, p_limit: 30 }),
   ]);
-  const issueRows: any[] = [];
-  let issueError: { code?: string; message: string } | null = null;
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, assignee_id, target_milestone_id, affected_version_id, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
-    if (error) { issueError = error; break; }
-    issueRows.push(...(data ?? []));
-    if ((data ?? []).length < 1000) break;
-  }
 
-  if (milestonesError || versionsError || issueError) {
-    const error = milestonesError ?? versionsError ?? issueError;
+  if (milestonesError || versionsError || analysisError || snapshotsError) {
+    const error = milestonesError ?? versionsError ?? analysisError ?? snapshotsError;
     console.error("Readiness load failed", { code: error?.code, message: error?.message });
     return <LoadErrorPage title="Readiness unavailable" description="We could not load the complete release dataset. No partial score is being shown." retryHref="/dashboard/readiness" />;
   }
-
-  const rawIssues = issueRows;
-  const assigneeIds = rawIssues.map((i) => i.assignee_id).filter(Boolean);
-  const nameMap = await displayNameMap(assigneeIds);
-
-  const issues: ReadinessIssue[] = rawIssues.map((row: any) => ({
-    id: row.id,
-    issueNumber: row.issue_number,
-    keyLabel: formatIssueKey(projectKey, row.issue_number),
-    title: row.title,
-    type: row.type,
-    priority: row.priority,
-    severity: row.severity,
-    statusCategory: row.status?.category ?? "OPEN",
-    statusName: row.status?.name ?? "Open",
-    assigneeId: row.assignee_id ?? null,
-    assigneeLabel: personLabel(nameMap.get(row.assignee_id ?? ""), row.assignee_id),
-    componentName: row.component?.name ?? null,
-    targetMilestoneId: row.target_milestone_id ?? null,
-    affectedVersionId: row.affected_version_id ?? null,
-  }));
 
   const milestones = (milestoneRows ?? []).map((m) => ({
     id: m.id,
@@ -106,9 +78,19 @@ export default async function ReadinessPage() {
 
   return (
     <ReadinessDashboard
+      projectId={projectId}
       projectName={projectName}
       projectKey={projectKey}
-      issues={issues}
+      initialAnalysis={normalizeReadinessAnalysis(analysisData, projectKey)}
+      snapshots={(snapshotRows ?? []).map((row) => ({
+        id: row.id,
+        milestoneId: row.milestone_id,
+        versionId: row.version_id,
+        score: row.score,
+        status: row.status,
+        breakdown: (row.breakdown ?? {}) as Record<string, unknown>,
+        createdAt: row.created_at,
+      } satisfies ReadinessSnapshot))}
       milestones={milestones}
       versions={versions}
     />

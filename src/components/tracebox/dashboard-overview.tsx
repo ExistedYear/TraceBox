@@ -38,9 +38,13 @@ export type OverviewMetrics = {
   inProgressCount: number;
   criticalCount: number;
   totalCount: number;
+  assignedToMe: number;
+  awaitingTriage: number;
+  dueMilestones: number;
 };
 
 type DashboardOverviewProps = {
+  userId: string;
   workspaceName: string;
   organizationId: string;
   activeProject: ProjectSummary | null;
@@ -61,6 +65,7 @@ function relativeTime(iso: string) {
 
 export function DashboardOverview({
   workspaceName,
+  userId,
   organizationId,
   activeProject,
   projects,
@@ -128,41 +133,44 @@ export function DashboardOverview({
           {!activeProject ? <Surface className="p-8 text-center"><FolderKanban className="mx-auto h-8 w-8 text-primary" /><h2 className="mt-3 text-sm font-semibold">Choose an active project</h2><p className="mt-1 text-xs text-muted-foreground">Metrics are project-specific. Select a project from the list below to open its issue queue.</p></Surface> : <>
           {/* Metrics Grid */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card p-4">
+            <Link href={`/dashboard/issues?assignee=${encodeURIComponent(userId)}&unresolved=1`} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"><p className="text-xs font-medium text-muted-foreground">Assigned to me</p><p className="mt-3 font-mono text-2xl font-semibold">{metrics.assignedToMe}</p><p className="mt-1 text-xs text-muted-foreground">Your active work</p></Link>
+            <Link href="/dashboard/issues?status_category=TRIAGE" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"><p className="text-xs font-medium text-muted-foreground">Awaiting triage</p><p className="mt-3 font-mono text-2xl font-semibold">{metrics.awaitingTriage}</p><p className="mt-1 text-xs text-muted-foreground">Unreviewed issues</p></Link>
+            <Link href="/dashboard/issues?overdue=1&unresolved=1" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"><p className="text-xs font-medium text-muted-foreground">Due milestones</p><p className="mt-3 font-mono text-2xl font-semibold">{metrics.dueMilestones}</p><p className="mt-1 text-xs text-muted-foreground">Overdue milestone work</p></Link>
+            <Link href="/dashboard/issues?status_category=TRIAGE,OPEN" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-muted-foreground">Open & Triage</p>
                 <AlertCircle className="h-4 w-4 text-amber-500" />
               </div>
               <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.openCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">Awaiting resolution or triage</p>
-            </div>
+            </Link>
 
-            <div className="rounded-xl border border-border bg-card p-4">
+            <Link href="/dashboard/issues?status_category=IN_PROGRESS,REVIEW" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-muted-foreground">In Progress & Review</p>
                 <Activity className="h-4 w-4 text-blue-500" />
               </div>
               <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.inProgressCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">Under active engineering</p>
-            </div>
+            </Link>
 
-            <div className="rounded-xl border border-border bg-card p-4">
+            <Link href="/dashboard/issues?critical=1&unresolved=1" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-muted-foreground">Critical & Blockers</p>
                 <AlertTriangle className="h-4 w-4 text-red-500" />
               </div>
               <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.criticalCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">Highest severity issues</p>
-            </div>
+            </Link>
 
-            <div className="rounded-xl border border-border bg-card p-4">
+            <Link href="/dashboard/issues" className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
               <div className="flex items-start justify-between">
                 <p className="text-xs font-medium text-muted-foreground">Total Issues</p>
                 <Ticket className="h-4 w-4 text-purple-500" />
               </div>
               <p className="mt-3 font-mono text-2xl font-semibold tracking-tight">{metrics.totalCount}</p>
               <p className="mt-1 text-xs text-muted-foreground">Tracked in active project</p>
-            </div>
+            </Link>
           </div>
 
           {/* Recent Issues Section */}

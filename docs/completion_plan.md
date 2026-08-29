@@ -312,6 +312,8 @@ Each resource supports its complete create, configure, use, update, archive/dele
 
 ## Phase 11 — Reports, readiness, dashboard, and audit explorer
 
+Status: source-complete on 2026-08-29. Migrations 058–061 provide visibility-filtered report history, readiness scoring and creator-private snapshots, operational dashboard metrics, and a restricted-safe audit feed. The report/readiness/audit UIs include drilldowns, bounded exports, explicit empty/error states, and canonical queue links; database replay and hosted multi-user/browser verification remain external.
+
 ### Reports
 
 Add backend-authoritative created-vs-resolved, backlog-over-time, resolution-duration, assignee, milestone, and historical trend data, with time windows, drilldowns, export, explicit no-data states, and explicit query-error states.
@@ -370,7 +372,7 @@ The hosted installation, repository binding, PR webhook, and merge-resolution pa
 
 A maintainer can determine whether GitHub is healthy, why automation failed, what delivery caused an issue change, and whether a retry is safe.
 
-## Phase 14 — Real database, API, realtime, and browser tests
+## Phase 14 — Real database, API, realtime, and browser tests (can be skipped for now)
 
 ### Database and RLS
 
@@ -420,11 +422,11 @@ npm run build
 npm run db:reset
 ```
 
-Also run the database, API, realtime, and browser commands introduced in Phase 14.
+Also run the database, API, realtime, and browser commands introduced in Phase 14. (skipped)
 
 ### Exit criteria
 
-Every backlog item is either verified `DONE` with evidence or explicitly `EXTERNAL` with the missing environment prerequisite documented.
+Every backlog item is either verified `DONE` with evidence or explicitly `EXTERNAL` with the missing environment prerequisite documented. then tell me about the status after finishing the implementation.
 
 ## Execution order
 

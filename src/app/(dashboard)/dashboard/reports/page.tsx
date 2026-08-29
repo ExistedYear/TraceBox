@@ -3,7 +3,7 @@ import { FolderKanban } from "lucide-react";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { NewProjectButton } from "@/components/layout/workspace-switcher";
-import { ReportsDashboard, type ReportIssueItem } from "@/components/reports/reports-dashboard";
+import { ReportsDashboard } from "@/components/reports/reports-dashboard";
 import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace-context";
@@ -46,35 +46,13 @@ export default async function ReportsPage() {
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("name");
-  const issueRows: any[] = [];
-  let issueError: { code?: string; message: string } | null = null;
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, created_at, resolved_at, closed_at, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
-    if (error) { issueError = error; break; }
-    issueRows.push(...(data ?? []));
-    if ((data ?? []).length < 1000) break;
-  }
+  const { data: reportMetrics, error: reportError } = await supabase.rpc("get_issue_reports", { p_project_id: projectId, p_window_days: 30 });
 
-  if (componentsError || issueError) {
-    const error = componentsError ?? issueError;
+  if (componentsError || reportError) {
+    const error = componentsError ?? reportError;
     console.error("Reports load failed", { code: error?.code, message: error?.message });
     return <LoadErrorPage title="Reports unavailable" description="We could not load the complete report dataset. No partial metrics are being shown." retryHref="/dashboard/reports" />;
   }
-
-  const issues: ReportIssueItem[] = issueRows.map((row: any) => ({
-    id: row.id,
-    issueNumber: row.issue_number,
-    title: row.title,
-    type: row.type,
-    priority: row.priority,
-    severity: row.severity,
-    statusCategory: row.status?.category ?? "OPEN",
-    statusName: row.status?.name ?? "Open",
-    componentName: row.component?.name ?? null,
-    createdAt: row.created_at,
-    resolvedAt: row.resolved_at ?? null,
-    closedAt: row.closed_at ?? null,
-  }));
 
   const components = (componentRows ?? []).map((c) => ({
     id: c.id,
@@ -85,7 +63,8 @@ export default async function ReportsPage() {
     <ReportsDashboard
       projectName={projectName}
       projectKey={projectKey}
-      issues={issues}
+      projectId={projectId}
+      initialMetrics={reportMetrics as unknown as Record<string, unknown>}
       components={components}
     />
   );

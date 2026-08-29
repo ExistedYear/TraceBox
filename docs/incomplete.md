@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–10 are source-implemented as of 2026-08-29. Migrations 045–057, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–11 are source-implemented as of 2026-08-29. Migrations 045–061, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -132,8 +132,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-004, TB-008
 - Owner area: Reports / Analytics
-- Status: OPEN
-- Evidence: `src/components/reports/reports-dashboard.tsx`; reports route
+- Status: EXTERNAL
+- Evidence: migration `202608260058_phase11_reports.sql`; `src/lib/reports.ts`; `src/components/reports/reports-dashboard.tsx`; reports route; `tests/reports.test.ts`; `supabase/tests/reports_phase11.test.sql`
 - Acceptance: Reports include created-vs-resolved, backlog-over-time, resolution-duration, assignee, milestone, and historical views with drilldowns/export where promised. No-data, partial-data, and query-failure states are explicit and metric denominators are authoritative.
 - Verification: Fixture-based calculation tests importing production functions; route failure/empty tests; browser metric/filter/drilldown/export journey.
 
@@ -142,8 +142,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-004, TB-007, TB-012
 - Owner area: Readiness / Planning
-- Status: OPEN
-- Evidence: `src/components/readiness/readiness-dashboard.tsx`; readiness route
+- Status: EXTERNAL
+- Evidence: migration `202608260059_phase11_release_readiness.sql`; `src/lib/readiness.ts`; `src/components/readiness/readiness-dashboard.tsx`; readiness route; `tests/readiness.test.ts`
 - Acceptance: Readiness includes unresolved security and overdue-milestone factors, uses a backend-authoritative calculation, persists snapshots/history, supports export and drilldowns, and renders “no release data” for an empty project rather than 100% ready.
 - Verification: SQL score/permission tests against production data; snapshot/history tests; browser factor, empty, failure, and export journey.
 
@@ -202,8 +202,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-004, TB-008
 - Owner area: Dashboard / Navigation
-- Status: OPEN
-- Evidence: dashboard route and `src/components/tracebox/dashboard-overview.tsx`
+- Status: EXTERNAL
+- Evidence: migration `202608260060_phase11_dashboard_metrics.sql`; dashboard route; `src/components/tracebox/dashboard-overview.tsx`; canonical filter support in `src/lib/issues.ts` and `src/components/issues/issue-table.tsx`; `tests/phase11-dashboard-audit.test.ts`
 - Acceptance: Overview includes assigned-to-me, awaiting-triage, due-milestone, and other committed operational cards; each card has an authorized clickable drilldown and truthful empty/error semantics.
 - Verification: Query/permission tests and browser card-to-filter journey for empty, populated, and failed data.
 
@@ -242,8 +242,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Low
 - Dependencies: TB-001, TB-003
 - Owner area: Audit / Issues / Settings
-- Status: OPEN
-- Evidence: issue timeline exists, but no standalone audit-history screen was found in either audit.
+- Status: EXTERNAL
+- Evidence: migration `202608260061_phase11_audit_explorer.sql`; `/dashboard/audit`; `src/components/audit/audit-explorer.tsx`; project/settings navigation entries; `tests/phase11-dashboard-audit.test.ts`
 - Acceptance: Authorized users can discover a paginated, filterable standalone audit history for the relevant project/workspace, with actor, timestamp, event type, target, before/after values, and restricted-data redaction.
 - Verification: RLS/query tests for cross-project and restricted events plus browser pagination/filter/export or documented non-export behavior.
 

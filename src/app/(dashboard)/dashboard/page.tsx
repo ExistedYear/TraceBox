@@ -22,6 +22,9 @@ export default async function DashboardPage() {
     inProgressCount: 0,
     criticalCount: 0,
     totalCount: 0,
+    assignedToMe: 0,
+    awaitingTriage: 0,
+    dueMilestones: 0,
   };
   let recentIssues: OverviewIssue[] = [];
 
@@ -31,10 +34,7 @@ export default async function DashboardPage() {
 
     const [
       { data: issueRows, error: issueError },
-      { count: totalCount, error: totalError },
-      { count: criticalCount, error: criticalError },
-      { data: openStates, error: openStatesError },
-      { data: inProgressStates, error: inProgressStatesError },
+      { data: authoritativeMetrics, error: metricsError },
     ] = await Promise.all([
       supabase
         .from("issues")
@@ -42,59 +42,32 @@ export default async function DashboardPage() {
         .eq("project_id", projectId)
         .order("updated_at", { ascending: false })
         .limit(10),
-      supabase
-        .from("issues")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", projectId),
-      supabase
-        .from("issues")
-        .select("id", { count: "exact", head: true })
-        .eq("project_id", projectId)
-        .in("severity", ["BLOCKER", "CRITICAL"]),
-      supabase
-        .from("workflow_states")
-        .select("id")
-        .eq("project_id", projectId)
-        .in("category", ["TRIAGE", "OPEN"]),
-      supabase
-        .from("workflow_states")
-        .select("id")
-        .eq("project_id", projectId)
-        .in("category", ["IN_PROGRESS", "REVIEW"]),
+      supabase.rpc("get_dashboard_metrics", { p_project_id: projectId }),
     ]);
 
-    const firstError = issueError ?? totalError ?? criticalError ?? openStatesError ?? inProgressStatesError;
+    const firstError = issueError ?? metricsError;
     if (firstError) {
       console.error("Dashboard metrics load failed", { code: firstError.code, message: firstError.message });
       return <LoadErrorPage title="Dashboard unavailable" description="We could not load the active project metrics. No partial totals are being shown." retryHref="/dashboard" />;
     }
 
-    const openStateIds = (openStates ?? []).map((s) => s.id);
-    const inProgressStateIds = (inProgressStates ?? []).map((s) => s.id);
-
-    const openCountResult = openStateIds.length > 0
-      ? await supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", openStateIds)
-      : { count: 0, error: null };
-    const inProgressCountResult = inProgressStateIds.length > 0
-      ? await supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", inProgressStateIds)
-      : { count: 0, error: null };
-    const { count: openCount, error: openCountError } = openCountResult;
-    const { count: inProgressCount, error: inProgressCountError } = inProgressCountResult;
-
-    const stateCountError = openCountError ?? inProgressCountError;
-    if (stateCountError) {
-      console.error("Dashboard state metrics load failed", { code: stateCountError.code, message: stateCountError.message });
+    if (!authoritativeMetrics?.[0]) {
+      console.error("Dashboard authoritative metrics load failed", { code: metricsError?.code, message: metricsError?.message });
       return <LoadErrorPage title="Dashboard unavailable" description="We could not calculate the active project metrics. No partial totals are being shown." retryHref="/dashboard" />;
     }
+    const m = authoritativeMetrics[0];
 
     const assigneeIds = (issueRows ?? []).map((r) => r.assignee_id);
     const names = await displayNameMap(assigneeIds);
 
     metrics = {
-      openCount: openCount ?? 0,
-      inProgressCount: inProgressCount ?? 0,
-      criticalCount: criticalCount ?? 0,
-      totalCount: totalCount ?? 0,
+      openCount: Number(m.open_count ?? 0),
+      inProgressCount: Number(m.in_progress_count ?? 0),
+      criticalCount: Number(m.critical_count ?? 0),
+      totalCount: Number(m.total_count ?? 0),
+      assignedToMe: Number(m.assigned_to_me ?? 0),
+      awaitingTriage: Number(m.awaiting_triage ?? 0),
+      dueMilestones: Number(m.due_milestones ?? 0),
     };
 
     recentIssues = (issueRows ?? []).map((row) => ({
@@ -114,6 +87,7 @@ export default async function DashboardPage() {
 
   return (
     <DashboardOverview
+      userId={context.userId}
       workspaceName={context.activeOrganization.name}
       organizationId={context.activeOrganization.id}
       activeProject={context.activeProject}

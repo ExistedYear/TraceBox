@@ -895,6 +895,42 @@ export type Database = {
           { foreignKeyName: "issue_template_labels_label_id_fkey"; columns: ["label_id"]; isOneToOne: false; referencedRelation: "labels"; referencedColumns: ["id"] }
         ]
       }
+      release_readiness_snapshots: {
+        Row: {
+          id: string
+          project_id: string
+          milestone_id: string | null
+          version_id: string | null
+          score: number
+          status: string
+          breakdown: Json
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          milestone_id?: string | null
+          version_id?: string | null
+          score: number
+          status: string
+          breakdown?: Json
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          milestone_id?: string | null
+          version_id?: string | null
+          score?: number
+          status?: string
+          breakdown?: Json
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       issue_watchers: {
         Row: {
           created_at: string
@@ -2121,6 +2157,30 @@ export type Database = {
         }[]
       }
       get_unread_notifications_count: { Args: never; Returns: number }
+      get_issue_reports: {
+        Args: { p_project_id: string; p_window_days?: number }
+        Returns: Json
+      }
+      calculate_release_readiness: {
+        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null }
+        Returns: Json
+      }
+      save_release_readiness_snapshot: {
+        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null }
+        Returns: string
+      }
+      list_release_readiness_snapshots: {
+        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null; p_limit?: number }
+        Returns: { id: string; milestone_id: string | null; version_id: string | null; score: number; status: string; breakdown: Json; created_by: string; created_at: string }[]
+      }
+      get_dashboard_metrics: {
+        Args: { p_project_id: string }
+        Returns: { assigned_to_me: number; awaiting_triage: number; due_milestones: number; open_count: number; in_progress_count: number; critical_count: number; total_count: number }[]
+      }
+      list_project_audit_events: {
+        Args: { p_actor_id?: string; p_event_type?: string; p_from?: string; p_issue_id?: string; p_limit?: number; p_offset?: number; p_project_id: string; p_to?: string }
+        Returns: { actor_id: string | null; created_at: string; event_type: string; field_name: string | null; id: string; issue_id: string; metadata: Json | null; new_value: Json | null; old_value: Json | null; total_count: number }[]
+      }
       get_notification_preferences: {
         Args: never
         Returns: {

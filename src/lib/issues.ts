@@ -21,6 +21,8 @@ export function severityLabel(value: string): string {
 }
 export const RESOLUTIONS = ["FIXED", "DUPLICATE", "WONT_FIX", "INVALID", "CANNOT_REPRODUCE", "WORKS_AS_EXPECTED"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
+export const WORKFLOW_CATEGORIES = ["TRIAGE", "OPEN", "IN_PROGRESS", "REVIEW", "RESOLVED", "CLOSED"] as const;
+export type WorkflowCategory = (typeof WORKFLOW_CATEGORIES)[number];
 
 export function formatIssueKey(projectKey: string, issueNumber: number) {
   return `${projectKey.toUpperCase()}-${issueNumber}`;
@@ -205,6 +207,7 @@ export function categoryClasses(category: string) {
 
 export type IssueFilters = {
   statusId?: string;
+  statusCategories?: WorkflowCategory[];
   priority?: string;
   severity?: string;
   type?: string;
@@ -222,6 +225,9 @@ export type IssueFilters = {
   updatedTo?: string;
   customFieldId?: string;
   customFieldValue?: string;
+  unresolved?: boolean;
+  overdue?: boolean;
+  critical?: boolean;
 };
 export const CUSTOM_FIELD_FILTER_MAX = 200;
 
@@ -229,6 +235,7 @@ export const CUSTOM_FIELD_FILTER_MAX = 200;
 export function encodeIssueFilters(filters: IssueFilters): Record<string, string> {
   const result: Record<string, string> = {};
   if (filters.statusId) result.status = filters.statusId;
+  if (filters.statusCategories?.length) result.status_category = filters.statusCategories.join(",");
   if (filters.componentId) result.component = filters.componentId;
   if (filters.assigneeId) result.assignee = filters.assigneeId;
   if (filters.reporterId) result.reporter = filters.reporterId;
@@ -246,6 +253,9 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
   if (filters.visibility) result.visibility = filters.visibility;
   if (filters.customFieldId) result.custom_field = filters.customFieldId;
   if (filters.customFieldValue) result.custom_value = filters.customFieldValue;
+  if (filters.unresolved) result.unresolved = "1";
+  if (filters.overdue) result.overdue = "1";
+  if (filters.critical) result.critical = "1";
   return result;
 }
 
@@ -261,6 +271,9 @@ export function decodeIssueSearchParams(
     return undefined;
   };
   const statusId = pick("status", "statusId");
+  const statusCategories = pick("status_category", "statusCategories")
+    ?.split(",")
+    .filter((value): value is WorkflowCategory => WORKFLOW_CATEGORIES.includes(value as WorkflowCategory));
   const componentId = pick("component", "componentId");
   const assigneeId = pick("assignee", "assigneeId");
   const reporterId = pick("reporter", "reporterId");
@@ -283,8 +296,12 @@ export function decodeIssueSearchParams(
   const updatedTo = date(pick("updated_to", "updatedTo"));
   const customFieldId = pick("custom_field", "customFieldId");
   const customFieldValue = pick("custom_value", "customFieldValue");
+  const unresolved = pick("unresolved") === "1";
+  const overdue = pick("overdue") === "1";
+  const critical = pick("critical") === "1";
   return {
     statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
+    statusCategories: statusCategories?.length ? [...new Set(statusCategories)] : undefined,
     priority,
     severity,
     type,
@@ -302,6 +319,9 @@ export function decodeIssueSearchParams(
     updatedTo: updatedFrom && updatedTo && updatedFrom > updatedTo ? undefined : updatedTo,
     customFieldId: customFieldId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(customFieldId) && (!valid.customFieldIds || valid.customFieldIds.has(customFieldId)) ? customFieldId : undefined,
     customFieldValue: customFieldValue && customFieldValue.length <= CUSTOM_FIELD_FILTER_MAX ? customFieldValue : undefined,
+    unresolved: unresolved || undefined,
+    overdue: overdue || undefined,
+    critical: critical || undefined,
   };
 }
 

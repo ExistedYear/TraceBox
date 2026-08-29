@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Braces, FileText, Github, KeyRound, SlidersHorizontal, Users } from "lucide-react";
+import { Bell, Braces, FileText, Github, KeyRound, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ const settingsLinks = [
   { href: "/dashboard/settings/templates", label: "Issue templates", description: "Reusable report structures", icon: FileText },
   { href: "/dashboard/settings/custom-fields", label: "Custom fields", description: "Typed project metadata", icon: Braces },
   { href: "/dashboard/settings/api", label: "API tokens", description: "Bearer access and lifecycle", icon: KeyRound },
+  { href: "/dashboard/audit", label: "Audit explorer", description: "Read-only project activity", icon: ScrollText },
   { href: "/dashboard/settings/members", label: "Workspace members", description: "Workspace roles and invitations", icon: Users },
   { href: "/dashboard/settings/contributors", label: "Contributors", description: "Project access and roles", icon: Users },
   { href: "/dashboard/settings/notifications", label: "Notifications", description: "Personal in-app delivery", icon: Bell },

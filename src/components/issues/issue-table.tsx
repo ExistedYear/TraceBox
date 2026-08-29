@@ -42,6 +42,7 @@ import {
   severityLabel,
   RESOLUTIONS,
   humanizeEnum,
+  type WorkflowCategory,
   type IssueFilters,
 } from "@/lib/issues";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,9 @@ type Props = {
   milestones: FilterOption[];
   labels: FilterOption[];
   customFields: Array<{ id: string; name: string; field_type: string; config: Record<string, unknown> }>;
+  unresolvedStateIds: string[];
+  overdueMilestoneIds: string[];
+  stateCategoryIds: Partial<Record<WorkflowCategory, string[]>>;
   initialFilters: IssueFilters;
   initialSearchQuery?: string;
 };
@@ -114,7 +118,7 @@ function relativeTime(iso: string) {
 
 const columnHelper = createColumnHelper<TableRow>();
 
-export function IssueTable({ projectKey, projectId, canEdit, canManageProject, currentUserId, states, components, members, versions, milestones, labels, customFields, initialFilters, initialSearchQuery = "" }: Props) {
+export function IssueTable({ projectKey, projectId, canEdit, canManageProject, currentUserId, states, components, members, versions, milestones, labels, customFields, unresolvedStateIds, overdueMilestoneIds, stateCategoryIds, initialFilters, initialSearchQuery = "" }: Props) {
   const router = useRouter();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [sorting, setSorting] = useState<SortingState>([{ id: "updated_at", desc: true }]);
@@ -198,6 +202,18 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
         return;
       }
     }
+    if (filters.unresolved && unresolvedStateIds.length === 0) {
+      setRows([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
+    if (filters.overdue && overdueMilestoneIds.length === 0) {
+      setRows([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
     if (filters.customFieldId && filters.customFieldValue) {
       if (filters.customFieldValue.length > CUSTOM_FIELD_FILTER_MAX) { setRows([]); setTotal(0); setLoading(false); return; }
       const customField = customFields.find((field) => field.id === filters.customFieldId);
@@ -237,6 +253,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     if (filters.statusId) query = query.eq("status_id", filters.statusId);
     if (filters.priority) query = query.eq("priority", filters.priority);
     if (filters.severity) query = query.eq("severity", filters.severity);
+    if (filters.critical) query = query.in("severity", ["BLOCKER", "CRITICAL"]);
     if (filters.type) query = query.eq("type", filters.type);
     if (filters.visibility) query = query.eq("visibility", filters.visibility);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
@@ -245,6 +262,18 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     if (filters.resolution) query = query.eq("resolution", filters.resolution);
     if (filters.versionId) query = query.eq("affected_version_id", filters.versionId);
     if (filters.milestoneId) query = query.eq("target_milestone_id", filters.milestoneId);
+    if (filters.statusCategories?.length) {
+      const categoryStateIds = filters.statusCategories.flatMap((category) => stateCategoryIds[category] ?? []);
+      if (categoryStateIds.length === 0) {
+        setRows([]);
+        setTotal(0);
+        setLoading(false);
+        return;
+      }
+      query = query.in("status_id", categoryStateIds);
+    }
+    if (filters.unresolved) query = query.in("status_id", unresolvedStateIds);
+    if (filters.overdue) query = query.in("target_milestone_id", overdueMilestoneIds);
     if (filters.createdFrom) query = query.gte("created_at", `${filters.createdFrom}T00:00:00.000Z`);
     if (filters.createdTo) query = query.lt("created_at", `${filters.createdTo}T23:59:59.999Z`);
     if (filters.updatedFrom) query = query.gte("updated_at", `${filters.updatedFrom}T00:00:00.000Z`);
@@ -309,7 +338,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     );
     setTotal(count ?? 0);
     setLoading(false);
-  }, [projectKey, projectId, filters, sorting, page, debouncedQuery, customFields]);
+  }, [projectKey, projectId, filters, sorting, page, debouncedQuery, customFields, unresolvedStateIds, overdueMilestoneIds, stateCategoryIds]);
 
   useEffect(() => {
     void fetchData();

@@ -6,7 +6,8 @@ import { IssueTable } from "@/components/issues/issue-table";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
 import { createClient } from "@/lib/supabase/server";
-import { decodeIssueSearchParams } from "@/lib/issues";
+import { decodeIssueSearchParams, WORKFLOW_CATEGORIES } from "@/lib/issues";
+import { MILESTONE_STATUSES } from "@/lib/validation/planning";
 import { isSavedViewId } from "@/lib/validation/saved-views";
 import { personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
@@ -29,13 +30,13 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
 
   const supabase = await createClient();
   const results = await Promise.all([
-    supabase.from("workflow_states").select("id, name").eq("project_id", projectId).order("position"),
+    supabase.from("workflow_states").select("id, name, category").eq("project_id", projectId).order("position"),
     supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.rpc("project_role", { p_project_id: projectId }),
     supabase.from("versions").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
-    supabase.from("milestones").select("id, name").eq("project_id", projectId).order("name"),
+    supabase.from("milestones").select("id, name, due_at, status").eq("project_id", projectId).order("name"),
     supabase.from("labels").select("id, name").eq("project_id", projectId).order("name"),
     supabase.from("custom_fields").select("id, name, field_type, config").eq("project_id", projectId).order("name"),
   ]);
@@ -67,6 +68,9 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
     labelIds: new Set((labels ?? []).map((label) => label.id)),
     customFieldIds: new Set((customFieldRows ?? []).map((field) => field.id)),
   });
+  const unresolvedStateIds = (states ?? []).filter((state) => !["RESOLVED", "CLOSED"].includes(state.category)).map((state) => state.id);
+  const overdueMilestoneIds = (milestones ?? []).filter((milestone) => milestone.due_at && MILESTONE_STATUSES.includes(milestone.status as (typeof MILESTONE_STATUSES)[number]) && ["PLANNED", "ACTIVE"].includes(milestone.status) && new Date(milestone.due_at).getTime() < new Date().getTime()).map((milestone) => milestone.id);
+  const stateCategoryIds = Object.fromEntries(WORKFLOW_CATEGORIES.map((category) => [category, (states ?? []).filter((state) => state.category === category).map((state) => state.id)]));
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
@@ -108,6 +112,9 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           milestones={(milestones ?? []).map((milestone) => ({ value: milestone.id, label: milestone.name }))}
           labels={(labels ?? []).map((label) => ({ value: label.id, label: label.name }))}
           customFields={(customFieldRows ?? []).map((field) => ({ id: field.id, name: field.name, field_type: field.field_type, config: (field.config ?? {}) as Record<string, unknown> }))}
+          unresolvedStateIds={unresolvedStateIds}
+          overdueMilestoneIds={overdueMilestoneIds}
+          stateCategoryIds={stateCategoryIds}
           initialFilters={filters}
           initialSearchQuery={typeof filterParams.q === "string" ? filterParams.q : ""}
         />

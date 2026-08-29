@@ -12421,3 +12421,524 @@ $$;
 
 revoke execute on function public.revoke_api_token(uuid) from anon, public;
 grant execute on function public.revoke_api_token(uuid) to authenticated;
+-- Phase 11: backend-authoritative, restricted-safe report metrics.
+-- SECURITY DEFINER is used for complete aggregates; every issue-derived
+-- expression therefore retains an explicit can_view_issue boundary.
+
+create or replace function public.get_issue_reports(
+  p_project_id uuid,
+  p_window_days integer default 30
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_window_days integer := coalesce(p_window_days, 30);
+  v_now timestamptz := timezone('utc'::text, now());
+  v_start timestamptz;
+  v_start_day timestamptz;
+  v_end_day timestamptz;
+  v_visible_count bigint;
+  v_window_count bigint;
+begin
+  if auth.uid() is null or not public.is_project_member(p_project_id) then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+  if v_window_days not in (0, 7, 30, 90, 365) then
+    raise exception 'VALIDATION: Unsupported report window' using errcode = '22023';
+  end if;
+
+  -- Keep the all-time series finite. PostgreSQL does not accept -infinity as
+  -- a generate_series timestamp on every supported version.
+  if v_window_days = 0 then
+    select coalesce(min(i.created_at), v_now) into v_start
+    from public.issues i
+    where i.project_id = p_project_id and public.can_view_issue(i.id);
+  else
+    v_start := v_now - make_interval(days => v_window_days);
+  end if;
+  v_start_day := date_trunc('day', v_start);
+  v_end_day := date_trunc('day', v_now);
+
+  select count(*) into v_visible_count from public.issues i
+  where i.project_id = p_project_id and public.can_view_issue(i.id);
+  select count(*) into v_window_count from public.issues i
+  where i.project_id = p_project_id and public.can_view_issue(i.id)
+    and i.created_at >= v_start and i.created_at <= v_now;
+
+  return (
+    with resolution_events as (
+      -- One latest qualifying resolution per visible issue in the window.
+      -- This is the shared source for resolved counts, duration statistics,
+      -- and the resolved drilldown/CSV.
+      select distinct on (i.id)
+        i.id,
+        i.created_at as issue_created_at,
+        e.created_at as resolution_at,
+        extract(epoch from (e.created_at - i.created_at)) / 86400.0 as duration_days
+      from public.issues i
+      join public.issue_events e on e.issue_id = i.id
+      left join public.workflow_states ns on ns.id::text = e.new_value #>> '{}'
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and upper(e.event_type) = 'STATUS_CHANGED'
+        and lower(coalesce(e.metadata->>'new_category', ns.category)) in ('resolved', 'closed')
+        and coalesce((select lower(coalesce(prev.metadata->>'new_category', ps.category))
+          from public.issue_events prev
+          left join public.workflow_states ps on ps.id::text = prev.new_value #>> '{}'
+          where prev.issue_id = e.issue_id and upper(prev.event_type) = 'STATUS_CHANGED'
+            and (prev.created_at, prev.id) < (e.created_at, e.id)
+          order by prev.created_at desc, prev.id desc limit 1), 'open') not in ('resolved', 'closed')
+        and e.created_at >= v_start and e.created_at <= v_now
+        and e.created_at >= i.created_at
+      order by i.id, e.created_at desc, e.id desc
+    )
+  select jsonb_build_object(
+    'window_days', v_window_days,
+    'window_start', v_start,
+    'window_end', v_now,
+    'visible_count', v_visible_count,
+    'window_issue_count', v_window_count,
+    'no_data', (v_visible_count = 0),
+    'created', (select count(*) from public.issues i
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now),
+    -- Count issues entering a terminal state from a non-terminal state. The
+    -- issue timestamp is intentionally not authoritative here: reopening an
+    -- issue clears it, while the immutable status history preserves every
+    -- resolution cycle.
+    'resolved', (select count(*) from resolution_events),
+    'backlog', (select count(*) from public.issues i
+      join public.workflow_states s on s.id = i.status_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and s.category not in ('RESOLVED', 'CLOSED')),
+
+    'resolution_duration', (select jsonb_build_object(
+      'count', count(*)::integer,
+      'avg_days', round((avg(r.duration_days))::numeric, 1),
+      'median_days', round((percentile_cont(0.5) within group (order by r.duration_days))::numeric, 1),
+      'p90_days', round((percentile_cont(0.9) within group (order by r.duration_days))::numeric, 1)
+    ) from resolution_events r),
+    'avg_resolution_days', (select round((avg(r.duration_days))::numeric, 1) from resolution_events r),
+
+    'category_counts', coalesce((select jsonb_object_agg(x.category, x.total) from (
+      select s.category, count(*)::integer as total from public.issues i
+      join public.workflow_states s on s.id = i.status_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now group by s.category
+    ) x), '{}'::jsonb),
+    'priority_counts', coalesce((select jsonb_object_agg(x.priority, x.total) from (
+      select i.priority, count(*)::integer as total from public.issues i
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now group by i.priority
+    ) x), '{}'::jsonb),
+    'component_counts', coalesce((select jsonb_agg(jsonb_build_object('id', x.component_id, 'name', x.component_name, 'count', x.total) order by x.total desc, x.component_name) from (
+      select coalesce(c.id::text, '') as component_id, coalesce(c.name, 'Unassigned component') as component_name, count(*)::integer as total
+      from public.issues i left join public.components c on c.id = i.component_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now group by c.id, c.name
+    ) x), '[]'::jsonb),
+    'by_assignee', coalesce((select jsonb_agg(jsonb_build_object('id', x.assignee_id, 'name', x.assignee_name, 'count', x.total) order by x.total desc, x.assignee_name) from (
+      select coalesce(i.assignee_id::text, '') as assignee_id, coalesce(nullif(p.display_name, ''), 'Unassigned') as assignee_name, count(*)::integer as total
+      from public.issues i left join public.profiles p on p.id = i.assignee_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now group by i.assignee_id, p.display_name
+    ) x), '[]'::jsonb),
+    'by_milestone', coalesce((select jsonb_agg(jsonb_build_object('id', x.milestone_id, 'name', x.milestone_name, 'count', x.total) order by x.total desc, x.milestone_name) from (
+      select coalesce(m.id::text, '') as milestone_id, coalesce(m.name, 'No milestone') as milestone_name, count(*)::integer as total
+      from public.issues i left join public.milestones m on m.id = i.target_milestone_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and i.created_at >= v_start and i.created_at <= v_now group by m.id, m.name
+    ) x), '[]'::jsonb),
+
+    -- Reconstruct historical status from immutable events; current status
+    -- alone loses the active interval when an issue is later reopened.
+    'historical_trend', coalesce((select jsonb_agg(jsonb_build_object('day', x.day, 'created', x.created, 'resolved', x.resolved, 'backlog', x.backlog) order by x.day) from (
+      with days as (
+        select d as day from generate_series(v_start_day, v_end_day, interval '1 day') d
+      ), visible as (
+        select i.id, i.created_at, i.resolved_at, i.closed_at, s.category as current_category
+        from public.issues i join public.workflow_states s on s.id = i.status_id
+        where i.project_id = p_project_id and public.can_view_issue(i.id)
+      ), state_at_day as (
+        select d.day, v.id,
+          coalesce(
+            (select lower(coalesce(e.metadata->>'new_category', ns.category))
+             from public.issue_events e
+             left join public.workflow_states ns on ns.id::text = e.new_value #>> '{}'
+             where e.issue_id = v.id and upper(e.event_type) = 'STATUS_CHANGED' and e.created_at < d.day + interval '1 day'
+             order by e.created_at desc, e.id desc limit 1),
+            (select lower(os.category)
+             from public.issue_events e
+             join public.workflow_states os on os.id::text = e.old_value #>> '{}'
+             where e.issue_id = v.id and upper(e.event_type) = 'STATUS_CHANGED'
+             order by e.created_at asc, e.id asc limit 1),
+            lower(v.current_category)
+          ) as category
+        from days d cross join visible v
+        where v.created_at < d.day + interval '1 day'
+      )
+      select d.day::date as day,
+        (select count(*)::integer from visible v where v.created_at >= d.day and v.created_at < d.day + interval '1 day') as created,
+        (select count(*)::integer
+         from public.issue_events e
+         join visible v on v.id = e.issue_id
+         left join public.workflow_states ns on ns.id::text = e.new_value #>> '{}'
+         where upper(e.event_type) = 'STATUS_CHANGED'
+           and lower(coalesce(e.metadata->>'new_category', ns.category)) in ('resolved', 'closed')
+           and coalesce((select lower(coalesce(prev.metadata->>'new_category', ps.category))
+             from public.issue_events prev
+             left join public.workflow_states ps on ps.id::text = prev.new_value #>> '{}'
+             where prev.issue_id = e.issue_id and upper(prev.event_type) = 'STATUS_CHANGED'
+               and (prev.created_at, prev.id) < (e.created_at, e.id)
+             order by prev.created_at desc, prev.id desc limit 1), 'open') not in ('resolved', 'closed')
+           and e.created_at >= d.day and e.created_at < d.day + interval '1 day') as resolved,
+        (select count(*)::integer from state_at_day s where s.day = d.day and s.category not in ('resolved', 'closed')) as backlog
+      from days d
+    ) x), '[]'::jsonb),
+
+    'drilldown', coalesce((select jsonb_agg(jsonb_build_object(
+      'id', x.id, 'issue_number', x.issue_number, 'title', x.title, 'type', x.type,
+      'priority', x.priority, 'severity', x.severity, 'status', x.status_name,
+      'status_category', x.status_category, 'component_name', x.component_name,
+      'assignee_id', x.assignee_id, 'assignee_name', x.assignee_name,
+      'milestone_id', x.milestone_id, 'milestone_name', x.milestone_name,
+      'created_at', x.created_at, 'resolved_at', x.resolved_at, 'closed_at', x.closed_at
+    ) order by x.updated_at desc, x.issue_number desc) from (
+      select i.id, i.issue_number, i.title, i.type, i.priority, i.severity,
+        s.name as status_name, s.category as status_category, c.name as component_name,
+        i.assignee_id, nullif(trim(coalesce(p.display_name, '')), '') as assignee_name,
+        i.target_milestone_id as milestone_id, m.name as milestone_name, i.created_at,
+        i.resolved_at, i.closed_at, i.updated_at
+      from public.issues i join public.workflow_states s on s.id = i.status_id
+      left join public.components c on c.id = i.component_id
+      left join public.profiles p on p.id = i.assignee_id
+      left join public.milestones m on m.id = i.target_milestone_id
+      where i.project_id = p_project_id and public.can_view_issue(i.id)
+        and s.category not in ('RESOLVED', 'CLOSED')
+      order by i.updated_at desc, i.issue_number desc limit 200
+    ) x), '[]'::jsonb),
+      'drilldowns', jsonb_build_object(
+      'created', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc, x.issue_number desc) from (
+        select i.id, i.issue_number, i.title, i.type, i.priority, i.severity, s.name as status_name, s.category as status_category, c.name as component_name, i.assignee_id, nullif(trim(coalesce(p.display_name, '')), '') as assignee_name, i.target_milestone_id as milestone_id, m.name as milestone_name, i.created_at, i.resolved_at, i.closed_at
+        from public.issues i join public.workflow_states s on s.id = i.status_id
+        left join public.components c on c.id = i.component_id
+        left join public.profiles p on p.id = i.assignee_id
+        left join public.milestones m on m.id = i.target_milestone_id
+        where i.project_id = p_project_id and public.can_view_issue(i.id) and i.created_at >= v_start and i.created_at <= v_now
+        order by i.created_at desc, i.issue_number desc limit 200
+      ) x), '[]'::jsonb),
+      'resolved', coalesce((select jsonb_agg(to_jsonb(x) order by x.resolution_at desc, x.issue_number desc) from (
+        select i.id, i.issue_number, i.title, i.type, i.priority, i.severity, s.name as status_name, s.category as status_category, c.name as component_name, i.assignee_id, nullif(trim(coalesce(p.display_name, '')), '') as assignee_name, i.target_milestone_id as milestone_id, m.name as milestone_name, i.created_at, r.resolution_at as resolved_at, i.closed_at, round((extract(epoch from (r.resolution_at - i.created_at)) / 86400.0)::numeric, 1) as resolution_days
+        from public.issues i join public.workflow_states s on s.id = i.status_id
+        left join public.components c on c.id = i.component_id
+        left join public.profiles p on p.id = i.assignee_id
+        left join public.milestones m on m.id = i.target_milestone_id
+        join resolution_events r on r.id = i.id
+        where i.project_id = p_project_id and public.can_view_issue(i.id)
+        order by r.resolution_at desc, i.issue_number desc limit 200
+      ) x), '[]'::jsonb),
+      'backlog', coalesce((select jsonb_agg(to_jsonb(x) order by x.updated_at desc, x.issue_number desc) from (
+        select i.id, i.issue_number, i.title, i.type, i.priority, i.severity, s.name as status_name, s.category as status_category, c.name as component_name, i.assignee_id, nullif(trim(coalesce(p.display_name, '')), '') as assignee_name, i.target_milestone_id as milestone_id, m.name as milestone_name, i.created_at, i.resolved_at, i.closed_at, i.updated_at
+        from public.issues i join public.workflow_states s on s.id = i.status_id
+        left join public.components c on c.id = i.component_id
+        left join public.profiles p on p.id = i.assignee_id
+        left join public.milestones m on m.id = i.target_milestone_id
+        where i.project_id = p_project_id and public.can_view_issue(i.id) and s.category not in ('RESOLVED', 'CLOSED')
+        order by i.updated_at desc, i.issue_number desc limit 200
+      ) x), '[]'::jsonb)
+    )
+  ));
+end;
+$$;
+
+revoke execute on function public.get_issue_reports(uuid, integer) from anon, public;
+grant execute on function public.get_issue_reports(uuid, integer) to authenticated;
+-- Phase 11: authoritative, visibility-safe release-readiness scoring and history.
+-- Scores are calculated in SQL so every client sees the same rubric. Restricted
+-- issues are included only when can_view_issue() permits the current caller.
+-- Snapshots retain the caller-specific aggregate, so history is creator-only.
+
+create table if not exists public.release_readiness_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  milestone_id uuid references public.milestones(id) on delete set null,
+  version_id uuid references public.versions(id) on delete set null,
+  score integer not null check (score between 0 and 100),
+  status text not null check (status in ('READY', 'ATTENTION', 'BLOCKED', 'NO_DATA')),
+  breakdown jsonb not null default '{}'::jsonb,
+  created_by uuid not null references auth.users(id) on delete restrict,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
+create index if not exists release_readiness_snapshots_project_idx
+  on public.release_readiness_snapshots(project_id, created_at desc, id desc);
+create index if not exists release_readiness_snapshots_creator_idx
+  on public.release_readiness_snapshots(project_id, created_by, created_at desc, id desc);
+
+alter table public.release_readiness_snapshots enable row level security;
+drop policy if exists "Project members can read readiness snapshots" on public.release_readiness_snapshots;
+drop policy if exists "Creators can read their readiness snapshots" on public.release_readiness_snapshots;
+create policy "Creators can read their readiness snapshots"
+  on public.release_readiness_snapshots for select to authenticated
+  using (created_by = auth.uid() and public.is_project_member(project_id));
+
+revoke all on public.release_readiness_snapshots from anon, authenticated, public;
+
+create or replace function public.prevent_release_readiness_snapshot_mutation()
+returns trigger language plpgsql security invoker set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    if coalesce(current_setting('tracebox.release_readiness_snapshot_write', true), '') <> 'on' then
+      raise exception 'READINESS_SNAPSHOT_RPC_ONLY' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+  raise exception 'READINESS_SNAPSHOT_IMMUTABLE' using errcode = '42501';
+end;
+$$;
+
+drop trigger if exists release_readiness_snapshots_immutable on public.release_readiness_snapshots;
+create trigger release_readiness_snapshots_immutable
+before insert or update or delete on public.release_readiness_snapshots
+for each row execute procedure public.prevent_release_readiness_snapshot_mutation();
+revoke execute on function public.prevent_release_readiness_snapshot_mutation() from public, anon, authenticated;
+
+create or replace function public.calculate_release_readiness(
+  p_project_id uuid, p_milestone_id uuid default null, p_version_id uuid default null
+)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid(); v_archived boolean; v_score integer;
+  v_total integer; v_resolved integer; v_open integer; v_blockers integer;
+  v_criticals integer; v_regressions integer; v_unassigned integer;
+  v_security integer; v_overdue integer; v_result jsonb;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select p.is_archived into v_archived from public.projects p where p.id = p_project_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if public.project_role(p_project_id) is null then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if p_milestone_id is not null and not exists (
+    select 1 from public.milestones m where m.id = p_milestone_id and m.project_id = p_project_id
+  ) then raise exception 'VALIDATION: Milestone does not belong to project' using errcode = '22023'; end if;
+  if p_version_id is not null and not exists (
+    select 1 from public.versions v where v.id = p_version_id and v.project_id = p_project_id
+  ) then raise exception 'VALIDATION: Version does not belong to project' using errcode = '22023'; end if;
+
+  -- This CTE is the privacy boundary for every count and factor.
+  with visible as (
+    select i.id, i.target_milestone_id, i.assignee_id, i.type, i.priority, i.severity,
+           ws.category as status_category, m.due_at
+      from public.issues i
+      join public.workflow_states ws on ws.id = i.status_id
+      left join public.milestones m on m.id = i.target_milestone_id
+     where i.project_id = p_project_id and public.can_view_issue(i.id)
+       and (p_milestone_id is null or i.target_milestone_id = p_milestone_id)
+       and (p_version_id is null or i.affected_version_id = p_version_id)
+  )
+  select count(*)::integer,
+         count(*) filter (where status_category in ('RESOLVED', 'CLOSED'))::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED'))::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED') and (priority = 'P0' or severity = 'BLOCKER'))::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED') and (priority = 'P1' or severity = 'CRITICAL') and not (priority = 'P0' or severity = 'BLOCKER'))::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED') and type = 'REGRESSION')::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED') and assignee_id is null)::integer,
+         count(*) filter (where status_category not in ('RESOLVED', 'CLOSED') and type = 'SECURITY')::integer,
+         count(distinct target_milestone_id) filter (where status_category not in ('RESOLVED', 'CLOSED') and target_milestone_id is not null and due_at is not null and due_at < timezone('utc'::text, now()))::integer
+    into v_total, v_resolved, v_open, v_blockers, v_criticals, v_regressions, v_unassigned, v_security, v_overdue
+    from visible;
+
+  if v_total = 0 then v_score := 0;
+  else v_score := greatest(0, least(100,
+    round((v_resolved::numeric / v_total::numeric) * 100)::integer
+    - v_blockers * 25 - v_criticals * 10 - v_regressions * 15
+    - v_unassigned * 5 - v_security * 10 - v_overdue * 5));
+  end if;
+
+  v_result := jsonb_build_object(
+    'total', v_total, 'resolved_count', v_resolved, 'open_count', v_open,
+    'blocker_count', v_blockers, 'critical_count', v_criticals,
+    'regression_count', v_regressions, 'unassigned_count', v_unassigned,
+    'unresolved_security_count', v_security, 'overdue_milestone_count', v_overdue,
+    'score', v_score,
+    'status', case when v_total = 0 then 'NO_DATA'
+      when v_blockers > 0 or v_score < 60 then 'BLOCKED'
+      when v_criticals > 0 or v_regressions > 0 or v_security > 0 or v_overdue > 0 or v_score < 85 then 'ATTENTION'
+      else 'READY' end,
+    'issues', '[]'::jsonb
+  );
+
+  -- Drilldowns are current-caller visible rows only and are never persisted.
+  with visible as (
+    select i.id, i.issue_number, i.title, i.type, i.priority, i.severity,
+           i.assignee_id, i.target_milestone_id, i.affected_version_id,
+           ws.category as status_category, ws.name as status_name, c.name as component_name,
+           m.due_at
+      from public.issues i
+      join public.workflow_states ws on ws.id = i.status_id
+      left join public.components c on c.id = i.component_id
+      left join public.milestones m on m.id = i.target_milestone_id
+     where i.project_id = p_project_id and public.can_view_issue(i.id)
+       and (p_milestone_id is null or i.target_milestone_id = p_milestone_id)
+       and (p_version_id is null or i.affected_version_id = p_version_id)
+       and ws.category not in ('RESOLVED', 'CLOSED')
+  )
+  select v_result || jsonb_build_object('issues', coalesce(jsonb_agg(jsonb_build_object(
+    'id', id, 'issueNumber', issue_number, 'title', title, 'type', type,
+    'priority', priority, 'severity', severity, 'statusCategory', status_category,
+    'statusName', status_name, 'assigneeId', assignee_id, 'componentName', component_name,
+    'targetMilestoneId', target_milestone_id, 'affectedVersionId', affected_version_id,
+    'dueAt', due_at
+  ) order by issue_number), '[]'::jsonb)) into v_result
+  from visible;
+  return v_result;
+end;
+$$;
+
+create or replace function public.save_release_readiness_snapshot(
+  p_project_id uuid, p_milestone_id uuid default null, p_version_id uuid default null
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_analysis jsonb; v_id uuid; v_archived boolean;
+begin
+  select is_archived into v_archived from public.projects where id = p_project_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  v_analysis := public.calculate_release_readiness(p_project_id, p_milestone_id, p_version_id);
+  perform set_config('tracebox.release_readiness_snapshot_write', 'on', true);
+  insert into public.release_readiness_snapshots(project_id, milestone_id, version_id, score, status, breakdown, created_by)
+  values (p_project_id, p_milestone_id, p_version_id, (v_analysis->>'score')::integer,
+          v_analysis->>'status', v_analysis - 'issues', auth.uid()) returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.list_release_readiness_snapshots(
+  p_project_id uuid, p_milestone_id uuid default null, p_version_id uuid default null,
+  p_limit integer default 30
+)
+returns table (id uuid, milestone_id uuid, version_id uuid, score integer, status text,
+  breakdown jsonb, created_by uuid, created_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if public.project_role(p_project_id) is null then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if p_milestone_id is not null and not exists (
+    select 1 from public.milestones m where m.id = p_milestone_id and m.project_id = p_project_id
+  ) then raise exception 'VALIDATION: Milestone does not belong to project' using errcode = '22023'; end if;
+  if p_version_id is not null and not exists (
+    select 1 from public.versions v where v.id = p_version_id and v.project_id = p_project_id
+  ) then raise exception 'VALIDATION: Version does not belong to project' using errcode = '22023'; end if;
+  return query select s.id, s.milestone_id, s.version_id, s.score, s.status,
+    s.breakdown, s.created_by, s.created_at
+    from public.release_readiness_snapshots s where s.project_id = p_project_id
+      and s.created_by = auth.uid()
+      and (p_milestone_id is null or s.milestone_id = p_milestone_id)
+      and (p_version_id is null or s.version_id = p_version_id)
+    order by s.created_at desc, s.id desc limit least(greatest(coalesce(p_limit, 30), 1), 100);
+end;
+$$;
+
+revoke execute on function public.calculate_release_readiness(uuid, uuid, uuid), public.save_release_readiness_snapshot(uuid, uuid, uuid), public.list_release_readiness_snapshots(uuid, uuid, uuid, integer) from public, anon;
+grant execute on function public.calculate_release_readiness(uuid, uuid, uuid), public.save_release_readiness_snapshot(uuid, uuid, uuid), public.list_release_readiness_snapshots(uuid, uuid, uuid, integer) to authenticated;
+-- Migration 060: authoritative restricted-safe dashboard metrics.
+-- All operational cards use one visibility-filtered aggregate so the counts
+-- cannot drift from one another or count resolved/restricted work differently.
+create or replace function public.get_dashboard_metrics(p_project_id uuid)
+returns table (assigned_to_me bigint, awaiting_triage bigint, due_milestones bigint, open_count bigint, in_progress_count bigint, critical_count bigint, total_count bigint)
+language plpgsql stable security definer set search_path = public as $$
+declare v_user uuid := auth.uid();
+begin
+  if v_user is null or not public.is_project_member(p_project_id) then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  return query
+  select
+    count(*) filter (where i.assignee_id = v_user and ws.category not in ('RESOLVED', 'CLOSED')),
+    count(*) filter (where ws.category = 'TRIAGE'),
+    count(*) filter (where m.due_at < timezone('utc'::text, now())
+      and m.status in ('PLANNED', 'ACTIVE')
+      and ws.category not in ('RESOLVED', 'CLOSED')),
+    count(*) filter (where ws.category in ('TRIAGE', 'OPEN')),
+    count(*) filter (where ws.category in ('IN_PROGRESS', 'REVIEW')),
+    count(*) filter (where i.severity in ('BLOCKER', 'CRITICAL')
+      and ws.category not in ('RESOLVED', 'CLOSED')),
+    count(*)
+  from public.issues i
+  join public.workflow_states ws on ws.id = i.status_id and ws.project_id = i.project_id
+  left join public.milestones m on m.id = i.target_milestone_id and m.project_id = i.project_id
+  where i.project_id = p_project_id and public.can_view_issue(i.id);
+end;
+$$;
+revoke execute on function public.get_dashboard_metrics(uuid) from anon, public;
+grant execute on function public.get_dashboard_metrics(uuid) to authenticated;
+-- Migration 061: read-only, restricted-safe project audit explorer.
+-- Issue events are the canonical immutable audit stream. The redaction helper
+-- recursively removes cross-issue references from values written by link and
+-- duplicate workflows, so a visible event can never disclose an inaccessible
+-- canonical issue through its JSON payload.
+create or replace function public.redact_audit_json(p_value jsonb)
+returns jsonb
+language plpgsql immutable set search_path = pg_catalog as $$
+declare v_key text; v_item jsonb; v_result jsonb := '{}'::jsonb;
+begin
+  if p_value is null then return null; end if;
+  if jsonb_typeof(p_value) = 'object' then
+    for v_key, v_item in select * from jsonb_each(p_value) loop
+      if lower(v_key) in ('target_id', 'target_issue', 'target_issue_id', 'source_issue', 'source_issue_id', 'canonical_issue_id', 'canonical_issue_number', 'canonical_issue_key', 'duplicate_issue_id', 'duplicate_issue_key', 'resolved_issue_id', 'resolved_issue_key', 'target_key', 'source_key')
+        or right(lower(v_key), 9) = '_issue_id'
+        or right(lower(v_key), 10) = '_issue_key'
+        or right(lower(v_key), 13) = '_issue_number' then
+        v_result := v_result || jsonb_build_object(v_key, '[redacted]');
+      else
+        v_result := v_result || jsonb_build_object(v_key, public.redact_audit_json(v_item));
+      end if;
+    end loop;
+    return v_result;
+  elsif jsonb_typeof(p_value) = 'array' then
+    return coalesce((select jsonb_agg(public.redact_audit_json(value)) from jsonb_array_elements(p_value)), '[]'::jsonb);
+  end if;
+  return p_value;
+end;
+$$;
+
+revoke execute on function public.redact_audit_json(jsonb) from anon, authenticated, public;
+
+create or replace function public.list_project_audit_events(
+  p_project_id uuid, p_limit integer default 50, p_offset integer default 0,
+  p_actor_id uuid default null, p_event_type text default null,
+  p_issue_id uuid default null, p_from timestamptz default null, p_to timestamptz default null
+)
+returns table (id uuid, issue_id uuid, actor_id uuid, event_type text, field_name text, old_value jsonb, new_value jsonb, metadata jsonb, created_at timestamptz, total_count bigint)
+language plpgsql stable security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_limit integer := greatest(1, least(coalesce(p_limit, 50), 100)); v_offset integer := greatest(coalesce(p_offset, 0), 0);
+begin
+  if v_user is null or not public.is_project_member(p_project_id) then
+    raise exception 'NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if p_from is not null and p_to is not null and p_from >= p_to then
+    raise exception 'VALIDATION: Invalid audit date range' using errcode = '22023';
+  end if;
+
+  return query
+  select e.id, e.issue_id, e.actor_id, e.event_type, e.field_name,
+    case when lower(coalesce(e.field_name, '')) = 'issue_link' then to_jsonb('[redacted]'::text) else public.redact_audit_json(e.old_value) end,
+    case when lower(coalesce(e.field_name, '')) = 'issue_link' then to_jsonb('[redacted]'::text) else public.redact_audit_json(e.new_value) end,
+    public.redact_audit_json(e.metadata), e.created_at, count(*) over ()
+  from public.issue_events e
+  join public.issues i on i.id = e.issue_id and i.project_id = p_project_id
+  where public.can_view_issue(i.id)
+    and (p_actor_id is null or e.actor_id = p_actor_id)
+    and (p_event_type is null or e.event_type = nullif(trim(p_event_type), ''))
+    and (p_issue_id is null or e.issue_id = p_issue_id)
+    and (p_from is null or e.created_at >= p_from)
+    and (p_to is null or e.created_at < p_to)
+  order by e.created_at desc, e.id desc
+  limit v_limit offset v_offset;
+end;
+$$;
+revoke execute on function public.list_project_audit_events(uuid, integer, integer, uuid, text, uuid, timestamptz, timestamptz) from anon, public;
+grant execute on function public.list_project_audit_events(uuid, integer, integer, uuid, text, uuid, timestamptz, timestamptz) to authenticated;
