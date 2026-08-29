@@ -52,7 +52,7 @@ select is(public.can_view_issue('50000000-0000-4000-8000-000000000001'), true, '
 select is((select count(*) from public.issue_access where issue_id = '50000000-0000-4000-8000-000000000001'), 1::bigint, 'explicit grantee can read access list');
 select is((select count(*) from storage.objects where name = '50000000-0000-4000-8000-000000000001/evidence.txt'), 1::bigint, 'explicit grantee can download issue attachment');
 select lives_ok(
-  $$insert into storage.objects (bucket_id, name, owner_id) values ('issue-attachments', '50000000-0000-4000-8000-000000000001/grantee.txt', '10000000-0000-4000-8000-000000000002')$$,
+  $$insert into storage.objects (bucket_id, name, owner_id, metadata) values ('issue-attachments', '50000000-0000-4000-8000-000000000001/grantee.txt', '10000000-0000-4000-8000-000000000002', '{"mimetype":"text/plain"}'::jsonb)$$,
   'authorized reporter can upload to a visible active issue'
 );
 

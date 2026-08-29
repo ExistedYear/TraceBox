@@ -20,8 +20,14 @@ select ok(not has_function_privilege('authenticated', 'public.api_create_issue(t
 select ok(has_function_privilege('service_role', 'public.api_create_issue(text,jsonb)', 'execute'), 'server API client can invoke bearer-token issue wrappers');
 select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prorettype = 'trigger'::regtype and has_function_privilege('anon', p.oid, 'execute')), 'anonymous callers cannot execute trigger functions as RPCs');
 select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prorettype = 'trigger'::regtype and has_function_privilege('authenticated', p.oid, 'execute')), 'browser callers cannot execute trigger functions as RPCs');
-select has_policy('storage', 'objects', 'Members can upload issue attachments', 'Storage upload policy exists');
-select has_policy('storage', 'objects', 'Issue viewers can download attachments', 'Storage read policy exists');
+select ok(exists (
+  select 1 from pg_policies
+  where schemaname = 'storage' and tablename = 'objects' and policyname = 'Members can upload issue attachments'
+), 'Storage upload policy exists');
+select ok(exists (
+  select 1 from pg_policies
+  where schemaname = 'storage' and tablename = 'objects' and policyname = 'Issue viewers can download attachments'
+), 'Storage read policy exists');
 select has_function('public', 'create_issue_complete', array['uuid','jsonb'], 'atomic issue creation RPC exists');
 select has_function('public', 'create_api_token', array['uuid','text','text','text[]','timestamp with time zone'], 'scoped API token RPC exists');
 select has_function('public', 'transfer_organization_ownership', array['uuid','uuid'], 'ownership transfer RPC exists');

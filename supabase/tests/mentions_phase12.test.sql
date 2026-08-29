@@ -16,7 +16,7 @@ select ok(not has_table_privilege('authenticated', 'public.comment_mentions', 'i
 select ok(has_table_privilege('authenticated', 'public.comment_mentions', 'select'), 'visible mention rows can be selected');
 select ok(position('notification_recipient_can_view_issue' in pg_get_functiondef('public.add_comment_with_mentions(uuid,text,uuid[])'::regprocedure)) > 0, 'add validates recipient issue visibility');
 select ok(position('v_added_ids' in pg_get_functiondef('public.edit_comment_with_mentions(uuid,text,uuid[])'::regprocedure)) > 0, 'edit tracks only newly added recipients');
-select ok(not has_trigger('public', 'comments', 'trg_comment_mentions_notifications'), 'legacy text-derived mention trigger is removed');
+select hasnt_trigger('public', 'comments', 'trg_comment_mentions_notifications', 'legacy text-derived mention trigger is removed');
 
 select * from finish();
 rollback;

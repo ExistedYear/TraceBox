@@ -1,6 +1,6 @@
 begin;
 
-select plan(10);
+select plan(9);
 select has_function('public', 'bulk_update_issue_fields', array['uuid', 'uuid[]', 'jsonb'], 'bulk issue update RPC exists');
 select has_index('public', 'issues', 'issues_queue_reporter_created_idx', 'reporter/date queue index exists');
 select has_index('public', 'issues', 'issues_queue_version_idx', 'version queue index exists');
