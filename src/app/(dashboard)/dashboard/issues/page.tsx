@@ -37,9 +37,10 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
     supabase.from("versions").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("milestones").select("id, name").eq("project_id", projectId).order("name"),
     supabase.from("labels").select("id, name").eq("project_id", projectId).order("name"),
+    supabase.from("custom_fields").select("id, name, field_type, config").eq("project_id", projectId).order("name"),
   ]);
-  const [{ data: states, error: statesError }, { data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: role, error: roleError }, { data: versions, error: versionsError }, { data: milestones, error: milestonesError }, { data: labels, error: labelsError }] = results;
-  const queryError = statesError ?? componentsError ?? memberError ?? adminsError ?? roleError ?? versionsError ?? milestonesError ?? labelsError;
+  const [{ data: states, error: statesError }, { data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: role, error: roleError }, { data: versions, error: versionsError }, { data: milestones, error: milestonesError }, { data: labels, error: labelsError }, { data: customFieldRows, error: customFieldsError }] = results;
+  const queryError = statesError ?? componentsError ?? memberError ?? adminsError ?? roleError ?? versionsError ?? milestonesError ?? labelsError ?? customFieldsError;
   if (queryError) {
     console.error("Issue queue metadata query failed", { code: queryError.code, message: queryError.message });
     return <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><Surface className="space-y-3 border-destructive/30 p-8 text-center"><h1 className="text-lg font-semibold">Issues unavailable</h1><p className="text-sm text-muted-foreground">The issue queue could not load its project metadata. No empty result was inferred.</p><Link href="/dashboard/issues" className="text-sm font-medium text-primary underline underline-offset-4">Retry</Link></Surface></main>;
@@ -64,6 +65,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
     versionIds: new Set((versions ?? []).map((version) => version.id)),
     milestoneIds: new Set((milestones ?? []).map((milestone) => milestone.id)),
     labelIds: new Set((labels ?? []).map((label) => label.id)),
+    customFieldIds: new Set((customFieldRows ?? []).map((field) => field.id)),
   });
 
   return (
@@ -105,6 +107,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           versions={(versions ?? []).map((version) => ({ value: version.id, label: version.name }))}
           milestones={(milestones ?? []).map((milestone) => ({ value: milestone.id, label: milestone.name }))}
           labels={(labels ?? []).map((label) => ({ value: label.id, label: label.name }))}
+          customFields={(customFieldRows ?? []).map((field) => ({ id: field.id, name: field.name, field_type: field.field_type, config: (field.config ?? {}) as Record<string, unknown> }))}
           initialFilters={filters}
           initialSearchQuery={typeof filterParams.q === "string" ? filterParams.q : ""}
         />

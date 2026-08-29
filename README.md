@@ -22,11 +22,13 @@ Included today: email/password signup, login, logout, session refresh, workspace
 
 The header palette supports independent accent themes (blue by default, neutral, amber, purple, and emerald) while preserving the light/dark mode and semantic status colors.
 
+The authenticated REST surface, token scopes, examples, and error contract are documented in [`docs/api.md`](docs/api.md).
+
 ## Database workflow
 
 Create a migration for every schema change, test it locally, commit it, and apply it to the linked project with `supabase db push`. Regenerate TypeScript types with `npm run db:types` after local schema changes or `npm run db:types:linked` after linking to a hosted project. Do not bypass RLS or make untracked production-only schema changes.
 
-`supabase/migrations/` holds 53 ordered migrations through Phase 20 and the completion-plan Phase 2–9 closure work. Migrations 042–045 cover GitHub reliability, the shared issue API contract, and explicit membership/invitations. Migrations 046–050 add relational membership guards, atomic full issue creation/editing, complete notifications, audited project/workflow administration, and restricted-security RLS/Storage hardening. Migrations 051–053 complete advanced queue/bulk actions, saved-view lifecycle, and atomic duplicate triage. The consolidated `supabase/full_schema.sql` contains the same 53 migrations in order; run `npm run sync:migrations` after adding a migration.
+`supabase/migrations/` holds 57 ordered migrations through Phase 20 and the completion-plan Phase 2–10 closure work. Migrations 042–045 cover GitHub reliability, the shared issue API contract, and explicit membership/invitations. Migrations 046–050 add relational membership guards, atomic full issue creation/editing, complete notifications, audited project/workflow administration, and restricted-security RLS/Storage hardening. Migrations 051–053 complete advanced queue/bulk actions, saved-view lifecycle, and atomic duplicate triage. Migrations 054–057 complete template lifecycle/default application, custom-field validation, attachment reconciliation hardening, and API-token lifecycle contracts. Regenerate `supabase/full_schema.sql` after applying the new migrations.
 
 ## Quality checks
 
@@ -42,7 +44,7 @@ npm run check:migrations
 
 Push this repository to GitHub and connect it to Vercel with the Next.js preset. Configure the Supabase variables, GitHub App variables, `SUPABASE_SERVICE_ROLE_KEY`, `GITHUB_WEBHOOK_SECRET`, and `CRON_SECRET` as non-public server variables. The GitHub App private key and client secret must never enter client code. See `docs/deployment.md` for the full setup and verification sequence.
 
-Apply all migrations before testing production signup. Configure Supabase Auth URLs, the private `issue-attachments` Storage bucket/policies, the `supabase_realtime` publication, the GitHub App callback/webhook, and Vercel server environment variables before the live end-to-end flow. Vercel invokes `/api/github/reconcile` once daily at 03:00 UTC using `CRON_SECRET`; that job also replays eligible webhook deliveries and clears expired payloads. Failed webhook deliveries stop after eight processing attempts and remain available as metadata for cleanup/diagnostics. The standalone replay and cleanup endpoints use the same secret for manual operations.
+Apply all migrations before testing production signup. Configure Supabase Auth URLs, the private `issue-attachments` Storage bucket/policies, the `supabase_realtime` publication, the GitHub App callback/webhook, and Vercel server environment variables before the live end-to-end flow. Vercel invokes `/api/github/reconcile` once daily at 03:00 UTC using `CRON_SECRET`; that job also replays eligible webhook deliveries and clears expired payloads. Failed webhook deliveries stop after eight processing attempts and remain available as metadata for cleanup/diagnostics. Protected `/api/attachments/reconcile` also requires `CRON_SECRET` and must be invoked manually or by a separately scheduled job; it is not included in the existing Vercel cron. The standalone replay and cleanup endpoints use the same secret for manual operations.
 
 GitHub Actions runs lint, typecheck, unit tests, and the production build on pull requests and pushes to `main`. Vercel's Git integration owns deployments, so no duplicate Vercel deployment workflow or Vercel token is required.
 
@@ -52,6 +54,6 @@ This checkout also has an ignored, local-only black-box suite under `qa/live/` f
 
 ## Verified release paths
 
-As of 2026-08-28, the hosted GitHub App flow has been manually verified with a private repository: installation callback, repository discovery, project binding, signed pull-request webhook delivery, automatic PR linking, and `Fixes <PROJECT_KEY>-<NUMBER>` resolution after merging into `main`. Issue keys use the selected TraceBox project's key (for example, `BUG-1`), not the workspace name. Apply migrations 042–053 before using the current PR, webhook, membership, issue-editing, notification, workflow, restricted-security, queue, saved-view, and triage paths.
+As of 2026-08-28, the hosted GitHub App flow has been manually verified with a private repository: installation callback, repository discovery, project binding, signed pull-request webhook delivery, automatic PR linking, and `Fixes <PROJECT_KEY>-<NUMBER>` resolution after merging into `main`. Issue keys use the selected TraceBox project's key (for example, `BUG-1`), not the workspace name. Apply migrations 042–057 before using the current PR, webhook, membership, issue-editing, notification, workflow, restricted-security, queue, saved-view, triage, template, custom-field, attachment, and API-token paths.
 
 The desktop sidebar is viewport-height and scrollable; its Settings and Contributors links remain reachable on short screens or when the workspace switcher is large, and the navigation no longer renders a stray semicolon. Source quality gates should be rerun after the contributor merge; the complete live Playwright suite still requires a local `qa/live/.env` and a workstation with its browser dependencies installed.

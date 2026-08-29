@@ -11906,3 +11906,518 @@ $$;
 
 revoke execute on function public.resolve_duplicate_issue(uuid, uuid) from anon, public;
 grant execute on function public.resolve_duplicate_issue(uuid, uuid) to authenticated;
+-- Phase 10: complete issue-template lifecycle and safe template application.
+
+alter table public.issue_templates
+  add column if not exists is_archived boolean not null default false;
+
+create index if not exists issue_templates_project_active_idx
+  on public.issue_templates (project_id, is_archived, name);
+
+create table if not exists public.issue_template_labels (
+  template_id uuid not null references public.issue_templates(id) on delete cascade,
+  label_id uuid not null references public.labels(id) on delete cascade,
+  primary key (template_id, label_id)
+);
+create index if not exists issue_template_labels_label_idx on public.issue_template_labels(label_id);
+alter table public.issue_template_labels enable row level security;
+create policy "Project members can read issue template labels"
+  on public.issue_template_labels for select to authenticated
+  using (exists (select 1 from public.issue_templates t where t.id = template_id and public.is_project_member(t.project_id)));
+
+create or replace function public.validate_issue_template_defaults()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not new.is_archived and new.default_component_id is not null and not exists (
+    select 1 from public.components c where c.id = new.default_component_id
+      and c.project_id = new.project_id and not c.is_archived
+  ) then
+    raise exception 'INVALID_COMPONENT' using errcode = '23503';
+  end if;
+  if new.default_priority is not null and new.default_priority not in ('P0','P1','P2','P3','P4') then
+    raise exception 'VALIDATION: Invalid template priority' using errcode = '22023';
+  end if;
+  if new.default_severity is not null and new.default_severity not in ('BLOCKER','CRITICAL','MAJOR','MINOR','TRIVIAL') then
+    raise exception 'VALIDATION: Invalid template severity' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists issue_templates_validate_defaults on public.issue_templates;
+create trigger issue_templates_validate_defaults before insert or update on public.issue_templates
+for each row execute procedure public.validate_issue_template_defaults();
+
+-- Keep the established function contract while applying template labels in the
+-- same transaction. The old implementation is retained as a private base.
+alter function public.create_issue_complete(uuid, jsonb) rename to create_issue_complete_base;
+create or replace function public.create_issue_complete(p_project_id uuid, p_payload jsonb)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare
+  v_number bigint;
+  v_issue_id uuid;
+  v_template_id uuid := nullif(p_payload->>'template_id', '')::uuid;
+  v_template public.issue_templates%rowtype;
+  v_key text;
+  v_field_id uuid;
+begin
+  if p_payload ? 'custom_values' and jsonb_typeof(p_payload->'custom_values') <> 'object' then
+    raise exception 'VALIDATION: Custom values must be an object' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_payload->'custom_values') = 'object' then
+    for v_key in select jsonb_object_keys(p_payload->'custom_values') loop
+      begin v_field_id := v_key::uuid;
+      exception when invalid_text_representation then
+        raise exception 'VALIDATION: Custom field id must be a UUID' using errcode = '22023';
+      end;
+      if not exists (select 1 from public.custom_fields f where f.id = v_field_id and f.project_id = p_project_id) then
+        raise exception 'VALIDATION: Custom field does not belong to this project' using errcode = '22023';
+      end if;
+    end loop;
+  end if;
+  if v_template_id is not null then
+    select * into v_template from public.issue_templates t
+    where t.id = v_template_id and t.project_id = p_project_id and not t.is_archived
+    for key share;
+  end if;
+  if v_template_id is not null and not found then
+    raise exception 'INVALID_TEMPLATE' using errcode = '23503';
+  end if;
+  v_number := public.create_issue_complete_base(p_project_id, p_payload);
+  if v_template_id is not null then
+    select id into v_issue_id from public.issues where project_id = p_project_id and issue_number = v_number;
+    insert into public.issue_labels(issue_id, label_id)
+    select v_issue_id, tl.label_id
+    from public.issue_template_labels tl
+    join public.labels l on l.id = tl.label_id and l.project_id = p_project_id
+    where tl.template_id = v_template_id
+    on conflict do nothing;
+  end if;
+  return v_number;
+end;
+$$;
+revoke execute on function public.create_issue_complete_base(uuid, jsonb) from anon, public, authenticated;
+revoke execute on function public.create_issue_complete(uuid, jsonb) from anon, public;
+grant execute on function public.create_issue_complete(uuid, jsonb) to authenticated;
+
+create or replace function public.set_issue_template_labels(p_template_id uuid, p_label_ids uuid[])
+returns void language plpgsql security definer set search_path = public as $$
+declare v_project_id uuid; v_archived boolean;
+begin
+  select project_id, is_archived into v_project_id, v_archived from public.issue_templates where id = p_template_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_archived then raise exception 'TEMPLATE_ARCHIVED' using errcode = '42501'; end if;
+  if not public.can_manage_project(v_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if exists (select 1 from unnest(coalesce(p_label_ids, '{}'::uuid[])) x(id) where not exists (select 1 from public.labels l where l.id = x.id and l.project_id = v_project_id)) then
+    raise exception 'INVALID_LABEL' using errcode = '23503';
+  end if;
+  delete from public.issue_template_labels where template_id = p_template_id;
+  insert into public.issue_template_labels(template_id, label_id)
+  select p_template_id, x.id from unnest(coalesce(p_label_ids, '{}'::uuid[])) x(id) on conflict do nothing;
+end;
+$$;
+
+create or replace function public.set_issue_template_archived(p_template_id uuid, p_archived boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_project_id uuid;
+begin
+  select project_id into v_project_id from public.issue_templates where id = p_template_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if not public.can_manage_project(v_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  update public.issue_templates set is_archived = coalesce(p_archived, false) where id = p_template_id;
+end;
+$$;
+
+create or replace function public.duplicate_issue_template(p_template_id uuid, p_name text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_source public.issue_templates%rowtype; v_id uuid; v_name text;
+begin
+  select * into v_source from public.issue_templates where id = p_template_id for key share;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if not public.can_manage_project(v_source.project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  v_name := nullif(trim(p_name), '');
+  if v_name is null or char_length(v_name) > 80 then raise exception 'VALIDATION: Template name is required' using errcode = '22023'; end if;
+  insert into public.issue_templates(project_id, name, description, issue_type, body_template, default_priority, default_severity, default_component_id, created_by)
+  values (v_source.project_id, v_name, v_source.description, v_source.issue_type, v_source.body_template, v_source.default_priority, v_source.default_severity, v_source.default_component_id, auth.uid()) returning id into v_id;
+  insert into public.issue_template_labels(template_id, label_id) select v_id, label_id from public.issue_template_labels where template_id = p_template_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.create_issue_template_complete(
+  p_project_id uuid, p_name text, p_description text, p_issue_type text,
+  p_body_template text, p_default_priority text, p_default_severity text,
+  p_default_component_id uuid, p_label_ids uuid[] default '{}'
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  v_id := public.create_issue_template(p_project_id, p_name, p_description, p_issue_type, p_body_template, p_default_priority, p_default_severity, p_default_component_id);
+  perform public.set_issue_template_labels(v_id, p_label_ids);
+  return v_id;
+end;
+$$;
+
+create or replace function public.update_issue_template_complete(
+  p_template_id uuid, p_name text, p_description text, p_issue_type text,
+  p_body_template text, p_default_priority text, p_default_severity text,
+  p_default_component_id uuid, p_label_ids uuid[] default '{}'
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+begin
+  perform public.update_issue_template(p_template_id, p_name, p_description, p_issue_type, p_body_template, p_default_priority, p_default_severity, p_default_component_id);
+  perform public.set_issue_template_labels(p_template_id, p_label_ids);
+  return p_template_id;
+end;
+$$;
+
+revoke execute on function public.set_issue_template_labels(uuid, uuid[]) from anon, public;
+revoke execute on function public.set_issue_template_archived(uuid, boolean) from anon, public;
+revoke execute on function public.duplicate_issue_template(uuid, text) from anon, public;
+grant execute on function public.set_issue_template_labels(uuid, uuid[]) to authenticated;
+grant execute on function public.set_issue_template_archived(uuid, boolean) to authenticated;
+grant execute on function public.duplicate_issue_template(uuid, text) to authenticated;
+revoke execute on function public.create_issue_template_complete(uuid, text, text, text, text, text, text, uuid, uuid[]) from anon, public;
+revoke execute on function public.update_issue_template_complete(uuid, text, text, text, text, text, text, uuid, uuid[]) from anon, public;
+grant execute on function public.create_issue_template_complete(uuid, text, text, text, text, text, text, uuid, uuid[]) to authenticated;
+grant execute on function public.update_issue_template_complete(uuid, text, text, text, text, text, text, uuid, uuid[]) to authenticated;
+-- Phase 10: complete custom-field lifecycle and authoritative value validation.
+-- All writes remain RPC-only; field types are immutable once values exist.
+
+revoke insert, update, delete on public.custom_fields, public.issue_custom_values from authenticated, anon, public;
+
+create or replace function public.validate_custom_field_definition(
+  p_field_type text,
+  p_config jsonb
+)
+returns void
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_options jsonb := coalesce(p_config, '{}'::jsonb)->'options';
+begin
+  if p_field_type not in ('TEXT', 'NUMBER', 'BOOLEAN', 'DATE', 'SINGLE_SELECT', 'MULTI_SELECT', 'USER') then
+    raise exception 'VALIDATION: Invalid custom field type' using errcode = '22023';
+  end if;
+  if p_field_type in ('SINGLE_SELECT', 'MULTI_SELECT') then
+    if jsonb_typeof(v_options) <> 'array' or jsonb_array_length(v_options) = 0
+       or exists (select 1 from jsonb_array_elements(v_options) option where jsonb_typeof(option) <> 'string' or nullif(trim(option #>> '{}'), '') is null)
+       or jsonb_array_length(v_options) <> (select count(distinct option #>> '{}') from jsonb_array_elements(v_options) option) then
+      raise exception 'VALIDATION: Select fields require unique non-empty options' using errcode = '22023';
+    end if;
+  end if;
+end;
+$$;
+
+create or replace function public.validate_custom_field_value(
+  p_field_id uuid,
+  p_value jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_field record;
+  v_item jsonb;
+  v_user uuid := auth.uid();
+begin
+  select * into v_field from public.custom_fields where id = p_field_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if p_value is null or jsonb_typeof(p_value) = 'null' or p_value = '""'::jsonb or p_value = '[]'::jsonb then
+    if v_field.is_required then raise exception 'VALIDATION: Required custom field cannot be empty' using errcode = '22023'; end if;
+    return;
+  end if;
+  if (v_field.field_type in ('TEXT', 'DATE', 'SINGLE_SELECT', 'USER') and jsonb_typeof(p_value) <> 'string')
+     or (v_field.field_type = 'NUMBER' and jsonb_typeof(p_value) <> 'number')
+     or (v_field.field_type = 'BOOLEAN' and jsonb_typeof(p_value) <> 'boolean')
+     or (v_field.field_type = 'MULTI_SELECT' and jsonb_typeof(p_value) <> 'array') then
+    raise exception 'VALIDATION: Custom field value has the wrong type' using errcode = '22023';
+  end if;
+  if v_field.field_type = 'DATE' then
+    begin perform trim(both '"' from p_value::text)::date; exception when others then raise exception 'VALIDATION: Invalid date value' using errcode = '22023'; end;
+  elsif v_field.field_type = 'USER' then
+    begin
+      if not exists (select 1 from public.project_members pm where pm.project_id = v_field.project_id and pm.user_id = trim(both '"' from p_value::text)::uuid)
+         and not exists (
+           select 1 from public.projects p
+           join public.organization_members om on om.organization_id = p.organization_id
+          where p.id = v_field.project_id
+            and om.user_id = trim(both '"' from p_value::text)::uuid
+            and om.role in ('OWNER', 'ADMIN')
+         ) then
+        raise exception 'VALIDATION: User must be a project member or workspace owner/admin' using errcode = '22023';
+      end if;
+    exception when invalid_text_representation then raise exception 'VALIDATION: Invalid user value' using errcode = '22023';
+    end;
+  elsif v_field.field_type = 'SINGLE_SELECT' and not (v_field.config->'options' @> jsonb_build_array(trim(both '"' from p_value::text))) then
+    raise exception 'VALIDATION: Invalid select option' using errcode = '22023';
+  elsif v_field.field_type = 'MULTI_SELECT' then
+    for v_item in select value from jsonb_array_elements(p_value) loop
+      if jsonb_typeof(v_item) <> 'string' or not (v_field.config->'options' @> jsonb_build_array(trim(both '"' from v_item::text))) then
+        raise exception 'VALIDATION: Invalid multi-select option' using errcode = '22023';
+      end if;
+    end loop;
+  end if;
+end;
+$$;
+
+create or replace function public.validate_custom_field_definition_trigger()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.name := nullif(trim(new.name), '');
+  if new.name is null or char_length(new.name) > 80 then
+    raise exception 'VALIDATION: Custom field name must be 1-80 characters' using errcode = '22023';
+  end if;
+  perform public.validate_custom_field_definition(new.field_type, coalesce(new.config, '{}'::jsonb));
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_custom_field_definition on public.custom_fields;
+create trigger validate_custom_field_definition
+before insert or update on public.custom_fields
+for each row execute function public.validate_custom_field_definition_trigger();
+
+create or replace function public.update_custom_field(
+  p_field_id uuid,
+  p_name text,
+  p_field_type text,
+  p_config jsonb default '{}'::jsonb,
+  p_is_required boolean default false
+)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_field record;
+  v_name text := nullif(trim(coalesce(p_name, '')), '');
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if v_name is null or char_length(v_name) > 80 then raise exception 'VALIDATION: Custom field name must be 1-80 characters' using errcode = '22023'; end if;
+  perform public.validate_custom_field_definition(p_field_type, p_config);
+  select cf.*, p.is_archived into v_field from public.custom_fields cf join public.projects p on p.id = cf.project_id where cf.id = p_field_id for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if v_field.is_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if public.project_role(v_field.project_id) <> 'MAINTAINER' then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if p_field_type <> v_field.field_type and exists (select 1 from public.issue_custom_values where custom_field_id = p_field_id) then
+    raise exception 'VALIDATION: Cannot change field type after values exist; clear values first' using errcode = '22023';
+  end if;
+  if p_field_type in ('SINGLE_SELECT', 'MULTI_SELECT') and exists (
+    select 1 from public.issue_custom_values cv
+    where cv.custom_field_id = p_field_id
+      and ((p_field_type = 'SINGLE_SELECT' and jsonb_typeof(cv.value) = 'string' and not (coalesce(p_config, '{}'::jsonb)->'options' @> jsonb_build_array(trim(both '"' from cv.value::text))))
+        or (p_field_type = 'MULTI_SELECT' and jsonb_typeof(cv.value) = 'array' and exists (select 1 from jsonb_array_elements_text(cv.value) item where not (coalesce(p_config, '{}'::jsonb)->'options' @> jsonb_build_array(item)))))
+  ) then
+    raise exception 'VALIDATION: Existing values use an option that would be removed' using errcode = '22023';
+  end if;
+  update public.custom_fields set name = v_name, field_type = p_field_type, config = coalesce(p_config, '{}'::jsonb), is_required = coalesce(p_is_required, false) where id = p_field_id;
+end; $$;
+
+create or replace function public.bulk_set_issue_custom_value(p_issue_ids uuid[], p_custom_field_id uuid, p_value jsonb)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_issue_id uuid; v_count integer := 0; v_project_id uuid; v_archived boolean; v_old_value jsonb; v_requested integer; v_locked integer;
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  v_requested := coalesce(array_length(p_issue_ids, 1), 0);
+  if v_requested = 0 or v_requested > 100 then raise exception 'VALIDATION: Select between 1 and 100 issues' using errcode = '22023'; end if;
+  select project_id into v_project_id from public.custom_fields where id = p_custom_field_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if v_archived or public.project_role(v_project_id) not in ('DEVELOPER', 'MAINTAINER') then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if v_requested <> (select count(distinct issue_id) from unnest(p_issue_ids) as requested(issue_id)) then raise exception 'VALIDATION: Duplicate issue IDs are not allowed' using errcode = '22023'; end if;
+  select count(*) into v_locked from public.issues i where i.id = any(p_issue_ids) and i.project_id = v_project_id and public.can_view_issue(i.id);
+  if v_locked <> v_requested then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  perform 1 from public.issues i where i.id = any(p_issue_ids) and i.project_id = v_project_id order by i.id for update;
+  perform public.validate_custom_field_value(p_custom_field_id, p_value);
+  foreach v_issue_id in array p_issue_ids loop
+    if not exists (select 1 from public.issues where id = v_issue_id and project_id = v_project_id and public.can_view_issue(id)) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+    select value into v_old_value from public.issue_custom_values where issue_id = v_issue_id and custom_field_id = p_custom_field_id;
+    if p_value is null or jsonb_typeof(p_value) = 'null' or p_value = '""'::jsonb or p_value = '[]'::jsonb then
+      delete from public.issue_custom_values where issue_id = v_issue_id and custom_field_id = p_custom_field_id;
+    else
+      insert into public.issue_custom_values(issue_id, custom_field_id, value) values (v_issue_id, p_custom_field_id, p_value) on conflict (issue_id, custom_field_id) do update set value = excluded.value;
+    end if;
+    update public.issues set updated_at = now() where id = v_issue_id;
+    insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value, metadata)
+    values (v_issue_id, auth.uid(), 'CUSTOM_FIELD_UPDATED', 'custom_field', v_old_value, nullif(p_value, 'null'::jsonb), jsonb_build_object('custom_field_id', p_custom_field_id));
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end; $$;
+
+create or replace function public.validate_issue_custom_value_trigger()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  perform public.validate_custom_field_value(new.custom_field_id, new.value);
+  if not exists (select 1 from public.issues i join public.custom_fields cf on cf.project_id = i.project_id where i.id = new.issue_id and cf.id = new.custom_field_id) then
+    raise exception 'VALIDATION: Custom field does not belong to this project' using errcode = '23503';
+  end if;
+  return new;
+end; $$;
+
+drop trigger if exists validate_issue_custom_value on public.issue_custom_values;
+create trigger validate_issue_custom_value
+before insert or update on public.issue_custom_values
+for each row execute function public.validate_issue_custom_value_trigger();
+
+create or replace function public.set_issue_custom_value(p_issue_id uuid, p_custom_field_id uuid, p_value jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_project_id uuid; v_archived boolean; v_old_value jsonb;
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select project_id into v_project_id from public.issues where id = p_issue_id;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  select is_archived into v_archived from public.projects where id = v_project_id for update;
+  if v_archived then raise exception 'PROJECT_ARCHIVED' using errcode = '42501'; end if;
+  if public.project_role(v_project_id) not in ('DEVELOPER', 'MAINTAINER') or not public.can_view_issue(p_issue_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if not exists (select 1 from public.custom_fields where id = p_custom_field_id and project_id = v_project_id) then raise exception 'VALIDATION: Custom field does not belong to this project' using errcode = '23503'; end if;
+  perform public.validate_custom_field_value(p_custom_field_id, p_value);
+  select value into v_old_value from public.issue_custom_values where issue_id = p_issue_id and custom_field_id = p_custom_field_id;
+  if p_value is null or jsonb_typeof(p_value) = 'null' or p_value = '""'::jsonb or p_value = '[]'::jsonb then
+    delete from public.issue_custom_values where issue_id = p_issue_id and custom_field_id = p_custom_field_id;
+  else
+    insert into public.issue_custom_values(issue_id, custom_field_id, value) values (p_issue_id, p_custom_field_id, p_value)
+    on conflict (issue_id, custom_field_id) do update set value = excluded.value;
+  end if;
+  update public.issues set updated_at = now() where id = p_issue_id;
+  insert into public.issue_events(issue_id, actor_id, event_type, field_name, old_value, new_value, metadata)
+  values (p_issue_id, auth.uid(), 'CUSTOM_FIELD_UPDATED', 'custom_field', v_old_value, nullif(p_value, 'null'::jsonb), jsonb_build_object('custom_field_id', p_custom_field_id));
+end; $$;
+
+revoke execute on function public.validate_custom_field_definition(text, jsonb), public.validate_custom_field_value(uuid, jsonb), public.update_custom_field(uuid, text, text, jsonb, boolean), public.bulk_set_issue_custom_value(uuid[], uuid, jsonb) from public, anon;
+revoke execute on function public.set_issue_custom_value(uuid, uuid, jsonb) from public, anon;
+grant execute on function public.update_custom_field(uuid, text, text, jsonb, boolean), public.bulk_set_issue_custom_value(uuid[], uuid, jsonb), public.set_issue_custom_value(uuid, uuid, jsonb) to authenticated;
+-- Migration 056: attachment upload/recovery hardening.
+-- Keep validation in a trigger so RPC and any privileged maintenance path share
+-- the same MIME and path contract.
+
+create or replace function public.validate_attachment_metadata()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_mime text := lower(trim(coalesce(new.mime_type, '')));
+begin
+  if v_mime not in (
+    'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml',
+    'text/plain', 'text/csv', 'text/markdown', 'application/json',
+    'application/pdf', 'application/zip', 'application/gzip',
+    'application/x-tar'
+  ) then
+    raise exception 'VALIDATION: Unsupported attachment MIME type' using errcode = '22023';
+  end if;
+  if new.storage_path !~ '^[0-9a-fA-F-]{36}/[^/]{1,255}$' then
+    raise exception 'VALIDATION: Invalid attachment storage path' using errcode = '22023';
+  end if;
+  if new.size_bytes < 0 or new.size_bytes > 52428800 then
+    raise exception 'VALIDATION: File size must be between 0 and 50MB' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_attachment_metadata on public.attachments;
+create trigger validate_attachment_metadata
+before insert or update on public.attachments
+for each row execute procedure public.validate_attachment_metadata();
+
+-- Validate the actual Supabase Storage Content-Type metadata; absent metadata
+-- is rejected so a client cannot claim an allowed MIME only in the DB row.
+drop policy if exists "Members can upload issue attachments" on storage.objects;
+create policy "Members can upload issue attachments"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'issue-attachments'
+    and name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[^/]+$'
+    and public.can_view_issue(public.issue_id_from_storage_path(name))
+    and public.can_comment_on_issue(public.issue_id_from_storage_path(name))
+    and metadata is not null
+    and lower(coalesce(metadata->>'mimetype', '')) in (
+      'image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml',
+      'text/plain', 'text/csv', 'text/markdown', 'application/json',
+      'application/pdf', 'application/zip', 'application/gzip', 'application/x-tar'
+    )
+  );
+
+-- Service-role cleanup uses this allowlisted RPC to identify DB rows whose
+-- object has disappeared. It never exposes issue metadata to browser clients.
+create or replace function public.list_missing_attachment_objects()
+returns table (attachment_id uuid, storage_path text)
+language sql
+security definer
+set search_path = public
+as $$
+  select a.id, a.storage_path
+  from public.attachments a
+  where not exists (select 1 from storage.objects o where o.bucket_id = 'issue-attachments' and o.name = a.storage_path);
+$$;
+
+revoke execute on function public.list_missing_attachment_objects() from anon, authenticated, public;
+grant execute on function public.list_missing_attachment_objects() to service_role;
+-- Migration 057: API-token lifecycle and developer experience.
+-- Tokens remain organization-scoped; API authorization additionally checks the
+-- owner's live project memberships. No project restriction is invented here.
+
+create or replace function public.validate_api_token_metadata()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'VALIDATION: Token hash must be a SHA-256 digest' using errcode = '22023';
+  end if;
+  if new.expires_at is not null and new.expires_at <= timezone('utc'::text, now()) then
+    raise exception 'VALIDATION: Token expiration must be in the future' using errcode = '22023';
+  end if;
+  if new.scopes is null or cardinality(new.scopes) = 0 or not (new.scopes <@ array['read','write','projects:read','issues:read','issues:write','comments:write','milestones:read','search:read','integrations:read','github_links:read','github_links:write']::text[]) then
+    raise exception 'VALIDATION: Invalid API token scopes' using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_api_token_metadata on public.api_tokens;
+create trigger validate_api_token_metadata before insert or update on public.api_tokens
+for each row execute procedure public.validate_api_token_metadata();
+
+create or replace function public.rotate_api_token(
+  p_token_id uuid,
+  p_token_hash text,
+  p_expires_at timestamptz default null
+)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_user uuid := auth.uid(); v_old record; v_new uuid;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  select * into v_old from public.api_tokens where id = p_token_id and user_id = v_user for update;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+  if not public.is_org_member(v_old.organization_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  insert into public.api_tokens(user_id, organization_id, name, token_hash, scopes, expires_at)
+  values (v_user, v_old.organization_id, v_old.name, p_token_hash, v_old.scopes, p_expires_at)
+  returning id into v_new;
+  delete from public.api_tokens where id = p_token_id and user_id = v_user;
+  return v_new;
+end;
+$$;
+
+revoke execute on function public.rotate_api_token(uuid, text, timestamptz) from anon, public;
+grant execute on function public.rotate_api_token(uuid, text, timestamptz) to authenticated;
+
+create or replace function public.revoke_api_token(p_token_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_user uuid := auth.uid(); v_deleted integer;
+begin
+  if v_user is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  delete from public.api_tokens where id = p_token_id and user_id = v_user;
+  get diagnostics v_deleted = row_count;
+  if v_deleted = 0 then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
+end;
+$$;
+
+revoke execute on function public.revoke_api_token(uuid) from anon, public;
+grant execute on function public.revoke_api_token(uuid) to authenticated;

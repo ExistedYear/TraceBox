@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 53) via SQL Script
+### 1.3 Apply Database Migrations (1 through 57) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 53 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 57 migrations directly in the Supabase web dashboard:
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 53 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 57 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -92,6 +92,10 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 51. `202608260051_phase9_queue_bulk.sql`
 52. `202608260052_phase9_saved_views.sql`
 53. `202608260053_phase9_triage_command_ux.sql`
+54. `202608260054_phase10_templates.sql`
+55. `202608260055_phase10_custom_fields.sql`
+56. `202608260056_phase10_attachments.sql`
+57. `202608260057_phase10_api_tokens.sql`
 
 ### 1.4 Configure Supabase Authentication
 
@@ -230,7 +234,7 @@ The GitHub App connection starts at `/api/github/connect?project_id=<uuid>` and 
 
 The GitHub webhook accepts signed `pull_request`, `push`, `check_run`, `check_suite`, `status`, installation lifecycle, repository, and repository-selection events at `/api/webhooks/github`. GitHub must send `X-Hub-Signature-256` and `X-GitHub-Delivery`; the signature is generated from the raw request body using `GITHUB_WEBHOOK_SECRET`. Delivery IDs are persisted before acknowledgement, then claimed atomically by the processor. `after()` is only a fast path; `/api/github/webhook-replay` and the daily reconciliation job retry eligible failures with bounded backoff and an eight-attempt cap. `/api/github/webhook-cleanup` clears old terminal payload bodies while retaining delivery metadata. Service-role RPCs use the PostgREST-compatible claim helper, and authorization failures invalidate the short-lived token cache. Issue keys are read case-insensitively and closing directives support multiple keys; merged pull requests can resolve linked issues only when the project binding enables it, the PR targets a configured branch, and the PR body/title uses a closing phrase such as `Fixes CORE-123`.
 
-`/api/github/reconcile` is protected by `CRON_SECRET` and refreshes App-visible repositories and previously linked pull-request artifacts once daily at 03:00 UTC. It also replays stale webhook deliveries, clears expired terminal payloads, marks revoked installations and removed repositories unavailable, and never deletes historical issue links. The issue GitHub section searches only project-bound repositories and links authoritative PR data through `/api/github/link-pull-request`; URL linking remains available for commits, branches, and unusual cases. The public GitHub-link API performs the same repository, pull-request, commit, or branch verification as the dashboard before creating a link.
+`/api/github/reconcile` is protected by `CRON_SECRET` and refreshes App-visible repositories and previously linked pull-request artifacts once daily at 03:00 UTC. It also replays stale webhook deliveries, clears expired terminal payloads, marks revoked installations and removed repositories unavailable, and never deletes historical issue links. Protected `/api/attachments/reconcile` also requires `CRON_SECRET`; invoke it manually or through a separately configured scheduler to remove orphaned attachment rows/objects. It is not included in the existing Vercel cron entry. The issue GitHub section searches only project-bound repositories and links authoritative PR data through `/api/github/link-pull-request`; URL linking remains available for commits, branches, and unusual cases. The public GitHub-link API performs the same repository, pull-request, commit, or branch verification as the dashboard before creating a link.
 
 ### 3.4 Deploy
 

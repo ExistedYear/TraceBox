@@ -31,7 +31,7 @@ export type IssueTemplateItem = {
   default_severity: string | null;
   default_component_id: string | null;
 };
-export type RequiredCustomField = { id: string; name: string; field_type: string; config: Record<string, unknown> };
+export type RequiredCustomField = { id: string; name: string; field_type: string; config: Record<string, unknown>; is_required: boolean };
 
 export function NewIssueForm({
   projectId,
@@ -117,12 +117,20 @@ export function NewIssueForm({
 
 
   async function onSubmit(values: IssueCreateValues) {
+    const customValues = { ...(values.custom_values ?? {}) } as Record<string, unknown>;
+    for (const field of requiredCustomFields) {
+      const raw = customValues[field.id];
+      if (field.field_type === "NUMBER" && typeof raw === "string") customValues[field.id] = raw === "" ? null : Number(raw);
+      if (field.field_type === "BOOLEAN" && typeof raw === "string") customValues[field.id] = raw === "" ? null : raw === "true";
+      if (field.field_type === "DATE" && raw === "") customValues[field.id] = null;
+    }
     let issueNumber;
     try {
       issueNumber = await createClient().rpc("create_issue_complete", {
         p_project_id: projectId,
         p_payload: {
           ...values,
+          custom_values: customValues,
           title: values.title.trim(),
           description: values.description?.trim() ?? "",
           component_id: values.component_id || null,
@@ -309,5 +317,5 @@ function CustomFieldInput({ field, members, register }: { field: RequiredCustomF
       : field.field_type === "BOOLEAN" ? <select id={`issue-custom-${field.id}`} className={selectClass} {...register(name)}><option value="">Select…</option><option value="true">Yes</option><option value="false">No</option></select>
         : field.field_type === "USER" ? <select id={`issue-custom-${field.id}`} className={selectClass} {...register(name)}><option value="">Select…</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.userId.slice(0, 8)}</option>)}</select>
           : <Input id={`issue-custom-${field.id}`} type={field.field_type === "NUMBER" ? "number" : field.field_type === "DATE" ? "date" : "text"} {...register(name)} />;
-  return <div className="space-y-2"><Label htmlFor={`issue-custom-${field.id}`}>{field.name} <span className="text-destructive">*</span></Label>{control}</div>;
+  return <div className="space-y-2"><Label htmlFor={`issue-custom-${field.id}`}>{field.name} {field.is_required && <span className="text-destructive">*</span>}</Label>{control}</div>;
 }

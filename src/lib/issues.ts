@@ -73,6 +73,8 @@ export function eventSummary(
       return { heading: "changed affected version", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "MILESTONE_CHANGED":
       return { heading: "changed target milestone", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
+    case "CUSTOM_FIELD_UPDATED":
+      return { heading: "updated custom field", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "TITLE_CHANGED":
       return { heading: "renamed the issue", detail: `${label(event.old_value)} → ${label(event.new_value)}` };
     case "COMMENT_ADDED":
@@ -218,7 +220,10 @@ export type IssueFilters = {
   createdTo?: string;
   updatedFrom?: string;
   updatedTo?: string;
+  customFieldId?: string;
+  customFieldValue?: string;
 };
+export const CUSTOM_FIELD_FILTER_MAX = 200;
 
 
 export function encodeIssueFilters(filters: IssueFilters): Record<string, string> {
@@ -239,12 +244,14 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
   if (filters.severity) result.severity = filters.severity;
   if (filters.type) result.type = filters.type;
   if (filters.visibility) result.visibility = filters.visibility;
+  if (filters.customFieldId) result.custom_field = filters.customFieldId;
+  if (filters.customFieldValue) result.custom_value = filters.customFieldValue;
   return result;
 }
 
 export function decodeIssueSearchParams(
   params: Record<string, string | string[] | undefined>,
-  valid: { stateIds: Set<string>; componentIds: Set<string>; memberIds?: Set<string>; versionIds?: Set<string>; milestoneIds?: Set<string>; labelIds?: Set<string> },
+  valid: { stateIds: Set<string>; componentIds: Set<string>; memberIds?: Set<string>; versionIds?: Set<string>; milestoneIds?: Set<string>; labelIds?: Set<string>; customFieldIds?: Set<string> },
 ): IssueFilters {
   const pick = (...names: string[]) => {
     for (const name of names) {
@@ -274,6 +281,8 @@ export function decodeIssueSearchParams(
   const createdTo = date(pick("created_to", "createdTo"));
   const updatedFrom = date(pick("updated_from", "updatedFrom"));
   const updatedTo = date(pick("updated_to", "updatedTo"));
+  const customFieldId = pick("custom_field", "customFieldId");
+  const customFieldValue = pick("custom_value", "customFieldValue");
   return {
     statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
     priority,
@@ -291,6 +300,8 @@ export function decodeIssueSearchParams(
     createdTo: createdFrom && createdTo && createdFrom > createdTo ? undefined : createdTo,
     updatedFrom: updatedFrom && updatedTo && updatedFrom > updatedTo ? undefined : updatedFrom,
     updatedTo: updatedFrom && updatedTo && updatedFrom > updatedTo ? undefined : updatedTo,
+    customFieldId: customFieldId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(customFieldId) && (!valid.customFieldIds || valid.customFieldIds.has(customFieldId)) ? customFieldId : undefined,
+    customFieldValue: customFieldValue && customFieldValue.length <= CUSTOM_FIELD_FILTER_MAX ? customFieldValue : undefined,
   };
 }
 

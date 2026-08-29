@@ -23,6 +23,12 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
+const ALLOWED_MIME_TYPES = new Set([
+  "image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml",
+  "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
+  "application/zip", "application/gzip", "application/x-tar",
+]);
+
 export type AttachmentItem = {
   id: string;
   issue_id: string;
@@ -67,6 +73,22 @@ function getFileIcon(mimeType: string | null, filename: string) {
   return <File className="h-4 w-4 text-muted-foreground" />;
 }
 
+function uploadObject(path: string, file: File, accessToken: string, onProgress: (value: number) => void, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/issue-attachments/${path}`);
+    xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "");
+    xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100)); };
+    xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("storage_upload_failed"));
+    xhr.onerror = () => reject(new Error("storage_upload_failed"));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+    signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    xhr.send(file);
+  });
+}
+
 export function IssueAttachmentsSection({
   issueId,
   canUpload,
@@ -76,6 +98,9 @@ export function IssueAttachmentsSection({
 }: Props) {
   const [attachments, setAttachments] = useState<AttachmentItem[]>(initialAttachments);
   const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadTasks, setUploadTasks] = useState<Array<{ id: string; file: File; progress: number; status: "uploading" | "failed" | "done"; error?: string }>>([]);
+  const uploadControllers = useRef(new Map<string, AbortController>());
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,28 +121,40 @@ export function IssueAttachmentsSection({
     enabled: Boolean(issueId),
   });
 
-  const handleUpload = async (files: FileList | null) => {
+  const handleUpload = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     const selected = Array.from(files);
     const oversized = selected.filter((file) => file.size > 52428800);
     if (oversized.length) { toast.error(`${oversized.map((file) => file.name).join(", ")} exceeded the 50MB limit.`); return; }
+    const unsupported = selected.filter((file) => !ALLOWED_MIME_TYPES.has(file.type));
+    if (unsupported.length) { toast.error(`Unsupported file type: ${unsupported.map((file) => file.name).join(", ")}.`); return; }
+    const tasks = selected.map((file) => ({ id: crypto.randomUUID(), file, progress: 0, status: "uploading" as const }));
+    setUploadTasks(tasks);
     setUploading(true);
     let uploaded = 0;
     try {
       const supabase = createClient();
-      for (const file of selected) {
+      for (const task of tasks) {
+        const file = task.file;
         const extension = file.name.includes(".") ? `.${file.name.split(".").pop()}` : "";
         const storagePath = `${issueId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}${extension}`;
-        const { error: uploadError } = await supabase.storage.from("issue-attachments").upload(storagePath, file, { cacheControl: "3600", upsert: false });
-        if (uploadError) { toast.error(`Could not upload ${file.name}.`); continue; }
-        const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", { p_issue_id: issueId, p_filename: file.name, p_storage_path: storagePath, p_mime_type: file.type || "application/octet-stream", p_size_bytes: file.size });
-        if (rpcError) { await supabase.storage.from("issue-attachments").remove([storagePath]); toast.error(`Could not register ${file.name}.`); continue; }
+        const { data: session } = await supabase.auth.getSession();
+        const controller = new AbortController();
+        uploadControllers.current.set(task.id, controller);
+        try { await uploadObject(storagePath, file, session.session?.access_token ?? "", (progress) => setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, progress } : item)), controller.signal); }
+        catch (error) { setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, status: "failed", error: error instanceof DOMException ? "Cancelled" : "Upload failed" } : item)); continue; }
+        finally { uploadControllers.current.delete(task.id); }
+        const { data: attachmentId, error: rpcError } = await supabase.rpc("add_attachment", { p_issue_id: issueId, p_filename: file.name, p_storage_path: storagePath, p_mime_type: file.type, p_size_bytes: file.size });
+        if (rpcError) { await supabase.storage.from("issue-attachments").remove([storagePath]); setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, status: "failed", error: "Could not register" } : item)); continue; }
+        setUploadTasks((current) => current.map((item) => item.id === task.id ? { ...item, progress: 100, status: "done" } : item));
         setAttachments((previous) => [...previous, { id: String(attachmentId), issue_id: issueId, uploader_id: currentUserId, filename: file.name, storage_path: storagePath, mime_type: file.type || null, size_bytes: file.size, created_at: new Date().toISOString() }]);
         uploaded++;
       }
       if (uploaded) toast.success(`${uploaded} attachment${uploaded === 1 ? "" : "s"} uploaded.`);
     } catch { toast.error("Could not upload attachments. Please try again."); } finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
+
+  const retryUpload = (task: (typeof uploadTasks)[number]) => { void handleUpload([task.file]); };
 
   const handleDownload = async (attachment: AttachmentItem) => {
     const downloadWindow = window.open("", "_blank");
@@ -170,7 +207,10 @@ export function IssueAttachmentsSection({
       }
 
       if (attachment) {
-        await createClient().storage.from("issue-attachments").remove([attachment.storage_path]);
+        const { error: storageError } = await createClient().storage.from("issue-attachments").remove([attachment.storage_path]);
+        if (storageError) {
+          toast.error("Attachment record deleted, but the Storage object could not be removed. It will be cleaned up automatically.");
+        }
       }
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
       toast.success("Attachment deleted.");
@@ -180,6 +220,13 @@ export function IssueAttachmentsSection({
   };
 
   return (
+    <div
+      className={dragActive ? "rounded-[10px] ring-2 ring-primary/70" : undefined}
+      onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => { if (event.currentTarget === event.target) setDragActive(false); }}
+      onDrop={(event) => { event.preventDefault(); setDragActive(false); void handleUpload(event.dataTransfer.files); }}
+    >
     <Surface>
       <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
         <div className="flex items-center gap-2">
@@ -214,6 +261,10 @@ export function IssueAttachmentsSection({
           </div>
         )}
       </div>
+
+      {canUpload && <div role="region" aria-label="Attachment drop zone" className={`mx-4 mb-3 rounded-md border border-dashed px-3 py-2 text-center text-[11px] transition-colors ${dragActive ? "border-primary bg-primary/10 text-foreground" : "border-border/80 text-muted-foreground"}`}><UploadCloud className="mx-auto mb-1 h-4 w-4" aria-hidden="true" /><p>{dragActive ? "Drop files to upload" : "Drag and drop files here, or use Upload files"}</p><p className="mt-0.5 text-[10px] text-muted-foreground/70">Allowed images, text, JSON, PDF, and archives · 50MB per file</p></div>}
+
+      {uploadTasks.length > 0 && <div className="space-y-2 border-b border-border/70 px-4 py-3" aria-live="polite">{uploadTasks.map((task) => <div key={task.id} className="flex items-center gap-2 text-xs"><span className="min-w-0 flex-1 truncate">{task.file.name}</span>{task.status === "uploading" && <><progress className="h-1.5 w-24" max={100} value={task.progress} aria-label={`Uploading ${task.file.name}`} /><Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => uploadControllers.current.get(task.id)?.abort()}>Cancel</Button></>}{task.status === "failed" && <><span className="text-destructive">{task.error}</span><Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={() => retryUpload(task)}>Retry</Button></>}{task.status === "done" && <span className="text-emerald-500">Done</span>}</div>)}</div>}
 
       {attachments.length === 0 ? (
         <div className="p-6 text-center">
@@ -292,5 +343,6 @@ export function IssueAttachmentsSection({
         </DialogContent>
       </Dialog>
     </Surface>
+    </div>
   );
 }

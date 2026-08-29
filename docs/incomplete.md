@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–9 are source-implemented as of 2026-08-29. Migrations 045–053, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–10 are source-implemented as of 2026-08-29. Migrations 045–057, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -152,30 +152,30 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-003
 - Owner area: Templates / Issue creation
-- Status: OPEN
-- Evidence: migration `202608260026_phase17_issue_templates.sql`; `src/components/settings/issue-templates-manager.tsx`; `src/components/issues/new-issue-form.tsx`
+- Status: EXTERNAL
+- Evidence: migrations `202608260026` and `202608260054`; `src/components/settings/issue-templates-manager.tsx`; `src/components/issues/new-issue-form.tsx`
 - Acceptance: Template management supports default priority, severity, component, labels, preview, archive/restore, and duplication. Creation applies every selected default atomically and reports invalid/archived defaults safely.
-- Verification: RPC/template validation tests and browser template-create/select/create-issue journey.
+- Verification: Focused source tests pass. Still run pgTAP and browser template-create/select/create-issue journey against an applied schema.
 
 ### TB-015 — Custom-field configuration and issue integration
 
 - Priority: Medium
 - Dependencies: TB-003, TB-008
 - Owner area: Custom fields / Issues / API
-- Status: OPEN
-- Evidence: `src/components/settings/custom-fields-manager.tsx`; `src/components/issues/issue-custom-fields-section.tsx`; migrations `202608260029` and `202608260039`
+- Status: EXTERNAL
+- Evidence: `src/components/settings/custom-fields-manager.tsx`; `src/components/issues/issue-custom-fields-section.tsx`; migrations `202608260029`, `202608260039`, and `202608260055`
 - Acceptance: Authorized users can rename/type-edit fields, configure options and requiredness, clear/reset values, use required fields during issue creation, filter/columnize fields in queues, and bulk update where promised. Browser and REST validation agree for all field types.
-- Verification: Typed SQL/RPC/API tests for valid, invalid, missing, and cross-project values; browser settings, creation, queue, and edit journey.
+- Verification: Source contracts and focused tests pass. Still run typed SQL/RPC/API tests and browser settings, creation, queue, and edit journeys.
 
 ### TB-016 — API-token lifecycle and project restrictions
 
 - Priority: Medium
 - Dependencies: TB-022
 - Owner area: API security / Settings
-- Status: OPEN
-- Evidence: `src/components/settings/custom-fields-manager.tsx`; `src/lib/api-auth.ts`; migration `202608260029_phase20_custom_fields_api.sql`
-- Acceptance: Token management supports expiration input/display, last-used display, rotation, revocation, usage history, API documentation/explorer, and project-level restrictions where declared. Plaintext is shown once, hashes are protected, and expired/revoked/restricted tokens fail safely.
-- Verification: Database constraint/RLS and route scope tests; browser token lifecycle journey; no-secret-leak log/response checks.
+- Status: EXTERNAL
+- Evidence: `/dashboard/settings/api`; `src/components/settings/api-tokens-manager.tsx`; `src/lib/api-auth.ts`; `docs/api.md`; migrations `202608260029` and `202608260057`
+- Acceptance: Token management supports expiration input/display, last-used display, rotation, revocation, complete API documentation, and honest usage guidance. Tokens remain organization-scoped and follow the owner's live project memberships; the product explicitly does not claim project-bound tokens, request history, a request explorer, or an application rate-limit guarantee. Plaintext is shown once, hashes are protected, and expired or revoked tokens fail safely.
+- Verification: Source contracts and focused tests pass. Still run database/RLS/route scope tests, browser token lifecycle, and no-secret-leak checks.
 
 ### TB-017 — GitHub integration operational observability
 
@@ -192,10 +192,10 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-004, TB-007
 - Owner area: Attachments / Storage
-- Status: OPEN
-- Evidence: `src/components/issues/issue-attachments-section.tsx`; migration `202608260031_api_storage_hardening.sql`
+- Status: EXTERNAL
+- Evidence: `src/components/issues/issue-attachments-section.tsx`; migrations `202608260031` and `202608260056`; protected `/api/attachments/reconcile`
 - Acceptance: Upload supports true drag/drop, multi-file selection, progress, retry, complete MIME allowlisting, orphan reconciliation, and clear Storage-delete failure handling while preserving the private 50MB bucket and signed access contract.
-- Verification: Storage policy tests, MIME/size tests, orphan cleanup tests, and browser upload/download/delete failure journeys.
+- Verification: Source contracts and focused tests pass. Still run Storage policy/MIME/size/orphan tests and browser upload/download/delete failure journeys.
 
 ### TB-019 — Dashboard operational overview
 
@@ -223,7 +223,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: none
 - Owner area: Database tooling / TypeScript
 - Status: IN PROGRESS
-- Evidence: migrations `202608260040`–`202608260053`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
+- Evidence: migrations `202608260040`–`202608260057`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
 - Acceptance: A disposable replay of migrations 001–041 succeeds; regenerated types include GitHub App tables/fields/RPCs, issue-link additions, and all current API/custom-field contracts; avoidable GitHub `any` casts are removed. `check:migrations` verifies only, `sync:migrations` regenerates the bundle, and `supabase db reset` executes locally.
 - Verification: Fresh local Supabase replay, `npm run db:types`, typecheck, `npm run check:migrations`, and schema/type catalog comparison.
 

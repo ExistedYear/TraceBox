@@ -37,9 +37,9 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- Migrations `202608260041` through `202608260053` complete the current service-role, GitHub reliability, membership, issue-editing, notification, workflow, restricted-security, advanced queue/saved-view, and duplicate-triage work; apply the full chain `202608260001` through `202608260053` to the linked Supabase project.
+- Migrations `202608260041` through `202608260057` complete the current service-role, GitHub reliability, membership, issue-editing, notification, workflow, restricted-security, queue/saved-view, duplicate-triage, template, custom-field, attachment, and API-token work; apply the full chain `202608260001` through `202608260057` to the linked Supabase project.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
-- Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, reconciliation cron, and broader multi-user/RLS behavior.
+- Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, both reconciliation paths (including protected `/api/attachments/reconcile`, which is not in the existing Vercel cron), and broader multi-user/RLS behavior. Template, custom-field, attachment, and API-token browser journeys also remain external checks.
 
 ## 4. Live-test limitation
 

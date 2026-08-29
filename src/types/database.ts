@@ -833,6 +833,7 @@ export type Database = {
           default_severity: string | null
           description: string | null
           id: string
+          is_archived: boolean
           issue_type: string
           name: string
           project_id: string
@@ -847,6 +848,7 @@ export type Database = {
           default_severity?: string | null
           description?: string | null
           id?: string
+          is_archived?: boolean
           issue_type: string
           name: string
           project_id: string
@@ -861,6 +863,7 @@ export type Database = {
           default_severity?: string | null
           description?: string | null
           id?: string
+          is_archived?: boolean
           issue_type?: string
           name?: string
           project_id?: string
@@ -881,6 +884,15 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      issue_template_labels: {
+        Row: { template_id: string; label_id: string }
+        Insert: { template_id: string; label_id: string }
+        Update: { template_id?: string; label_id?: string }
+        Relationships: [
+          { foreignKeyName: "issue_template_labels_template_id_fkey"; columns: ["template_id"]; isOneToOne: false; referencedRelation: "issue_templates"; referencedColumns: ["id"] },
+          { foreignKeyName: "issue_template_labels_label_id_fkey"; columns: ["label_id"]; isOneToOne: false; referencedRelation: "labels"; referencedColumns: ["id"] }
         ]
       }
       issue_watchers: {
@@ -1957,6 +1969,10 @@ export type Database = {
         }
         Returns: string
       }
+      bulk_set_issue_custom_value: {
+        Args: { p_issue_ids: string[]; p_custom_field_id: string; p_value: Json }
+        Returns: number
+      }
       create_issue: {
         Args: {
           p_actual_behavior?: string
@@ -1982,6 +1998,20 @@ export type Database = {
           p_default_severity?: string
           p_description?: string
           p_issue_type?: string
+          p_name: string
+          p_project_id: string
+        }
+        Returns: string
+      }
+      create_issue_template_complete: {
+        Args: {
+          p_body_template: string
+          p_default_component_id: string | null
+          p_default_priority: string | null
+          p_default_severity: string | null
+          p_description: string
+          p_issue_type: string
+          p_label_ids?: string[]
           p_name: string
           p_project_id: string
         }
@@ -2023,6 +2053,10 @@ export type Database = {
         Args: { p_payload: Json; p_project_id: string }
         Returns: number
       }
+      create_issue_complete_base: {
+        Args: { p_payload: Json; p_project_id: string }
+        Returns: number
+      }
       create_saved_view: {
         Args: {
           p_filters?: Json
@@ -2047,10 +2081,17 @@ export type Database = {
         Returns: undefined
       }
       delete_custom_field: { Args: { p_field_id: string }; Returns: undefined }
+      update_custom_field: {
+        Args: { p_field_id: string; p_name: string; p_field_type: string; p_config?: Json; p_is_required?: boolean }
+        Returns: undefined
+      }
+      validate_custom_field_definition: { Args: { p_config: Json; p_field_type: string }; Returns: undefined }
+      validate_custom_field_value: { Args: { p_field_id: string; p_value: Json }; Returns: undefined }
       delete_issue_template: {
         Args: { p_template_id: string }
         Returns: undefined
       }
+      duplicate_issue_template: { Args: { p_name: string; p_template_id: string }; Returns: string }
       delete_label: { Args: { p_label_id: string }; Returns: undefined }
       delete_saved_view: { Args: { p_view_id: string }; Returns: undefined }
       rename_saved_view: { Args: { p_name: string; p_view_id: string }; Returns: undefined }
@@ -2160,6 +2201,10 @@ export type Database = {
           has_more: boolean
         }[]
       }
+      list_missing_attachment_objects: {
+        Args: Record<PropertyKey, never>
+        Returns: { attachment_id: string; storage_path: string }[]
+      }
       update_notification_preferences: {
         Args: {
           p_mentions: boolean
@@ -2240,6 +2285,10 @@ export type Database = {
             Returns: boolean
           }
       revoke_api_token: { Args: { p_token_id: string }; Returns: undefined }
+      rotate_api_token: {
+        Args: { p_expires_at?: string; p_token_hash: string; p_token_id: string }
+        Returns: string
+      }
       revoke_issue_access: {
         Args: { p_issue_id: string; p_user_id: string }
         Returns: undefined
@@ -2267,6 +2316,8 @@ export type Database = {
         Args: { p_custom_field_id: string; p_issue_id: string; p_value: Json }
         Returns: undefined
       }
+      set_issue_template_archived: { Args: { p_archived: boolean; p_template_id: string }; Returns: undefined }
+      set_issue_template_labels: { Args: { p_label_ids: string[]; p_template_id: string }; Returns: undefined }
       set_issue_labels: {
         Args: { p_issue_id: string; p_label_ids: string[] }
         Returns: undefined
@@ -2345,6 +2396,20 @@ export type Database = {
           p_template_id: string
         }
         Returns: undefined
+      }
+      update_issue_template_complete: {
+        Args: {
+          p_body_template: string
+          p_default_component_id: string | null
+          p_default_priority: string | null
+          p_default_severity: string | null
+          p_description: string
+          p_issue_type: string
+          p_label_ids?: string[]
+          p_name: string
+          p_template_id: string
+        }
+        Returns: string
       }
       update_label: {
         Args: {

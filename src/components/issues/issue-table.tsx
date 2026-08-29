@@ -35,6 +35,7 @@ import {
   issueTypeLabel,
   ISSUE_TYPES,
   personLabel,
+  CUSTOM_FIELD_FILTER_MAX,
   priorityLabel,
   PRIORITIES,
   SEVERITIES,
@@ -64,6 +65,7 @@ export type TableRow = {
   assigneeId: string | null;
   assigneeLabel: string;
   updated_at: string;
+  customValues: Record<string, unknown>;
 };
 
 export type FilterOption = { value: string; label: string };
@@ -95,6 +97,7 @@ type Props = {
   versions: FilterOption[];
   milestones: FilterOption[];
   labels: FilterOption[];
+  customFields: Array<{ id: string; name: string; field_type: string; config: Record<string, unknown> }>;
   initialFilters: IssueFilters;
   initialSearchQuery?: string;
 };
@@ -111,7 +114,7 @@ function relativeTime(iso: string) {
 
 const columnHelper = createColumnHelper<TableRow>();
 
-export function IssueTable({ projectKey, projectId, canEdit, canManageProject, currentUserId, states, components, members, versions, milestones, labels, initialFilters, initialSearchQuery = "" }: Props) {
+export function IssueTable({ projectKey, projectId, canEdit, canManageProject, currentUserId, states, components, members, versions, milestones, labels, customFields, initialFilters, initialSearchQuery = "" }: Props) {
   const router = useRouter();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [sorting, setSorting] = useState<SortingState>([{ id: "updated_at", desc: true }]);
@@ -129,7 +132,8 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
   const [savedViewsError, setSavedViewsError] = useState(false);
   const [savedViewsNonce, setSavedViewsNonce] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkField, setBulkField] = useState<"priority" | "severity" | "assignee_id" | "component_id" | "affected_version_id" | "target_milestone_id">("priority");
+  const [bulkField, setBulkField] = useState<"priority" | "severity" | "assignee_id" | "component_id" | "affected_version_id" | "target_milestone_id" | "custom_field">("priority");
+  const [bulkCustomFieldId, setBulkCustomFieldId] = useState("");
   const [bulkValue, setBulkValue] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
 
@@ -174,6 +178,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     setLoadError(false);
     const supabase = createClient();
     let labelIssueIds: string[] | null = null;
+    let customIssueIds: string[] | null = null;
     if (filters.labelId) {
       const { data: labelRows, error: labelError } = await supabase.from("issue_labels").select("issue_id").eq("label_id", filters.labelId);
       if (seq !== requestSeq.current) return;
@@ -193,9 +198,21 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
         return;
       }
     }
+    if (filters.customFieldId && filters.customFieldValue) {
+      if (filters.customFieldValue.length > CUSTOM_FIELD_FILTER_MAX) { setRows([]); setTotal(0); setLoading(false); return; }
+      const customField = customFields.find((field) => field.id === filters.customFieldId);
+      const rawValue = filters.customFieldValue;
+      const typedValue: string | number | boolean | string[] | undefined = customField?.field_type === "NUMBER" ? Number(rawValue) : customField?.field_type === "BOOLEAN" ? rawValue === "true" ? true : rawValue === "false" ? false : undefined : customField?.field_type === "MULTI_SELECT" ? rawValue.split(",").map((item) => item.trim()).filter(Boolean) : rawValue;
+      if (typedValue === undefined || (customField?.field_type === "NUMBER" && (typeof typedValue !== "number" || !Number.isFinite(typedValue)))) { setRows([]); setTotal(0); setLoading(false); return; }
+      const { data: customRows, error: customError } = await supabase.from("issue_custom_values").select("issue_id").eq("custom_field_id", filters.customFieldId).eq("value", JSON.stringify(typedValue));
+      if (seq !== requestSeq.current) return;
+      if (customError) { console.error("Custom field filter load failed", { code: customError.code, message: customError.message }); setLoadError(true); setRows([]); setTotal(0); setLoading(false); return; }
+      customIssueIds = (customRows ?? []).map((row) => row.issue_id);
+      if (customIssueIds.length === 0) { setRows([]); setTotal(0); setLoading(false); return; }
+    }
     let query = supabase
       .from("issues")
-      .select("id, issue_number, title, type, priority, severity, resolution, visibility, reporter_id, affected_version_id, target_milestone_id, created_at, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name), milestone:milestones (name)", { count: "exact" })
+      .select("id, issue_number, title, type, priority, severity, resolution, visibility, reporter_id, affected_version_id, target_milestone_id, created_at, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name), milestone:milestones (name), custom_values:issue_custom_values(custom_field_id, value)", { count: "exact" })
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -233,6 +250,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     if (filters.updatedFrom) query = query.gte("updated_at", `${filters.updatedFrom}T00:00:00.000Z`);
     if (filters.updatedTo) query = query.lt("updated_at", `${filters.updatedTo}T23:59:59.999Z`);
     if (labelIssueIds) query = query.in("id", labelIssueIds);
+    if (customIssueIds) query = query.in("id", customIssueIds);
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
     const sort = sorting[0];
     if (sort && sortableIds.has(sort.id)) {
@@ -286,11 +304,12 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
         assigneeId: row.assignee_id,
         assigneeLabel: personLabel(nameMap.get(row.assignee_id ?? "") ?? undefined, row.assignee_id),
         updated_at: row.updated_at,
+        customValues: Object.fromEntries(((row.custom_values ?? []) as Array<{ custom_field_id: string; value: unknown }>).map((item) => [item.custom_field_id, item.value])),
       })),
     );
     setTotal(count ?? 0);
     setLoading(false);
-  }, [projectKey, projectId, filters, sorting, page, debouncedQuery]);
+  }, [projectKey, projectId, filters, sorting, page, debouncedQuery, customFields]);
 
   useEffect(() => {
     void fetchData();
@@ -377,8 +396,17 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
   );
 
   const bulkUpdate = useCallback(async () => {
-    if (!canEdit || selectedIds.size === 0 || !bulkValue) return;
+    if (!canEdit || selectedIds.size === 0 || (bulkField === "custom_field" ? !bulkCustomFieldId : !bulkValue)) return;
     setBulkLoading(true);
+    if (bulkField === "custom_field") {
+      if (!bulkCustomFieldId) { toast.error("Choose a custom field."); setBulkLoading(false); return; }
+      const customField = customFields.find((field) => field.id === bulkCustomFieldId);
+      const customValue = bulkValue === "__NULL__" || bulkValue === "" ? null : customField?.field_type === "NUMBER" ? Number(bulkValue) : customField?.field_type === "BOOLEAN" ? bulkValue === "true" : customField?.field_type === "MULTI_SELECT" ? JSON.parse(bulkValue) : bulkValue;
+      const { error } = await (createClient() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> }).rpc("bulk_set_issue_custom_value", { p_issue_ids: [...selectedIds], p_custom_field_id: bulkCustomFieldId, p_value: customValue });
+      setBulkLoading(false);
+      if (error) { toast.error("Bulk custom-field update rejected. No partial changes were applied."); return; }
+      toast.success(`${selectedIds.size} issues updated.`); setSelectedIds(new Set()); setBulkValue(""); setRefreshNonce((value) => value + 1); return;
+    }
     const { error } = await (createClient() as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> }).rpc("bulk_update_issue_fields", {
       p_project_id: projectId,
       p_issue_ids: [...selectedIds],
@@ -394,7 +422,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     setSelectedIds(new Set());
     setBulkValue("");
     setRefreshNonce((value) => value + 1);
-  }, [bulkField, bulkValue, canEdit, projectId, selectedIds]);
+  }, [bulkCustomFieldId, bulkField, bulkValue, canEdit, customFields, projectId, selectedIds]);
 
   const columns = useMemo(() => {
     return [
@@ -522,10 +550,15 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
         header: "Updated",
         cell: (info) => <span className="whitespace-nowrap text-xs text-muted-foreground">{relativeTime(info.getValue())}</span>,
       }),
+      ...customFields.map((field) => columnHelper.display({
+        id: `custom-${field.id}`,
+        header: field.name,
+        cell: (info) => <span className="max-w-32 truncate text-xs text-muted-foreground">{Array.isArray(info.row.original.customValues[field.id]) ? (info.row.original.customValues[field.id] as unknown[]).join(", ") : String(info.row.original.customValues[field.id] ?? "—")}</span>,
+      })),
     ];
     // updateField/fetchData are stabilized with useCallback; including them
     // keeps cell handlers in sync with the latest filters/sort/page.
-  }, [projectKey, canEdit, editingId, components, members, currentUserId, updateField]);
+  }, [projectKey, canEdit, editingId, components, members, currentUserId, updateField, customFields]);
 
   const table = useReactTable({
     data: rows,
@@ -548,6 +581,12 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const firstRow = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const lastRow = Math.min(total, (page + 1) * PAGE_SIZE);
+  const selectedCustomField = customFields.find((field) => field.id === bulkCustomFieldId);
+  const customOptions = selectedCustomField && Array.isArray(selectedCustomField.config.options) ? selectedCustomField.config.options.filter((option): option is string => typeof option === "string") : [];
+  const filterCustomField = customFields.find((field) => field.id === filters.customFieldId);
+  const filterCustomOptions = filterCustomField && Array.isArray(filterCustomField.config.options) ? filterCustomField.config.options.filter((option): option is string => typeof option === "string") : [];
+  const customFilterControl = filterCustomField?.field_type === "SINGLE_SELECT" ? <select id="issue-custom-value-filter" className={selectClass} value={filters.customFieldValue ?? ""} onChange={(event) => setFilter("customFieldValue", event.target.value)}><option value="">Any value</option>{filterCustomOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select> : filterCustomField?.field_type === "BOOLEAN" ? <select id="issue-custom-value-filter" className={selectClass} value={filters.customFieldValue ?? ""} onChange={(event) => setFilter("customFieldValue", event.target.value)}><option value="">Any value</option><option value="true">Yes</option><option value="false">No</option></select> : filterCustomField?.field_type === "USER" ? <select id="issue-custom-value-filter" className={selectClass} value={filters.customFieldValue ?? ""} onChange={(event) => setFilter("customFieldValue", event.target.value)}><option value="">Any user</option>{members.map((member) => <option key={member.value} value={member.value}>{member.label}</option>)}</select> : <Input id="issue-custom-value-filter" type={filterCustomField?.field_type === "NUMBER" ? "number" : filterCustomField?.field_type === "DATE" ? "date" : "text"} value={filters.customFieldValue ?? ""} onChange={(event) => setFilter("customFieldValue", event.target.value)} className="h-7 text-xs" placeholder={filterCustomField?.field_type === "MULTI_SELECT" ? "Values, comma-separated" : "Value"} />;
+  const bulkCustomControl = selectedCustomField?.field_type === "SINGLE_SELECT" ? <select aria-label="Bulk custom value" className={selectClass} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)}><option value="">Choose value</option>{customOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select> : selectedCustomField?.field_type === "MULTI_SELECT" ? <select aria-label="Bulk custom value" multiple className="min-h-8 rounded-md border border-input bg-background px-2 text-xs" value={bulkValue ? JSON.parse(bulkValue) as string[] : []} onChange={(event) => setBulkValue(JSON.stringify(Array.from(event.target.selectedOptions, (option) => option.value)))}>{customOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select> : selectedCustomField?.field_type === "BOOLEAN" ? <select aria-label="Bulk custom value" className={selectClass} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)}><option value="">Choose value</option><option value="true">Yes</option><option value="false">No</option></select> : <Input aria-label="Bulk custom value" type={selectedCustomField?.field_type === "NUMBER" ? "number" : selectedCustomField?.field_type === "DATE" ? "date" : "text"} className={selectClass} value={bulkValue === "__NULL__" ? "" : bulkValue} onChange={(event) => setBulkValue(event.target.value)} placeholder="Value (blank clears)" />;
 
   return (
     <div className="space-y-3">
@@ -569,6 +608,7 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
             versionIds: new Set(versions.map((version) => version.value)),
             milestoneIds: new Set(milestones.map((milestone) => milestone.value)),
             labelIds: new Set(labels.map((label) => label.value)),
+            customFieldIds: new Set(customFields.map((field) => field.id)),
           }));
           setSearchQuery(typeof filters.q === "string" ? filters.q : "");
         }}
@@ -605,6 +645,8 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
           <FilterSelect id="issue-version-filter" label="Version" value={filters.versionId ?? ""} placeholder="All versions" options={versions} onChange={(value) => setFilter("versionId", value)} />
           <FilterSelect id="issue-milestone-filter" label="Milestone" value={filters.milestoneId ?? ""} placeholder="All milestones" options={milestones} onChange={(value) => setFilter("milestoneId", value)} />
           <FilterSelect id="issue-label-filter" label="Label" value={filters.labelId ?? ""} placeholder="All labels" options={labels} onChange={(value) => setFilter("labelId", value)} />
+          <FilterSelect id="issue-custom-field-filter" label="Custom field" value={filters.customFieldId ?? ""} placeholder="Any custom field" options={customFields.map((field) => ({ value: field.id, label: field.name }))} onChange={(value) => setFilter("customFieldId", value)} />
+          {filters.customFieldId && <div className="min-w-[130px]"><label htmlFor="issue-custom-value-filter" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Custom value</label><div className="mt-1">{customFilterControl}</div></div>}
           <div className="min-w-[130px]"><label htmlFor="created-from" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Created from</label><Input id="created-from" type="date" className="mt-1 h-7 text-xs" value={filters.createdFrom ?? ""} onChange={(event) => setFilter("createdFrom", event.target.value)} /></div>
           <div className="min-w-[130px]"><label htmlFor="created-to" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Created to</label><Input id="created-to" type="date" className="mt-1 h-7 text-xs" value={filters.createdTo ?? ""} onChange={(event) => setFilter("createdTo", event.target.value)} /></div>
           <div className="min-w-[130px]"><label htmlFor="updated-from" className="block font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">Updated from</label><Input id="updated-from" type="date" className="mt-1 h-7 text-xs" value={filters.updatedFrom ?? ""} onChange={(event) => setFilter("updatedFrom", event.target.value)} /></div>
@@ -628,9 +670,10 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
 
       {canEdit && selectedIds.size > 0 && <div className="flex flex-wrap items-end gap-2 rounded-[10px] border border-primary/30 bg-primary/5 p-3" role="region" aria-label="Bulk issue actions">
         <div className="flex items-center gap-2 text-xs font-medium"><CheckSquare className="h-3.5 w-3.5 text-primary" /> {selectedIds.size} selected on this page</div>
-        <label className="text-[10px] text-muted-foreground">Field<select className={cn(selectClass, "ml-1")} value={bulkField} onChange={(event) => { setBulkField(event.target.value as typeof bulkField); setBulkValue(""); }}><option value="priority">Priority</option><option value="severity">Severity</option><option value="assignee_id">Assignee</option><option value="component_id">Component</option><option value="affected_version_id">Version</option><option value="target_milestone_id">Milestone</option></select></label>
-        <select aria-label="Bulk value" className={selectClass} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)}><option value="">Choose value</option>{(bulkField === "priority" ? PRIORITIES.map((value) => ({ value, label: priorityLabel(value) })) : bulkField === "severity" ? SEVERITIES.map((value) => ({ value, label: severityLabel(value) })) : bulkField === "assignee_id" ? [{ value: "__NULL__", label: "Unassigned" }, ...members] : bulkField === "component_id" ? [{ value: "__NULL__", label: "None" }, ...components] : bulkField === "affected_version_id" ? [{ value: "__NULL__", label: "None" }, ...versions] : [{ value: "__NULL__", label: "None" }, ...milestones]).map((option) => <option key={option.value || "none"} value={option.value}>{option.label}</option>)}</select>
-        <Button type="button" size="sm" className="h-7 text-xs" disabled={bulkLoading || !bulkValue} onClick={() => void bulkUpdate()}>{bulkLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}Apply atomically</Button>
+        <label className="text-[10px] text-muted-foreground">Field<select className={cn(selectClass, "ml-1")} value={bulkField} onChange={(event) => { setBulkField(event.target.value as typeof bulkField); setBulkValue(""); }}><option value="priority">Priority</option><option value="severity">Severity</option><option value="assignee_id">Assignee</option><option value="component_id">Component</option><option value="affected_version_id">Version</option><option value="target_milestone_id">Milestone</option>{customFields.length > 0 && <option value="custom_field">Custom field</option>}</select></label>
+        {bulkField === "custom_field" && <select aria-label="Bulk custom field" className={selectClass} value={bulkCustomFieldId} onChange={(event) => { setBulkCustomFieldId(event.target.value); setBulkValue(""); }}><option value="">Choose field</option>{customFields.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select>}
+        {bulkField === "custom_field" ? bulkCustomControl : <select aria-label="Bulk value" className={selectClass} value={bulkValue} onChange={(event) => setBulkValue(event.target.value)}><option value="">Choose value</option>{(bulkField === "priority" ? PRIORITIES.map((value) => ({ value, label: priorityLabel(value) })) : bulkField === "severity" ? SEVERITIES.map((value) => ({ value, label: severityLabel(value) })) : bulkField === "assignee_id" ? [{ value: "__NULL__", label: "Unassigned" }, ...members] : bulkField === "component_id" ? [{ value: "__NULL__", label: "None" }, ...components] : bulkField === "affected_version_id" ? [{ value: "__NULL__", label: "None" }, ...versions] : [{ value: "__NULL__", label: "None" }, ...milestones]).map((option) => <option key={option.value || "none"} value={option.value}>{option.label}</option>)}</select>}
+        <Button type="button" size="sm" className="h-7 text-xs" disabled={bulkLoading || (bulkField === "custom_field" ? !bulkCustomFieldId : !bulkValue)} onClick={() => void bulkUpdate()}>{bulkLoading ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}Apply atomically</Button>
         <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedIds(new Set())}>Clear</Button>
       </div>}
 

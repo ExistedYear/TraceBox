@@ -25,7 +25,7 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260053`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–045 cover GitHub reliability, shared issue API contracts, and explicit membership/invitations. Migration 046 enforces workspace/project relational membership guards. Migration 047 adds conflict-aware full issue editing and atomic template/custom-field/restricted creation. Migration 048 completes preference-aware notification delivery and the cursor inbox contract. Migration 049 adds audited project lifecycle and atomic workflow publication. Migration 050 closes restricted access-history, notification, immutable-audit, RLS, and Storage boundaries. Migrations 051–053 complete advanced queue/bulk updates, saved-view visibility and lifecycle, and atomic duplicate triage.
+Database state is represented by migrations `202608260001` through `202608260057`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–045 cover GitHub reliability, shared issue API contracts, and explicit membership/invitations. Migration 046 enforces workspace/project relational membership guards. Migration 047 adds conflict-aware full issue editing and atomic template/custom-field/restricted creation. Migration 048 completes preference-aware notification delivery and the cursor inbox contract. Migration 049 adds audited project lifecycle and atomic workflow publication. Migration 050 closes restricted access-history, notification, immutable-audit, RLS, and Storage boundaries. Migrations 051–053 complete advanced queue/bulk updates, saved-view visibility and lifecycle, and atomic duplicate triage. Migrations 054–057 complete template lifecycle/default application, custom-field validation, attachment reconciliation hardening, and API-token lifecycle contracts.
 
 Completion-plan Phases 2–9 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage, and command workflows are implemented. Database replay and hosted multi-user/realtime/browser validation remain distinct external release checks.
 
@@ -53,12 +53,12 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       158/158 passed across 26 test files
+Tests:       168/168 passed across 30 test files
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
-Migration check: 53 files contiguous and `supabase/full_schema.sql` synchronized
+Migration check: 57 files are contiguous and `supabase/full_schema.sql` is synchronized
 Database tests: pgTAP suites are committed under `supabase/tests/`; execution is pending because this checkout cannot access the Docker socket
-Database types: committed types are reconciled through migration 053; regenerate from a replayed local or linked schema before deployment
+Database types: committed types must be regenerated from a replayed local or linked schema after migrations 054–057 before deployment
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
@@ -71,7 +71,7 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`053` in order from `supabase/full_schema.sql` or the individual files, then regenerate `src/types/database.ts` from that applied schema.
+2. Apply all migrations `001`–`057` in order from `supabase/full_schema.sql` or the individual files, then regenerate `src/types/database.ts` from that applied schema.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
@@ -79,7 +79,8 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
 9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.
-10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile` (repository reconciliation plus webhook replay/cleanup), and regenerate database types from the live schema if the deployed schema differs. Migrations 042–053 are required for the current GitHub, membership, issue editing, notifications, workflow administration, restricted-security, queue, saved-view, and triage paths.
+10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile` (repository reconciliation plus webhook replay/cleanup), and regenerate database types from the live schema if the deployed schema differs. Migrations 042–057 are required for the current GitHub, membership, issue editing, notifications, workflow administration, restricted-security, queue, saved-view, triage, template, custom-field, attachment, and API-token paths.
+11. If attachment orphan reconciliation is scheduled, invoke protected `/api/attachments/reconcile` with `CRON_SECRET` from a separately configured scheduler. It is not part of the existing Vercel cron entry.
 
 Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `docs/deployment.md`.
 

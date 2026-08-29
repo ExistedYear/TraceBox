@@ -288,6 +288,8 @@ Advanced filters serialize consistently across the queue, saved views, URLs, tri
 
 ## Phase 10 — Templates, custom fields, attachments, and API tokens
 
+Status: source-complete on 2026-08-29. Migrations 054–057 complete template lifecycle/default application, custom-field configuration/value validation, attachment MIME/path/reconciliation hardening, and API-token lifecycle contracts. Local typecheck, focused unit tests, and lint pass; pgTAP replay, migration replay, hosted Storage/API validation, and browser template/upload/token journeys remain external checks.
+
 ### Issue templates
 
 Add default priority, severity, component, labels if adopted, preview, archive/restore, duplication, and validation for archived referenced defaults.
