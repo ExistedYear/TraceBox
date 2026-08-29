@@ -35,6 +35,7 @@ type StateOption = {
 
 type TransitionOption = {
   toStateId: string;
+  requiresResolution: boolean;
 };
 
 type Props = {
@@ -114,7 +115,9 @@ export function IssueStatusTransition({
   }
 
   function handleStateSelect(targetState: StateOption) {
-    if (targetState.category === "RESOLVED" || targetState.category === "CLOSED") {
+    const configured = allowedTransitions.find((transition) => transition.toStateId === targetState.id);
+    const resolutionRequired = configured?.requiresResolution ?? (targetState.category === "RESOLVED" || targetState.category === "CLOSED");
+    if (resolutionRequired) {
       setPendingState(targetState);
       setSelectedResolution(
         (currentResolution as Resolution) || "FIXED",
@@ -247,9 +250,7 @@ export function IssueStatusTransition({
       <Dialog open={resolutionModalOpen} onOpenChange={setResolutionModalOpen}>
         <DialogContent className="max-w-md rounded-[10px]">
           <DialogHeader>
-            <DialogTitle className="text-base">
-              Resolve issue · {pendingState?.name}
-            </DialogTitle>
+            <DialogTitle className="text-base">Complete transition · {pendingState?.name}</DialogTitle>
             <DialogDescription>
               Select a resolution describing how this issue was completed or dismissed.
             </DialogDescription>

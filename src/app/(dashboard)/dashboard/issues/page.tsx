@@ -27,13 +27,19 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
   const projectId = context.activeProject.id;
 
   const supabase = await createClient();
-  const [{ data: states }, { data: components }, { data: memberRows }, { data: adminRows }, { data: role }] = await Promise.all([
+  const results = await Promise.all([
     supabase.from("workflow_states").select("id, name").eq("project_id", projectId).order("position"),
     supabase.from("components").select("id, name").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.rpc("project_role", { p_project_id: projectId }),
   ]);
+  const [{ data: states, error: statesError }, { data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: role, error: roleError }] = results;
+  const queryError = statesError ?? componentsError ?? memberError ?? adminsError ?? roleError;
+  if (queryError) {
+    console.error("Issue queue metadata query failed", { code: queryError.code, message: queryError.message });
+    return <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><Surface className="space-y-3 border-destructive/30 p-8 text-center"><h1 className="text-lg font-semibold">Issues unavailable</h1><p className="text-sm text-muted-foreground">The issue queue could not load its project metadata. No empty result was inferred.</p><Link href="/dashboard/issues" className="text-sm font-medium text-primary underline underline-offset-4">Retry</Link></Surface></main>;
+  }
 
   const candidates = [...(memberRows ?? []), ...(adminRows ?? [])];
   const names = await displayNameMap(candidates.map((row) => row.user_id));

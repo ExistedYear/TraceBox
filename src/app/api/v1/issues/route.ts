@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { authenticateApiRequest, filterApiVisibleIssues } from "@/lib/api-auth";
 import { ISSUE_TYPES, PRIORITIES } from "@/lib/issues";
-import { issueCreateSchema } from "@/lib/validation/issue";
+import { issueCreatePayloadSchema } from "@/lib/validation/issue";
+import type { Json } from "@/types/database";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type ApiIssueRow = {
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
-  const parsed = issueCreateSchema.safeParse(payload);
+  const parsed = issueCreatePayloadSchema.safeParse(payload);
   if (!parsed.success) return NextResponse.json({ error: "Invalid issue payload.", details: parsed.error.flatten().fieldErrors }, { status: 422 });
 
   const projectId = (payload as Record<string, unknown>).project_id;
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   if (project.organization_id !== auth.context.organizationId) return NextResponse.json({ error: "Project is not accessible with this token." }, { status: 403 });
 
-  const { data: issueNumber, error } = await auth.client.rpc("api_create_issue", { p_token_hash: auth.context.tokenHash, p_payload: { ...parsed.data, project_id: projectId } });
+  const { data: issueNumber, error } = await auth.client.rpc("api_create_issue", { p_token_hash: auth.context.tokenHash, p_payload: { ...parsed.data, project_id: projectId } as unknown as Json });
   if (error) return NextResponse.json({ error: "Could not create issue." }, { status: 400 });
   return NextResponse.json({ success: true, issue_number: issueNumber }, { status: 201 });
 }

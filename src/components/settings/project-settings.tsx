@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Archive,
-  ArrowRight,
   Calendar,
   CheckCircle2,
   ExternalLink,
@@ -23,7 +22,6 @@ import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -34,9 +32,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { WorkflowEditor } from "@/components/settings/workflow-editor";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { componentSchema, type ComponentValues } from "@/lib/validation/components";
+import type { WorkflowStateValues } from "@/lib/validation/project-settings";
 import {
   labelSchema,
   versionSchema,
@@ -87,18 +87,9 @@ export type MilestoneRow = {
   status: string;
 };
 
-export type StateRow = { id: string; name: string; category: string; position: number; isInitial: boolean; isTerminal: boolean };
-export type TransitionRow = { fromStateId: string; toStateId: string };
+export type StateRow = { id: string; name: string; category: WorkflowStateValues["category"]; position: number; color: string | null; isInitial: boolean; isTerminal: boolean };
+export type TransitionRow = { fromStateId: string; toStateId: string; requiredRole: string | null; requiresResolution: boolean };
 export type MemberRow = { userId: string; role: string; displayName: string | null };
-
-const categoryTone: Record<string, string> = {
-  TRIAGE: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  OPEN: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  IN_PROGRESS: "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
-  REVIEW: "border-purple-500/25 bg-purple-500/10 text-purple-700 dark:text-purple-300",
-  RESOLVED: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  CLOSED: "border-zinc-500/25 bg-zinc-500/10 text-zinc-600 dark:text-zinc-300",
-};
 
 function memberLabel(members: MemberRow[], userId: string | null) {
   if (!userId) return "Unassigned";
@@ -486,7 +477,6 @@ export function ProjectSettings({
     setEditingMilestone(null);
   }
 
-  const stateName = (id: string) => states.find((state) => state.id === id)?.name ?? "?";
   const settingTabs = [
     { value: "components" as const, label: "Components", description: "Ownership areas", icon: Layers3, count: components.length },
     { value: "labels" as const, label: "Labels", description: "Issue taxonomy", icon: Tag, count: labels.length },
@@ -700,35 +690,8 @@ export function ProjectSettings({
 
       {/* Workflow Tab */}
       {tab === "workflow" && (
-        <div role="tabpanel" id="panel-workflow" aria-labelledby="tab-workflow" className="grid gap-3 lg:grid-cols-2">
-          <Card className="rounded-[10px] border-border/80">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">States</CardTitle>
-              <CardDescription className="text-xs">Every new issue starts in the initial state.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              {states.map((state) => (
-                <div key={state.id} className="flex items-center gap-2 text-sm">
-                  <span className="w-6 shrink-0 font-mono text-[10px] text-muted-foreground">{state.position}</span>
-                  <span className="min-w-0 flex-1 truncate">{state.name}{state.isInitial && <span className="ml-2 font-mono text-[10px] uppercase tracking-wide text-primary">initial</span>}{state.isTerminal && <span className="ml-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">terminal</span>}</span>
-                  <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide", categoryTone[state.category])}>{state.category.replace("_", " ").toLowerCase()}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="rounded-[10px] border-border/80">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Transitions</CardTitle>
-              <CardDescription className="text-xs">Allowed moves between states.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
-              {transitions.map((transition) => (
-                <span key={`${transition.fromStateId}->${transition.toStateId}`} className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {stateName(transition.fromStateId)} <ArrowRight className="h-3 w-3" /> {stateName(transition.toStateId)}
-                </span>
-              ))}
-            </CardContent>
-          </Card>
+        <div role="tabpanel" id="panel-workflow" aria-labelledby="tab-workflow">
+          <WorkflowEditor projectId={projectId} canManage={canManage} initialStates={states.map((state) => ({ id: state.id, clientId: state.id, name: state.name, category: state.category, position: state.position, color: state.color ?? "", isInitial: state.isInitial, isTerminal: state.isTerminal }))} initialTransitions={transitions} />
         </div>
       )}
 

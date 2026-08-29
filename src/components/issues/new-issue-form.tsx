@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
@@ -15,6 +15,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatIssueKey, ISSUE_TYPES, PRIORITIES, SEVERITIES } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 import { issueCreateSchema, type IssueCreateValues } from "@/lib/validation/issue";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import type { Json } from "@/types/database";
 
 const selectClass = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 const errorClass = "text-xs text-destructive";
@@ -29,6 +31,7 @@ export type IssueTemplateItem = {
   default_severity: string | null;
   default_component_id: string | null;
 };
+export type RequiredCustomField = { id: string; name: string; field_type: string; config: Record<string, unknown> };
 
 export function NewIssueForm({
   projectId,
@@ -36,6 +39,7 @@ export function NewIssueForm({
   components,
   members,
   templates = [],
+  requiredCustomFields = [],
   initialStateName,
 }: {
   projectId: string;
@@ -43,10 +47,11 @@ export function NewIssueForm({
   components: { id: string; name: string; defaultAssigneeId: string | null }[];
   members: { userId: string; displayName: string | null }[];
   templates?: IssueTemplateItem[];
+  requiredCustomFields?: RequiredCustomField[];
   initialStateName: string;
 }) {
   const router = useRouter();
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(requiredCustomFields.length > 0);
   const [duplicateCandidates, setDuplicateCandidates] = useState<Array<{ issue_number: number; title: string }>>([]);
   const form = useForm<IssueCreateValues>({
     resolver: zodResolver(issueCreateSchema),
@@ -62,11 +67,17 @@ export function NewIssueForm({
       steps_to_reproduce: "",
       expected_behavior: "",
       actual_behavior: "",
+      visibility: "PROJECT",
+      access_user_ids: [],
+      template_id: "",
+      custom_values: {},
     },
   });
   const componentField = form.register("component_id");
   const watchedTitle = form.watch("title");
   const duplicateSeq = useRef(0);
+
+  useUnsavedChanges(form.formState.isDirty && !form.formState.isSubmitting, "Discard this unsaved issue?");
 
   useEffect(() => {
     const title = watchedTitle?.trim();
@@ -88,38 +99,36 @@ export function NewIssueForm({
         .ilike("title", `%${safe}%`)
         .limit(5);
       if (seq !== duplicateSeq.current) return;
-      if (data) setDuplicateCandidates(data as any);
+      if (data) setDuplicateCandidates(data);
     }, 450);
     return () => clearTimeout(handle);
   }, [watchedTitle, projectId]);
   function applyTemplate(templateId: string) {
     const tmpl = templates.find((t) => t.id === templateId);
     if (!tmpl) return;
+    form.setValue("template_id", templateId);
     if (tmpl.body_template) form.setValue("description", tmpl.body_template, { shouldValidate: true });
-    if (tmpl.issue_type) form.setValue("type", tmpl.issue_type as any, { shouldValidate: true });
-    if (tmpl.default_priority) form.setValue("priority", tmpl.default_priority as any);
-    if (tmpl.default_severity) form.setValue("severity", tmpl.default_severity as any);
+    if ((ISSUE_TYPES as readonly string[]).includes(tmpl.issue_type)) form.setValue("type", tmpl.issue_type as IssueCreateValues["type"], { shouldValidate: true });
+    if (tmpl.default_priority && (PRIORITIES as readonly string[]).includes(tmpl.default_priority)) form.setValue("priority", tmpl.default_priority as IssueCreateValues["priority"]);
+    if (tmpl.default_severity && (SEVERITIES as readonly string[]).includes(tmpl.default_severity)) form.setValue("severity", tmpl.default_severity as IssueCreateValues["severity"]);
     if (tmpl.default_component_id) form.setValue("component_id", tmpl.default_component_id);
     toast.info(`Applied template "${tmpl.name}"`);
   }
 
 
   async function onSubmit(values: IssueCreateValues) {
-    let issueNumber: { data: number | null; error: { message: string } | null };
+    let issueNumber;
     try {
-      issueNumber = await createClient().rpc("create_issue", {
+      issueNumber = await createClient().rpc("create_issue_complete", {
         p_project_id: projectId,
-        p_title: values.title.trim(),
-        p_type: values.type,
-        p_description: values.description ? values.description.trim() : undefined,
-        p_component_id: values.component_id || undefined,
-        p_priority: values.priority,
-        p_severity: values.severity,
-        p_assignee_id: values.assignee_id || undefined,
-        p_environment: values.environment ? values.environment.trim() : undefined,
-        p_steps_to_reproduce: values.steps_to_reproduce ? values.steps_to_reproduce.trim() : undefined,
-        p_expected_behavior: values.expected_behavior ? values.expected_behavior.trim() : undefined,
-        p_actual_behavior: values.actual_behavior ? values.actual_behavior.trim() : undefined,
+        p_payload: {
+          ...values,
+          title: values.title.trim(),
+          description: values.description?.trim() ?? "",
+          component_id: values.component_id || null,
+          assignee_id: values.assignee_id || null,
+          template_id: values.template_id || null,
+        } as unknown as Json,
       });
     } catch (err) {
       console.error("Unexpected issue creation error:", err);
@@ -138,6 +147,10 @@ export function NewIssueForm({
               ? "That component is not available."
               : message.includes("INVALID_ASSIGNEE")
                 ? "That assignee is not eligible for this project."
+                : message.includes("Required custom field")
+                  ? "Complete every required custom field."
+                  : message.includes("VALIDATION")
+                    ? "Check the issue fields and try again."
                 : "Could not create the issue.",
       );
       return;
@@ -259,11 +272,16 @@ export function NewIssueForm({
             <Field label="Expected behaviour" id="issue-expected" placeholder="what should happen" register={form.register("expected_behavior")} error={form.formState.errors.expected_behavior?.message} />
             <Field label="Actual behaviour" id="issue-actual" placeholder="what actually happened" register={form.register("actual_behavior")} error={form.formState.errors.actual_behavior?.message} />
           </div>
+          <div className="space-y-3 border-t border-border/70 pt-3">
+            <div className="space-y-2"><Label htmlFor="issue-visibility">Visibility</Label><select id="issue-visibility" className={selectClass} {...form.register("visibility")}><option value="PROJECT">Project members</option><option value="RESTRICTED">Restricted security issue</option></select><p className="text-[11px] text-muted-foreground">Restricted issues are visible only to maintainers, the reporter, the assignee, and explicitly granted project members.</p></div>
+            {form.watch("visibility") === "RESTRICTED" && <div className="space-y-2"><Label htmlFor="issue-access-users">Initial access grants</Label><select id="issue-access-users" multiple className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-xs" {...form.register("access_user_ids")}><option disabled value="">Select project members…</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName}</option>)}</select><p className="text-[11px] text-muted-foreground">Hold Ctrl/Cmd to select additional reviewers.</p></div>}
+            {requiredCustomFields.length > 0 && <div className="grid gap-3 sm:grid-cols-2">{requiredCustomFields.map((field) => <CustomFieldInput key={field.id} field={field} members={members} register={form.register} />)}</div>}
+          </div>
         </div>
       )}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+        <Button type="button" variant="outline" onClick={() => { if (!form.formState.isDirty || window.confirm("Discard this unsaved issue?")) router.back(); }}>Cancel</Button>
         <Button type="submit" disabled={form.formState.isSubmitting} className={cn(form.formState.isSubmitting && "opacity-80")}>
           {form.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
           Create issue
@@ -281,4 +299,15 @@ function Field({ label, id, placeholder, register, error }: { label: string; id:
       {error && <p className={errorClass}>{error}</p>}
     </div>
   );
+}
+
+function CustomFieldInput({ field, members, register }: { field: RequiredCustomField; members: Array<{ userId: string; displayName: string | null }>; register: UseFormRegister<IssueCreateValues> }) {
+  const name = `custom_values.${field.id}` as `custom_values.${string}`;
+  const options = Array.isArray(field.config.options) ? field.config.options.filter((item): item is string => typeof item === "string") : [];
+  const control = field.field_type === "SINGLE_SELECT" ? <select id={`issue-custom-${field.id}`} className={selectClass} {...register(name)}><option value="">Select…</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>
+    : field.field_type === "MULTI_SELECT" ? <select id={`issue-custom-${field.id}`} multiple className="min-h-20 w-full rounded-md border border-input bg-background px-2 py-1 text-xs" {...register(name)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>
+      : field.field_type === "BOOLEAN" ? <select id={`issue-custom-${field.id}`} className={selectClass} {...register(name)}><option value="">Select…</option><option value="true">Yes</option><option value="false">No</option></select>
+        : field.field_type === "USER" ? <select id={`issue-custom-${field.id}`} className={selectClass} {...register(name)}><option value="">Select…</option>{members.map((member) => <option key={member.userId} value={member.userId}>{member.displayName ?? member.userId.slice(0, 8)}</option>)}</select>
+          : <Input id={`issue-custom-${field.id}`} type={field.field_type === "NUMBER" ? "number" : field.field_type === "DATE" ? "date" : "text"} {...register(name)} />;
+  return <div className="space-y-2"><Label htmlFor={`issue-custom-${field.id}`}>{field.name} <span className="text-destructive">*</span></Label>{control}</div>;
 }

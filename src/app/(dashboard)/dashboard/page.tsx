@@ -5,6 +5,7 @@ import {
   type OverviewIssue,
   type OverviewMetrics,
 } from "@/components/tracebox/dashboard-overview";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
@@ -29,11 +30,11 @@ export default async function DashboardPage() {
     const projectKey = context.activeProject.key;
 
     const [
-      { data: issueRows },
-      { count: totalCount },
-      { count: criticalCount },
-      { data: openStates },
-      { data: inProgressStates },
+      { data: issueRows, error: issueError },
+      { count: totalCount, error: totalError },
+      { count: criticalCount, error: criticalError },
+      { data: openStates, error: openStatesError },
+      { data: inProgressStates, error: inProgressStatesError },
     ] = await Promise.all([
       supabase
         .from("issues")
@@ -62,17 +63,29 @@ export default async function DashboardPage() {
         .in("category", ["IN_PROGRESS", "REVIEW"]),
     ]);
 
+    const firstError = issueError ?? totalError ?? criticalError ?? openStatesError ?? inProgressStatesError;
+    if (firstError) {
+      console.error("Dashboard metrics load failed", { code: firstError.code, message: firstError.message });
+      return <LoadErrorPage title="Dashboard unavailable" description="We could not load the active project metrics. No partial totals are being shown." retryHref="/dashboard" />;
+    }
+
     const openStateIds = (openStates ?? []).map((s) => s.id);
     const inProgressStateIds = (inProgressStates ?? []).map((s) => s.id);
 
-    const [{ count: openCount }, { count: inProgressCount }] = await Promise.all([
-      openStateIds.length > 0
-        ? supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", openStateIds)
-        : { count: 0 },
-      inProgressStateIds.length > 0
-        ? supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", inProgressStateIds)
-        : { count: 0 },
-    ]);
+    const openCountResult = openStateIds.length > 0
+      ? await supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", openStateIds)
+      : { count: 0, error: null };
+    const inProgressCountResult = inProgressStateIds.length > 0
+      ? await supabase.from("issues").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("status_id", inProgressStateIds)
+      : { count: 0, error: null };
+    const { count: openCount, error: openCountError } = openCountResult;
+    const { count: inProgressCount, error: inProgressCountError } = inProgressCountResult;
+
+    const stateCountError = openCountError ?? inProgressCountError;
+    if (stateCountError) {
+      console.error("Dashboard state metrics load failed", { code: stateCountError.code, message: stateCountError.message });
+      return <LoadErrorPage title="Dashboard unavailable" description="We could not calculate the active project metrics. No partial totals are being shown." retryHref="/dashboard" />;
+    }
 
     const assigneeIds = (issueRows ?? []).map((r) => r.assignee_id);
     const names = await displayNameMap(assigneeIds);

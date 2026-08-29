@@ -4,6 +4,7 @@ import { FolderKanban } from "lucide-react";
 import { Surface } from "@/components/tracebox/primitives";
 import { NewProjectButton } from "@/components/layout/workspace-switcher";
 import { ReportsDashboard, type ReportIssueItem } from "@/components/reports/reports-dashboard";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
@@ -39,18 +40,25 @@ export default async function ReportsPage() {
   const projectName = context.activeProject.name;
   const projectKey = context.activeProject.key;
 
-  const { data: componentRows } = await supabase
+  const { data: componentRows, error: componentsError } = await supabase
       .from("components")
       .select("id, name")
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("name");
   const issueRows: any[] = [];
+  let issueError: { code?: string; message: string } | null = null;
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, created_at, resolved_at, closed_at, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
-    if (error) break;
+    if (error) { issueError = error; break; }
     issueRows.push(...(data ?? []));
     if ((data ?? []).length < 1000) break;
+  }
+
+  if (componentsError || issueError) {
+    const error = componentsError ?? issueError;
+    console.error("Reports load failed", { code: error?.code, message: error?.message });
+    return <LoadErrorPage title="Reports unavailable" description="We could not load the complete report dataset. No partial metrics are being shown." retryHref="/dashboard/reports" />;
   }
 
   const issues: ReportIssueItem[] = issueRows.map((row: any) => ({

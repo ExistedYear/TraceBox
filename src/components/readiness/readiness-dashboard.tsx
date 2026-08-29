@@ -105,7 +105,7 @@ export function ReadinessDashboard({
     // - 10 points per critical
     // - 15 points per regression
     // - 5 points per unassigned
-    let score = 100;
+    let score = 0;
     if (total > 0) {
       const completionRatio = resolved.length / total;
       score = Math.round(completionRatio * 100);
@@ -120,13 +120,13 @@ export function ReadinessDashboard({
       if (blockers.length === 0 && criticals.length === 0 && open.length === 0) {
         score = 100;
       }
-    } else {
-      score = 100;
     }
     score = Math.max(0, Math.min(100, score));
 
-    let status: "READY" | "ATTENTION" | "BLOCKED" = "READY";
-    if (score < 60 || blockers.length > 0) {
+    let status: "READY" | "ATTENTION" | "BLOCKED" | "NO_DATA" = "NO_DATA";
+    if (total === 0) {
+      status = "NO_DATA";
+    } else if (score < 60 || blockers.length > 0) {
       status = "BLOCKED";
     } else if (score < 85 || criticals.length > 0 || regressions.length > 0) {
       status = "ATTENTION";
@@ -206,14 +206,16 @@ export function ReadinessDashboard({
               <div
                 className={cn(
                   "flex h-28 w-28 items-center justify-center rounded-full border-4 font-mono text-3xl font-bold tracking-tight shadow-lg",
-                  analysis.status === "READY"
+                  analysis.status === "NO_DATA"
+                    ? "border-border bg-muted/30 text-muted-foreground"
+                    : analysis.status === "READY"
                     ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 shadow-emerald-500/10"
                     : analysis.status === "ATTENTION"
                       ? "border-amber-500 bg-amber-500/10 text-amber-400 shadow-amber-500/10"
                       : "border-red-500 bg-red-500/10 text-red-400 shadow-red-500/10",
                 )}
               >
-                {analysis.score}%
+                {analysis.status === "NO_DATA" ? "—" : `${analysis.score}%`}
               </div>
             </div>
 
@@ -221,14 +223,18 @@ export function ReadinessDashboard({
               <span
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wider",
-                  analysis.status === "READY"
+                  analysis.status === "NO_DATA"
+                    ? "border-border bg-muted/30 text-muted-foreground"
+                    : analysis.status === "READY"
                     ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
                     : analysis.status === "ATTENTION"
                       ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
                       : "border-red-500/40 bg-red-500/15 text-red-300",
                 )}
               >
-                {analysis.status === "READY" ? (
+                {analysis.status === "NO_DATA" ? (
+                  <><AlertCircle className="h-3.5 w-3.5" /> No Release Data</>
+                ) : analysis.status === "READY" ? (
                   <>
                     <ShieldCheck className="h-3.5 w-3.5" /> Release Ready
                   </>
@@ -252,7 +258,7 @@ export function ReadinessDashboard({
             <div className="mt-6 space-y-2 border-t border-border/70 pt-4 text-left font-mono text-xs">
               <div className="flex justify-between text-muted-foreground">
                 <span>Completed work:</span>
-                <span className="text-foreground">{analysis.resolvedCount} / {analysis.total} ({analysis.total > 0 ? Math.round((analysis.resolvedCount / analysis.total) * 100) : 100}%)</span>
+                <span className="text-foreground">{analysis.total > 0 ? `${analysis.resolvedCount} / ${analysis.total} (${Math.round((analysis.resolvedCount / analysis.total) * 100)}%)` : "No issue data"}</span>
               </div>
               <div className="flex justify-between text-red-400">
                 <span>Open blockers:</span>
@@ -307,7 +313,13 @@ export function ReadinessDashboard({
               <span className="font-mono text-xs text-muted-foreground">{analysis.riskCount} risks</span>
             </div>
 
-            {analysis.blockers.length === 0 && analysis.criticals.length === 0 && analysis.regressions.length === 0 && analysis.unassigned.length === 0 ? (
+            {analysis.status === "NO_DATA" ? (
+              <div className="py-12 text-center">
+                <AlertCircle className="mx-auto h-10 w-10 text-muted-foreground" />
+                <h3 className="mt-3 text-sm font-semibold text-foreground">No release data</h3>
+                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">Add issues to this project or choose a different milestone/version to calculate readiness.</p>
+              </div>
+            ) : analysis.blockers.length === 0 && analysis.criticals.length === 0 && analysis.regressions.length === 0 && analysis.unassigned.length === 0 ? (
               <div className="py-12 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
                 <h3 className="mt-3 text-sm font-semibold text-foreground">Zero Release Blockers</h3>

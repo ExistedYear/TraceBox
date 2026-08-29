@@ -1120,7 +1120,11 @@ export type Database = {
         Row: {
           assignments: boolean
           comments: boolean
+          issue_links: boolean
+          labels: boolean
           mentions: boolean
+          milestones: boolean
+          planning: boolean
           status_changes: boolean
           updated_at: string
           user_id: string
@@ -1129,7 +1133,11 @@ export type Database = {
         Insert: {
           assignments?: boolean
           comments?: boolean
+          issue_links?: boolean
+          labels?: boolean
           mentions?: boolean
+          milestones?: boolean
+          planning?: boolean
           status_changes?: boolean
           updated_at?: string
           user_id: string
@@ -1138,7 +1146,11 @@ export type Database = {
         Update: {
           assignments?: boolean
           comments?: boolean
+          issue_links?: boolean
+          labels?: boolean
           mentions?: boolean
+          milestones?: boolean
+          planning?: boolean
           status_changes?: boolean
           updated_at?: string
           user_id?: string
@@ -1340,6 +1352,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      project_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          project_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          project_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_github_repositories: {
         Row: {
@@ -1662,6 +1715,7 @@ export type Database = {
           id: string
           project_id: string
           required_role: string | null
+          requires_resolution: boolean
           to_state_id: string
         }
         Insert: {
@@ -1670,6 +1724,7 @@ export type Database = {
           id?: string
           project_id: string
           required_role?: string | null
+          requires_resolution?: boolean
           to_state_id: string
         }
         Update: {
@@ -1678,6 +1733,7 @@ export type Database = {
           id?: string
           project_id?: string
           required_role?: string | null
+          requires_resolution?: boolean
           to_state_id?: string
         }
         Relationships: [
@@ -1955,6 +2011,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_issue_complete: {
+        Args: { p_payload: Json; p_project_id: string }
+        Returns: number
+      }
       create_saved_view: {
         Args: {
           p_filters?: Json
@@ -2009,6 +2069,22 @@ export type Database = {
         }[]
       }
       get_unread_notifications_count: { Args: never; Returns: number }
+      get_notification_preferences: {
+        Args: never
+        Returns: {
+          user_id: string
+          mentions: boolean
+          assignments: boolean
+          comments: boolean
+          status_changes: boolean
+          watch_updates: boolean
+          issue_links: boolean
+          labels: boolean
+          planning: boolean
+          milestones: boolean
+          updated_at: string | null
+        }[]
+      }
       grant_issue_access: {
         Args: { p_issue_id: string; p_user_id: string }
         Returns: undefined
@@ -2017,6 +2093,7 @@ export type Database = {
       is_org_member: { Args: { p_organization_id: string }; Returns: boolean }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       is_service_role_request: { Args: never; Returns: boolean }
+      issue_id_from_storage_path: { Args: { p_name: string }; Returns: string | null }
       list_organization_invitations: {
         Args: { p_organization_id: string }
         Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[]
@@ -2046,6 +2123,44 @@ export type Database = {
       }
       mark_notification_read: {
         Args: { p_notification_id: string }
+        Returns: undefined
+      }
+      list_notifications: {
+        Args: {
+          p_cursor_created_at?: string | null
+          p_cursor_id?: string | null
+          p_limit?: number
+          p_unread_only?: boolean
+        }
+        Returns: {
+          id: string
+          issue_id: string | null
+          type: string
+          data: Json | null
+          actor_id: string | null
+          actor_name: string | null
+          issue_number: number | null
+          project_key: string | null
+          issue_title: string | null
+          read_at: string | null
+          created_at: string
+          next_cursor_created_at: string | null
+          next_cursor_id: string | null
+          has_more: boolean
+        }[]
+      }
+      update_notification_preferences: {
+        Args: {
+          p_mentions: boolean
+          p_assignments: boolean
+          p_comments: boolean
+          p_status_changes: boolean
+          p_watch_updates: boolean
+          p_issue_links: boolean
+          p_labels: boolean
+          p_planning: boolean
+          p_milestones: boolean
+        }
         Returns: undefined
       }
       membership_role_rank: { Args: { p_role: string }; Returns: number }
@@ -2149,6 +2264,10 @@ export type Database = {
         Args: { p_issue_id: string; p_visibility: string }
         Returns: undefined
       }
+      set_project_archived: {
+        Args: { p_archived: boolean; p_project_id: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       toggle_watch_issue: { Args: { p_issue_id: string }; Returns: boolean }
@@ -2176,12 +2295,25 @@ export type Database = {
         }
         Returns: undefined
       }
-      update_issue_fields: {
-        Args: { p_issue_id: string; p_updates: Json }
-        Returns: undefined
-      }
+      update_issue_fields:
+        | {
+            Args: { p_issue_id: string; p_updates: Json }
+            Returns: undefined
+          }
+        | {
+            Args: { p_expected_updated_at: string; p_issue_id: string; p_updates: Json }
+            Returns: undefined
+          }
       update_organization_member_role: { Args: { p_organization_id: string; p_user_id: string; p_role: string }; Returns: undefined }
       update_project_member_role: { Args: { p_project_id: string; p_user_id: string; p_role: string }; Returns: undefined }
+      update_project_settings: {
+        Args: { p_description?: string | null; p_name: string; p_project_id: string }
+        Returns: undefined
+      }
+      replace_project_workflow: {
+        Args: { p_project_id: string; p_states: Json; p_transitions: Json }
+        Returns: undefined
+      }
       update_issue_planning: {
         Args: {
           p_affected_version_id?: string

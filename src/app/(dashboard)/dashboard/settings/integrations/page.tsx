@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { GithubIntegrationManager } from "@/components/settings/github-integration-manager";
+import { LoadError } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
@@ -11,17 +12,30 @@ export default async function IntegrationsSettingsPage() {
   const context = await getWorkspaceContext();
   if (!context.activeProject) redirect("/dashboard/settings");
   const supabase = await createClient();
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: context.activeProject.id });
+  const { data: role, error: roleError } = await supabase.rpc("project_role", { p_project_id: context.activeProject.id });
+  if (roleError) {
+    console.error("Integration permissions load failed", { code: roleError.code, message: roleError.message });
+    return <LoadError title="Integrations unavailable" description="We could not verify your project permissions. Try again in a moment." retryHref="/dashboard/settings/integrations" />;
+  }
   if (role !== "DEVELOPER" && role !== "MAINTAINER") redirect("/dashboard/settings");
   const db = supabase as any;
-  const [{ data: legacy }, { data: installations }, { data: bindings }] = await Promise.all([
+  const [{ data: legacy, error: legacyError }, { data: installations, error: installationsError }, { data: bindings, error: bindingsError }] = await Promise.all([
     supabase.from("project_integrations").select("repo_full_name, auto_resolve_enabled").eq("project_id", context.activeProject.id).eq("provider", "GITHUB").maybeSingle(),
     db.from("github_installations").select("id, github_installation_id, github_account_login, github_account_type, status, permissions, last_verified_at").eq("organization_id", context.activeOrganization.id).order("created_at"),
     db.from("project_github_repositories").select("github_repository_id, is_primary, auto_resolve_enabled, target_branches").eq("project_id", context.activeProject.id),
   ]);
+  if (legacyError || installationsError || bindingsError) {
+    const error = legacyError ?? installationsError ?? bindingsError;
+    console.error("GitHub integrations load failed", { code: error?.code, message: error?.message });
+    return <LoadError title="Integrations unavailable" description="We could not load the connected repositories. No partial connection state is being shown." retryHref="/dashboard/settings/integrations" />;
+  }
   const installationIds = (installations ?? []).map((installation: { id: string }) => installation.id);
-  const { data: organizationRepositories } = installationIds.length
+  const { data: organizationRepositories, error: repositoriesError } = installationIds.length
     ? await db.from("github_repositories").select("id, installation_id, github_repository_id, owner_login, name, full_name, private, archived, default_branch, html_url, is_accessible, last_synced_at").in("installation_id", installationIds).order("full_name")
-    : { data: [] };
+    : { data: [], error: null };
+  if (repositoriesError) {
+    console.error("GitHub repositories load failed", { code: repositoriesError.code, message: repositoriesError.message });
+    return <LoadError title="Integrations unavailable" description="We could not load the repositories available to this workspace. Try again in a moment." retryHref="/dashboard/settings/integrations" />;
+  }
   return <GithubIntegrationManager projectId={context.activeProject.id} canManage={role === "MAINTAINER"} initialLegacyRepo={legacy?.repo_full_name ?? null} initialInstallations={(installations ?? []) as any} initialRepositories={(organizationRepositories ?? []) as any} initialBindings={(bindings ?? []) as any} />;
 }

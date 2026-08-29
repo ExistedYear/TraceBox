@@ -15,16 +15,32 @@ export type WorkspaceContext = {
   activeProject: ProjectSummary | null;
 };
 
+export class WorkspaceContextLoadError extends Error {
+  readonly code: string | undefined;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "WorkspaceContextLoadError";
+    this.code = code;
+  }
+}
+
 // Shared server-side resolution of the cookie-backed workspace/project context.
 // cache() dedupes layout + page calls within one request.
 export const getWorkspaceContext = cache(async function getWorkspaceContext(): Promise<WorkspaceContext> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const [{ data: profile }, { data: membershipRows }] = await Promise.all([
+  const [{ data: profile, error: profileError }, { data: membershipRows, error: membershipError }] = await Promise.all([
     supabase.from("profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle(),
     supabase.from("organization_members").select("organization:organizations (id, name, slug)").eq("user_id", user.id).order("joined_at"),
   ]);
+  if (profileError || membershipError) {
+    const error = profileError || membershipError;
+    if (!error) throw new WorkspaceContextLoadError("Workspace context unavailable");
+    console.error("Workspace context load failed", { code: error.code, message: error.message });
+    throw new WorkspaceContextLoadError("Workspace context unavailable", error.code);
+  }
   const organizations = (membershipRows ?? []).flatMap((row) => (row.organization ? [row.organization] : []));
   if (organizations.length === 0) redirect("/onboarding");
 
@@ -32,12 +48,17 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
   const requestedOrganizationId = cookieStore.get("tb_org")?.value;
   const activeOrganization = organizations.find((organization) => organization.id === requestedOrganizationId) ?? organizations[0];
 
-  const { data: projectRows } = await supabase
+  const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
     .select("id, key, name")
     .eq("organization_id", activeOrganization.id)
     .eq("is_archived", false)
     .order("name");
+
+  if (projectsError) {
+    console.error("Workspace projects load failed", { code: projectsError.code, message: projectsError.message });
+    throw new WorkspaceContextLoadError("Workspace projects unavailable", projectsError.code);
+  }
 
   const projects = projectRows ?? [];
   const requestedProjectId = cookieStore.get("tb_project")?.value;

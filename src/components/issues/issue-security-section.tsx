@@ -33,6 +33,7 @@ export function IssueSecuritySection({ issueId, canEdit, initialVisibility, init
         return;
       }
       setVisibility(next);
+      if (next !== "RESTRICTED") setGrants([]);
       toast.success("Issue visibility updated.");
     } catch {
       toast.error("Could not reach the server.");

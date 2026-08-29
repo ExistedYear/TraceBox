@@ -13,8 +13,16 @@ export async function GET(request: NextRequest) {
   const { data: project } = await auth.client.from("projects").select("id").eq("id", projectId).eq("organization_id", auth.context.organizationId).eq("is_archived", false).maybeSingle();
   if (!project) return NextResponse.json({ error: "Project not found." }, { status: 404 });
   const escaped = search.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-  const { data, error } = await auth.client.from("issues").select("id, project_id, visibility, reporter_id, assignee_id, issue_number, title, type, priority, severity, created_at, updated_at").eq("project_id", project.id).or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`).order("updated_at", { ascending: false }).limit(100);
-  if (error) return NextResponse.json({ error: "Could not search issues." }, { status: 500 });
-  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, data ?? []));
-  return NextResponse.json({ data: (data ?? []).filter((issue) => visibleIds.has(issue.id)) });
+  const matches = [];
+  const batchSize = 1000;
+  for (let from = 0; ; from += batchSize) {
+    const { data, error } = await auth.client.from("issues").select("id, project_id, visibility, reporter_id, assignee_id, issue_number, title, type, priority, severity, created_at, updated_at").eq("project_id", project.id).or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`).order("updated_at", { ascending: false }).range(from, from + batchSize - 1);
+    if (error) return NextResponse.json({ error: "Could not search issues." }, { status: 500 });
+    matches.push(...(data ?? []));
+    if ((data ?? []).length < batchSize) break;
+  }
+  // Filter before applying the public result limit so hidden restricted rows
+  // cannot displace visible results and become inferable through result shape.
+  const visibleIds = new Set(await filterApiVisibleIssues(auth.client, auth.context, matches));
+  return NextResponse.json({ data: matches.filter((issue) => visibleIds.has(issue.id)).slice(0, 100) });
 }

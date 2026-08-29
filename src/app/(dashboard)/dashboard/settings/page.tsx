@@ -3,9 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FolderKanban } from "lucide-react";
 
-import { ProjectSettings } from "@/components/settings/project-settings";
+import { ArchivedProjects, ProjectAdministration } from "@/components/settings/project-administration";
+import { ProjectSettings, type StateRow } from "@/components/settings/project-settings";
 import { ProjectMembersManager } from "@/components/settings/project-members-manager";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
+import { LoadError } from "@/components/tracebox/load-error";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { displayNameMap } from "@/lib/server-people";
@@ -15,19 +17,29 @@ export const metadata: Metadata = { title: "Project settings" };
 
 export default async function SettingsPage() {
   const context = await getWorkspaceContext();
+  const supabase = await createClient();
   if (!context.activeProject) {
+    const [archivedResult, organizationRoleResult, maintainerResult] = await Promise.all([
+      supabase.from("projects").select("id, key, name").eq("organization_id", context.activeOrganization.id).eq("is_archived", true).order("name"),
+      supabase.from("organization_members").select("role").eq("organization_id", context.activeOrganization.id).eq("user_id", context.userId).maybeSingle(),
+      supabase.from("project_members").select("project_id, role").eq("user_id", context.userId).eq("role", "MAINTAINER"),
+    ]);
+    const archivedError = archivedResult.error ?? organizationRoleResult.error ?? maintainerResult.error;
+    if (archivedError) {
+      console.error("Archived project settings load failed", { code: archivedError.code, message: archivedError.message });
+      return <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><LoadError title="Project settings unavailable" description="We could not load active and archived projects for this workspace." retryHref="/dashboard/settings" /></div>;
+    }
+    const canRestoreAll = organizationRoleResult.data?.role === "OWNER" || organizationRoleResult.data?.role === "ADMIN";
+    const maintainableIds = new Set((maintainerResult.data ?? []).map((row) => row.project_id));
+    const restorableProjects = (archivedResult.data ?? []).filter((project) => canRestoreAll || maintainableIds.has(project.id));
     return (
-      <div className="mx-auto max-w-[1500px]">
-        <EmptyState
-          icon={FolderKanban}
-          title="No project selected"
-          description="Pick a project from the sidebar switcher to manage its components and workflow."
-        />
+      <div className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
+        <EmptyState icon={FolderKanban} title="No active project selected" description="Pick an active project from the sidebar, or restore an archived project below." />
+        <ArchivedProjects projects={restorableProjects} />
       </div>
     );
   }
 
-  const supabase = await createClient();
   const projectId = context.activeProject.id;
 
   const [
@@ -42,21 +54,25 @@ export default async function SettingsPage() {
     { data: adminRows, error: adminsError },
     { data: organizationMemberRows, error: organizationMembersError },
     { data: canManage, error: manageError },
+    { data: archivedProjects, error: archivedProjectsError },
+    { data: maintainedProjects, error: maintainedProjectsError },
   ] = await Promise.all([
-    supabase.from("projects").select("name, key, description").eq("id", projectId).maybeSingle(),
+    supabase.from("projects").select("name, key, description, is_archived").eq("id", projectId).maybeSingle(),
     supabase.from("components").select("*").eq("project_id", projectId).order("name"),
     supabase.from("labels").select("*").eq("project_id", projectId).order("name"),
     supabase.from("versions").select("*").eq("project_id", projectId).order("created_at", { ascending: false }),
     supabase.from("milestones").select("*").eq("project_id", projectId).order("due_at", { ascending: true }),
     supabase.from("workflow_states").select("*").eq("project_id", projectId).order("position"),
-    supabase.from("workflow_transitions").select("from_state_id, to_state_id").eq("project_id", projectId),
+    supabase.from("workflow_transitions").select("from_state_id, to_state_id, required_role, requires_resolution").eq("project_id", projectId),
     supabase.from("project_members").select("user_id, role").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id, role").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.from("organization_members").select("user_id, role").eq("organization_id", context.activeOrganization.id),
     supabase.rpc("can_manage_project", { p_project_id: projectId }),
+    supabase.from("projects").select("id, key, name").eq("organization_id", context.activeOrganization.id).eq("is_archived", true).order("name"),
+    supabase.from("project_members").select("project_id").eq("user_id", context.userId).eq("role", "MAINTAINER"),
   ]);
 
-  const loadError = projectError ?? componentsError ?? labelsError ?? versionsError ?? milestonesError ?? statesError ?? transitionsError ?? membersError ?? adminsError ?? organizationMembersError ?? manageError;
+  const loadError = projectError ?? componentsError ?? labelsError ?? versionsError ?? milestonesError ?? statesError ?? transitionsError ?? membersError ?? adminsError ?? organizationMembersError ?? manageError ?? archivedProjectsError ?? maintainedProjectsError;
   if (loadError) {
     console.error("Project settings load failed", { code: loadError.code, message: loadError.message });
     return <div className="mx-auto max-w-[1500px]"><Surface className="p-8 text-center"><h1 className="text-lg font-semibold">Project settings unavailable</h1><p className="mt-2 text-sm text-muted-foreground">We could not load the complete project configuration. Try again in a moment.</p><Button asChild variant="outline" className="mt-5"><Link href="/dashboard/settings">Retry</Link></Button></Surface></div>;
@@ -79,9 +95,14 @@ export default async function SettingsPage() {
     organizationRole: row.role,
     displayName: organizationNames.get(row.user_id) ?? null,
   }));
+  const viewerOrganizationRole = (organizationMemberRows ?? []).find((row) => row.user_id === context.userId)?.role;
+  const canRestoreAll = viewerOrganizationRole === "OWNER" || viewerOrganizationRole === "ADMIN";
+  const maintainableProjectIds = new Set((maintainedProjects ?? []).map((row) => row.project_id));
+  const restorableProjects = (archivedProjects ?? []).filter((archivedProject) => canRestoreAll || maintainableProjectIds.has(archivedProject.id));
 
   return (
     <div className="space-y-6">
+      <ProjectAdministration project={{ id: projectId, key: project.key, name: project.name, description: project.description, isArchived: project.is_archived }} canManage={Boolean(canManage)} />
       <ProjectSettings
         key={projectId}
         projectId={projectId}
@@ -91,11 +112,12 @@ export default async function SettingsPage() {
         initialLabels={labels ?? []}
         initialVersions={versions ?? []}
         initialMilestones={milestones ?? []}
-        states={(states ?? []).map(({ id, name, category, position, is_initial, is_terminal }) => ({ id, name, category, position, isInitial: is_initial, isTerminal: is_terminal }))}
-        transitions={(transitions ?? []).map(({ from_state_id, to_state_id }) => ({ fromStateId: from_state_id, toStateId: to_state_id }))}
+        states={(states ?? []).map(({ id, name, category, position, color, is_initial, is_terminal }) => ({ id, name, category: category as StateRow["category"], position, color, isInitial: is_initial, isTerminal: is_terminal }))}
+        transitions={(transitions ?? []).map(({ from_state_id, to_state_id, required_role, requires_resolution }) => ({ fromStateId: from_state_id, toStateId: to_state_id, requiredRole: required_role, requiresResolution: requires_resolution }))}
         members={members}
       />
       <ProjectMembersManager organizationId={context.activeOrganization.id} projectId={projectId} members={contributorCandidates} canManage={Boolean(canManage)} canInvite={Boolean(canManage)} />
+      {restorableProjects.length > 0 && <ArchivedProjects projects={restorableProjects} />}
     </div>
   );
 }

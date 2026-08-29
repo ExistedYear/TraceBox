@@ -35,6 +35,9 @@ src/app/
                            resolution from tb_org/tb_project cookies (redirects to
                            /onboarding when the user has no workspace)
   dashboard/issues/[issueKey]/  issue detail with description + unified activity (events+comments)
+  dashboard/notifications/      full cursor-paginated personal notification inbox
+  dashboard/security/           RLS-filtered restricted issue queue + access history
+  dashboard/settings/notifications/ personal notification preferences
   onboarding/              two-step create-workspace → create-first-project flow;
                            ?create=1 bypasses the has-orgs redirect for extra workspaces
   auth/callback/route.ts   OAuth/email code exchange handler
@@ -45,15 +48,19 @@ src/components/
                            theme-toggle
   auth/auth-form.tsx       dual-mode ('use client') login/signup form
   tracebox/                brand marks (trace-mark), dashboard overview, primitives kit
-  issues/                  new-issue-form, issue-table (TanStack v8 client table),
-                           comments-section (unified timeline + composer + inline edit)
-  settings/project-settings.tsx   components manager + workflow viewer tabs
+  issues/                  atomic new-issue form, conflict-aware detail editor, realtime
+                           issue table, comments timeline, planning and security controls
+  notifications/           full notification inbox
+  security/                restricted issue queue and access history
+  settings/project-settings.tsx   components/planning manager + workflow editor tabs
+  settings/project-administration.tsx project metadata and archive/restore
   settings/*members-manager.tsx  workspace invitations, ownership, and project contributors
 src/lib/
   supabase/{client,server,middleware}.ts   three-tier clients
   validation/auth.ts       zod schemas + inferred LoginValues/SignupValues
   validation/workspace.ts  workspaceSchema (name+slug) / projectSchema (name+KEY+description)
   validation/issue.ts      issueCreateSchema (title/type/component + advanced fields)
+  validation/project-settings.ts project metadata and workflow draft schemas
   validation/components.ts componentSchema
   validation/comment.ts    commentSchema (body 1–10k chars)
   issues.ts                KEY format/parse, event timeline copy, category pills, filter codecs,
@@ -64,7 +71,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (45 ordered), seed.sql (intentionally empty)
+supabase/                  config.toml, migrations/ (50 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, gap, and feature plans
@@ -127,10 +134,14 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Sidebar layout**: the desktop rail is sticky and viewport-height; its content scrolls vertically so the Settings link remains reachable when the workspace switcher or navigation exceeds the viewport. Keep JSX text nodes free of stray punctuation.
 - **Issue components**: `component_id` is optional when a project has no components yet; the RPC accepts null and the form exposes `None`. When a component is selected, its configured default assignee is preselected if the user has not chosen one.
 - **Comments**: `comments` table is RPC-only (`add_comment`/`edit_comment`); `select` is allowed for project members via `is_project_member(issue.project_id)`. Reporter+ may add (`can_comment_on_issue`), author or Developer/Maintainer may edit; project-archived guard and 1–10k body validation are enforced server-side. Every add/edit writes `COMMENT_ADDED`/`COMMENT_EDITED` to `issue_events` and bumps `issues.updated_at`.
-- **Mutations go through SQL RPCs**: trusted `security definer` functions in migrations (`create_organization`, `create_project`, `create_component`, `update_component`, `create_issue`, `update_issue_fields`, `add_comment`, `edit_comment`) own privileged/transactional writes; clients call `supabase.rpc(...)` via the browser client. Direct client inserts/updates for memberships, issues, components, and comments are blocked by RLS/grants — keep it that way.
+- **Mutations go through SQL RPCs**: trusted `security definer` functions own privileged/transactional writes, including membership/invitations, atomic issue creation/editing, notification preferences/read state, project lifecycle/workflow publication, restricted grants, components, comments, and planning. Clients call `supabase.rpc(...)`; direct browser writes to protected tables and audit history remain revoked.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed types cover the 45-migration schema; refresh them after applying migrations 044–045 to a local or hosted database. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed types are reconciled through migration 050, but must be regenerated after replaying migrations 046–050 locally or on the linked project. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
 - **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
+- **Issue editing and realtime**: full issue creation is one `create_issue_complete` transaction covering template defaults, required custom values, visibility, grants, labels, watchers, and audit. Detail edits use the optimistic `updated_at` overload and never overwrite a dirty draft on realtime changes. Filter/visibility-sensitive queue events always refetch through RLS; newly restricted rows are removed before refetch.
+- **Notifications**: the full inbox and header preview share the cursor/exact-count feed. Preference and read mutations are RPC-only; retained categories are mentions, assignments, comments, status, watched updates, links, labels, planning, and milestones. Restricted notification rows are returned only while `can_view_issue` remains true; title/actor/payload are redacted while key/number preserve an authorized link.
+- **Project workflow administration**: project keys are immutable. Maintainers edit metadata, archive/restore, and publish the entire workflow graph atomically through migration 049. The server enforces one initial state, a terminal path for every state, reachability, valid roles/edges, and safe deletion of in-use states.
+- **Restricted issues**: `can_view_issue` is the common RLS boundary for issue-owned data. Reporter-owned issue editing includes visibility/grant controls. Access grant/revoke events are table-triggered and `issue_events` is immutable even for privileged maintenance clients. Storage object paths are `<issue-uuid>/<filename>` and require current issue visibility plus an active project.
 - **GitHub App**: GitHub login remains identity-only. Repository access requires a separately verified GitHub App installation; callback state is signed and bound to the TraceBox user, organization, and project. Installation tokens and App private keys stay server-only.
 - **GitHub installation verification**: verify callback installation IDs by paginating the user-token `GET /user/installations` endpoint; GitHub does not provide `GET /user/installations/{id}`.
 - **GitHub repository model**: use stable GitHub IDs for installations, repositories, and normalized PR/commit artifacts. Projects may bind multiple repositories; `main` is the default auto-resolution branch and branch matching is explicit.
@@ -195,6 +206,11 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260043_github_review_fixes.sql` | Service-role compatibility for 042 functions, bounded webhook retry finalization, stale automatic-link cleanup, and active-installation primary checks |
 | `supabase/migrations/202608260044_issue_api_contracts.sql` | Shared validated browser/REST issue update contract, nullable body clearing, and per-field audit events |
 | `supabase/migrations/202608260045_membership_invitations.sql` | Explicit project membership backfill, hashed workspace/project invitations, membership audit history, role/removal RPCs, and ownership transfer |
+| `supabase/migrations/202608260046_phase2_membership_relational_guards.sql` | Workspace/project referential guards for invitations and membership audit rows |
+| `supabase/migrations/202608260047_phase4_issue_editing.sql` | Conflict-aware full editing and atomic browser/REST issue creation with templates, custom values, and restricted grants |
+| `supabase/migrations/202608260048_phase6_notifications.sql` | Exact cursor inbox, RPC-only preferences/read state, and preference-aware lifecycle emitters |
+| `supabase/migrations/202608260049_phase7_project_workflow_admin.sql` | Audited project lifecycle and atomic validated workflow publication |
+| `supabase/migrations/202608260050_phase8_restricted_completion.sql` | Restricted access history, immutable issue audit, safe notifications, and active-project Storage policies |
 | `src/lib/validation/comment.ts` | `commentSchema` (body 1–10k chars) |
 | `src/components/layout/workspace-switcher.tsx` | Workspace/project context switching + project creation dialog |
 | `src/components/triage/triage-inbox.tsx` | Phase 12 triage queue, classification controls, duplicate resolution, keyboard actions |
@@ -222,7 +238,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 
 ## Runtime/Tooling Preferences
 
-- **Node ≥ 20.9** (`engines`); **npm** with committed `package-lock.json`; CI runs `npm ci` on Node 20.
+- **Node ≥ 22** (`engines`); **npm** with committed `package-lock.json`; CI runs `npm ci` on Node 22. Supabase client libraries dropped Node 20 support after 2026-06-30.
 - TypeScript `strict`, target ES2017, moduleResolution `bundler`, isolatedModules.
 - ESLint 9 flat config re-exporting `eslint-config-next/core-web-vitals` — no custom rules; keep it that way unless required.
 - Tailwind v3 (not v4): content globs cover `src/{app,components}`.
@@ -234,6 +250,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 
 - **Vitest 4**, run-only: `npm test` (equivalent to `vitest run`).
 - Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
-- Current scope: pure functions — zod schemas (`auth-validation`, `workspace-validation`, `components-validation`, `issues`, `comment`), `slugify`, redirect sanitizer + error-message mapping (`utils`), issue-key/event/filter helpers (`issues`), comment helpers (`tokenizeCommentBody`, `buildTimeline`, `excerptBody`, `COMMENT_ADDED/EDITED` summaries), GitHub repository/key extraction, branch matching, signed connection-state helpers, and mocked GitHub user-installation pagination.
-- Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build`.
-- The tracked unit suite remains Vitest-only. A separate ignored black-box Playwright suite exists under `qa/live/`; it is installed and run independently with deployment credentials and must not be added to CI or committed with secrets.
+- Current Vitest scope includes pure helpers and schemas plus structural contracts for loading/error states, membership invariants, atomic issue editing/creation, notifications, workflow publication, and restricted security behavior.
+- `supabase/tests/*.test.sql` contains pgTAP catalog and authorization tests for membership, issue editing, notifications, workflows, restricted RLS, and Storage. Run them through a disposable Supabase stack; they do not replace hosted multi-user/realtime validation.
+- Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build && npm run check:migrations`.
+- A separate ignored black-box Playwright suite exists under `qa/live/`; it is installed and run independently with deployment credentials and must not be committed with secrets.

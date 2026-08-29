@@ -75,9 +75,15 @@ describe("issueCreateSchema", () => {
 
 describe("issue filter codecs", () => {
   it("encodes set filters and drops empty values", () => {
-    expect(encodeIssueFilters({ priority: "P1", type: "BUG" })).toEqual({ priority: "P1", type: "BUG" });
+    expect(encodeIssueFilters({ priority: "P1", type: "BUG", visibility: "RESTRICTED" })).toEqual({ priority: "P1", type: "BUG", visibility: "RESTRICTED" });
     expect(encodeIssueFilters({ statusId: "s1", componentId: "c1" })).toEqual({ status: "s1", component: "c1" });
     expect(encodeIssueFilters({ priority: "", severity: undefined })).toEqual({});
+  });
+
+  it("accepts only canonical visibility filters", () => {
+    const valid = { stateIds: new Set<string>(), componentIds: new Set<string>() };
+    expect(decodeIssueSearchParams({ visibility: "RESTRICTED" }, valid)).toEqual({ visibility: "RESTRICTED" });
+    expect(decodeIssueSearchParams({ visibility: "PRIVATE" }, valid)).toEqual({});
   });
 
   it("round-trips encoded filters through decodeIssueSearchParams", () => {
@@ -131,6 +137,31 @@ describe("issue mutation contract", () => {
     expect(issueUpdateSchema.safeParse({}).success).toBe(false);
     expect(issueUpdateSchema.safeParse({ status_id: "state" }).success).toBe(false);
     expect(issueUpdateSchema.safeParse({ description: "a".repeat(10001) }).success).toBe(false);
+  });
+
+  it("accepts restricted creation metadata and custom values", () => {
+    const result = issueCreateSchema.safeParse({
+      title: "Credential leak in logs",
+      description: "Redacted reproduction details",
+      type: "SECURITY",
+      priority: "P1",
+      severity: "CRITICAL",
+      visibility: "RESTRICTED",
+      access_user_ids: ["11111111-1111-4111-8111-111111111111"],
+      custom_values: { impact: "high" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed restricted access grants", () => {
+    expect(issueCreateSchema.safeParse({
+      title: "Security issue",
+      description: "Details",
+      type: "SECURITY",
+      priority: "P2",
+      severity: "MAJOR",
+      access_user_ids: ["not-a-uuid"],
+    }).success).toBe(false);
   });
 });
 

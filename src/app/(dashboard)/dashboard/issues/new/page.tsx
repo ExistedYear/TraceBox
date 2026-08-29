@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { NewIssueForm } from "@/components/issues/new-issue-form";
+import { Surface } from "@/components/tracebox/primitives";
 import { createClient } from "@/lib/supabase/server";
 import { personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
@@ -15,14 +17,22 @@ export default async function NewIssuePage() {
   const projectId = context.activeProject.id;
 
   const supabase = await createClient();
-  const [{ data: components }, { data: memberRows }, { data: adminRows }, { data: states }, { data: role }, { data: templateRows }] = await Promise.all([
+  const results = await Promise.all([
     supabase.from("components").select("id, name, default_assignee_id").eq("project_id", projectId).eq("is_archived", false).order("name"),
     supabase.from("project_members").select("user_id").eq("project_id", projectId),
     supabase.from("organization_members").select("user_id").eq("organization_id", context.activeOrganization.id).in("role", ["OWNER", "ADMIN"]),
     supabase.from("workflow_states").select("name").eq("project_id", projectId).order("is_initial", { ascending: false }).order("position").limit(1),
     supabase.rpc("project_role", { p_project_id: projectId }),
     supabase.from("issue_templates").select("id, name, description, issue_type, body_template, default_priority, default_severity, default_component_id").eq("project_id", projectId).order("name"),
+    supabase.from("custom_fields").select("id, name, field_type, config, is_required").eq("project_id", projectId).eq("is_required", true).order("name"),
   ]);
+  const [{ data: components, error: componentsError }, { data: memberRows, error: memberError }, { data: adminRows, error: adminsError }, { data: states, error: statesError }, { data: role, error: roleError }, { data: templateRows, error: templatesError }, { data: customFieldRows, error: customFieldsError }] = results;
+
+  const queryError = componentsError ?? memberError ?? adminsError ?? statesError ?? roleError ?? templatesError ?? customFieldsError;
+  if (queryError) {
+    console.error("New issue metadata query failed", { code: queryError.code, message: queryError.message });
+    return <main className="mx-auto max-w-3xl p-4 sm:p-6 lg:p-8"><Surface className="space-y-3 border-destructive/30 p-8 text-center"><h1 className="text-lg font-semibold">Issue form unavailable</h1><p className="text-sm text-muted-foreground">Project metadata could not be loaded. No issue was created.</p><Link href="/dashboard/issues/new" className="text-sm font-medium text-primary underline underline-offset-4">Retry</Link></Surface></main>;
+  }
 
   if (role !== "REPORTER" && role !== "DEVELOPER" && role !== "MAINTAINER") redirect("/dashboard");
 
@@ -43,7 +53,7 @@ export default async function NewIssuePage() {
         projectKey={context.activeProject.key}
         components={(components ?? []).map((component) => ({ id: component.id, name: component.name, defaultAssigneeId: component.default_assignee_id }))}
         members={members}
-        templates={(templateRows ?? []).map((t: any) => ({
+        templates={(templateRows ?? []).map((t) => ({
           id: t.id,
           name: t.name,
           description: t.description ?? null,
@@ -53,6 +63,7 @@ export default async function NewIssuePage() {
           default_severity: t.default_severity ?? null,
           default_component_id: t.default_component_id ?? null,
         }))}
+        requiredCustomFields={(customFieldRows ?? []).map((field) => ({ id: field.id, name: field.name, field_type: field.field_type, config: (field.config ?? {}) as Record<string, unknown> }))}
         initialStateName={states?.[0]?.name ?? "Triage"}
       />
     </main>

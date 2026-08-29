@@ -12,7 +12,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, Filter, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, Loader2, Search, ShieldAlert, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
@@ -29,6 +29,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   categoryClasses,
+  decodeIssueSearchParams,
   encodeIssueFilters,
   formatIssueKey,
   issueTypeLabel,
@@ -42,6 +43,7 @@ import {
 } from "@/lib/issues";
 import { cn } from "@/lib/utils";
 import type { IssueUpdateField } from "@/lib/validation/issue-update";
+import { useRealtimeIssueUpdates } from "@/hooks/use-realtime";
 
 export type TableRow = {
   id: string;
@@ -50,6 +52,7 @@ export type TableRow = {
   type: string;
   priority: string;
   severity: string;
+  visibility: "PROJECT" | "RESTRICTED";
   statusName: string;
   statusCategory: string;
   componentId: string | null;
@@ -113,6 +116,9 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [savedViews, setSavedViews] = useState<Array<{ id: string; project_id: string; name: string; filters: Record<string, string>; is_shared: boolean; created_by: string }>>([]);
+  const [loadError, setLoadError] = useState(false);
+  const [savedViewsError, setSavedViewsError] = useState(false);
+  const [savedViewsNonce, setSavedViewsNonce] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -126,10 +132,16 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   useEffect(() => {
     void (async () => {
       const supabase = createClient();
-      const { data } = await supabase.from("saved_views").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
-      if (data) setSavedViews(data as any);
+      const { data, error } = await supabase.from("saved_views").select("*").eq("project_id", projectId).order("created_at", { ascending: false });
+      if (error) {
+        console.error("Saved views load failed", { code: error.code, message: error.message });
+        setSavedViewsError(true);
+        return;
+      }
+      setSavedViewsError(false);
+      setSavedViews((data ?? []) as typeof savedViews);
     })();
-  }, [projectId]);
+  }, [projectId, savedViewsNonce]);
 
   useEffect(() => {
     setPage(0);
@@ -146,10 +158,11 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   const fetchData = useCallback(async () => {
     const seq = ++requestSeq.current;
     setLoading(true);
+    setLoadError(false);
     const supabase = createClient();
     let query = supabase
       .from("issues")
-      .select("id, issue_number, title, type, priority, severity, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name)", { count: "exact" })
+      .select("id, issue_number, title, type, priority, severity, visibility, updated_at, assignee_id, component_id, status:workflow_states (name, category), component:components (name)", { count: "exact" })
       .eq("project_id", projectId)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -175,6 +188,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     if (filters.priority) query = query.eq("priority", filters.priority);
     if (filters.severity) query = query.eq("severity", filters.severity);
     if (filters.type) query = query.eq("type", filters.type);
+    if (filters.visibility) query = query.eq("visibility", filters.visibility);
     if (filters.componentId) query = query.eq("component_id", filters.componentId);
     if (filters.assigneeId) query = query.eq("assignee_id", filters.assigneeId);
     const sortableIds = new Set(["updated_at", "issue_number", "title", "priority", "severity"]);
@@ -190,6 +204,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     if (seq !== requestSeq.current) return; // a newer request superseded this one
     if (error) {
       toast.error("Could not load issues.");
+      setLoadError(true);
       setRows([]);
       setTotal(0);
       setLoading(false);
@@ -197,11 +212,19 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
     }
 
     const assigneeIds = [...new Set((data ?? []).map((row) => row.assignee_id).filter((id): id is string => Boolean(id)))];
-    const { data: profileRows } = assigneeIds.length
+    const { data: profileRows, error: profilesError } = assigneeIds.length
       ? await supabase.from("profiles").select("id, display_name").in("id", assigneeIds)
-      : { data: [] as { id: string; display_name: string | null }[] };
+      : { data: [] as { id: string; display_name: string | null }[], error: null };
 
     if (seq !== requestSeq.current) return;
+    if (profilesError) {
+      console.error("Issue assignee profile load failed", { code: profilesError.code, message: profilesError.message });
+      setLoadError(true);
+      setRows([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
 
     const nameMap = new Map((profileRows ?? []).map((row) => [row.id, row.display_name]));
     setRows(
@@ -212,6 +235,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         type: row.type,
         priority: row.priority,
         severity: row.severity,
+        visibility: row.visibility === "RESTRICTED" ? "RESTRICTED" : "PROJECT",
         statusName: row.status?.name ?? "—",
         statusCategory: row.status?.category ?? "",
         componentId: row.component_id,
@@ -228,6 +252,45 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
   useEffect(() => {
     void fetchData();
   }, [fetchData, refreshNonce]);
+
+  useRealtimeIssueUpdates(
+    projectId,
+    (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const incoming = payload as Partial<TableRow> & { id?: unknown; status_id?: unknown; component_id?: unknown; assignee_id?: unknown; updated_at?: unknown };
+      if (typeof incoming.id !== "string") return;
+      // Visibility changes are security-sensitive. Remove a newly restricted
+      // row before the RLS-backed refetch decides whether this user may retain
+      // it; authorized users get it back from the server immediately.
+      if (incoming.visibility === "RESTRICTED") {
+        setRows((current) => current.filter((row) => row.id !== incoming.id));
+        setRefreshNonce((value) => value + 1);
+        return;
+      }
+      setRows((current) => current.map((row) => row.id !== incoming.id ? row : {
+        ...row,
+        title: typeof incoming.title === "string" ? incoming.title : row.title,
+        type: typeof incoming.type === "string" ? incoming.type : row.type,
+        priority: typeof incoming.priority === "string" ? incoming.priority : row.priority,
+        severity: typeof incoming.severity === "string" ? incoming.severity : row.severity,
+        visibility: incoming.visibility === "RESTRICTED" || incoming.visibility === "PROJECT" ? incoming.visibility : row.visibility,
+        assigneeId: typeof incoming.assignee_id === "string" ? incoming.assignee_id : incoming.assignee_id === null ? null : row.assigneeId,
+        componentId: typeof incoming.component_id === "string" ? incoming.component_id : incoming.component_id === null ? null : row.componentId,
+        updated_at: typeof incoming.updated_at === "string" ? incoming.updated_at : row.updated_at,
+      }));
+      // Re-fetch for status/relationship changes and for INSERTs. The client
+      // cannot safely evaluate restricted visibility or every active filter.
+      setRefreshNonce((value) => value + 1);
+    },
+    (payload) => {
+      if (!payload || typeof payload !== "object") return;
+      const id = (payload as { id?: unknown }).id;
+      if (typeof id === "string") setRows((current) => current.filter((row) => row.id !== id));
+      setRefreshNonce((value) => value + 1);
+    },
+    () => setLoadError(true),
+    () => setRefreshNonce((value) => value + 1),
+  );
 
   const updateField = useCallback(
     async (issue: TableRow, field: IssueUpdateField, value: string) => {
@@ -287,6 +350,13 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
             {info.getValue()}
           </Link>
         ),
+      }),
+      columnHelper.display({
+        id: "visibility",
+        header: "Access",
+        cell: (info) => info.row.original.visibility === "RESTRICTED" ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"><ShieldAlert className="h-3 w-3" aria-hidden="true" /> Restricted</span>
+        ) : <span className="text-xs text-muted-foreground">Project</span>,
       }),
       columnHelper.display({
         id: "status",
@@ -408,6 +478,8 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
   return (
     <div className="space-y-3">
+      {loadError && <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><span>Issues could not be loaded. Your filters are preserved.</span><Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setRefreshNonce((value) => value + 1)}>Retry</Button></div>}
+      {savedViewsError && <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"><span>Saved views could not be loaded. The issue queue remains available.</span><Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSavedViewsNonce((value) => value + 1)}>Retry views</Button></div>}
       <SavedViewsBar
         projectId={projectId}
         currentFilters={encodeIssueFilters(filters)}
@@ -416,7 +488,11 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
         onApply={(filters) => {
           const next: Record<string, string> = {};
           for (const [k, v] of Object.entries(filters)) next[k] = v as string;
-          setFilters(next as any);
+          setFilters(decodeIssueSearchParams(next, {
+            stateIds: new Set(states.map((state) => state.value)),
+            componentIds: new Set(components.map((component) => component.value)),
+            memberIds: new Set(members.map((member) => member.value)),
+          }));
         }}
         onViewsChange={setSavedViews}
       />
@@ -443,6 +519,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
           <FilterSelect id="issue-priority-filter" label="Priority" value={filters.priority ?? ""} placeholder="Any priority" options={PRIORITIES.map((value) => ({ value, label: priorityLabel(value) }))} onChange={(value) => setFilter("priority", value)} />
           <FilterSelect id="issue-severity-filter" label="Severity" value={filters.severity ?? ""} placeholder="Any severity" options={SEVERITIES.map((value) => ({ value, label: severityLabel(value) }))} onChange={(value) => setFilter("severity", value)} />
           <FilterSelect id="issue-type-filter" label="Type" value={filters.type ?? ""} placeholder="Any type" options={ISSUE_TYPES.map((value) => ({ value, label: issueTypeLabel(value) }))} onChange={(value) => setFilter("type", value)} />
+          <FilterSelect id="issue-visibility-filter" label="Access" value={filters.visibility ?? ""} placeholder="All visibility" options={[{ value: "PROJECT", label: "Project" }, { value: "RESTRICTED", label: "Restricted" }]} onChange={(value) => setFilter("visibility", value)} />
           <FilterSelect id="issue-component-filter" label="Component" value={filters.componentId ?? ""} placeholder="All components" options={components} onChange={(value) => setFilter("componentId", value)} />
           <FilterSelect id="issue-assignee-filter" label="Assignee" value={filters.assigneeId ?? ""} placeholder="All assignees" options={members} onChange={(value) => setFilter("assigneeId", value)} />
           {activeFilterCount > 0 && <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setFilters({})}><X className="h-3 w-3" /> Clear {activeFilterCount}</Button>}
@@ -464,7 +541,7 @@ export function IssueTable({ projectKey, projectId, canEdit, currentUserId, stat
 
       <Surface>
         <div className="divide-y divide-border/70 sm:hidden">
-          {rows.map((issue) => <Link key={issue.id} href={`/dashboard/issues/${formatIssueKey(projectKey, issue.issue_number)}`} className="block space-y-2 p-3 hover:bg-accent/40"><div className="flex items-start justify-between gap-2"><span className="font-mono text-xs font-semibold text-primary">{formatIssueKey(projectKey, issue.issue_number)}</span><span className={cn("rounded-full border px-2 py-0.5 text-[9px] uppercase", categoryClasses(issue.statusCategory))}>{issue.statusName}</span></div><p className="line-clamp-2 text-sm font-medium">{issue.title}</p><div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground"><span>{issueTypeLabel(issue.type)}</span><span>{priorityLabel(issue.priority)}</span><span>{severityLabel(issue.severity)}</span><span>{issue.assigneeLabel}</span></div></Link>)}
+          {rows.map((issue) => <Link key={issue.id} href={`/dashboard/issues/${formatIssueKey(projectKey, issue.issue_number)}`} className="block space-y-2 p-3 hover:bg-accent/40"><div className="flex items-start justify-between gap-2"><span className="font-mono text-xs font-semibold text-primary">{formatIssueKey(projectKey, issue.issue_number)}</span><span className={cn("rounded-full border px-2 py-0.5 text-[9px] uppercase", categoryClasses(issue.statusCategory))}>{issue.statusName}</span></div><p className="line-clamp-2 text-sm font-medium">{issue.title}</p><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">{issue.visibility === "RESTRICTED" && <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300"><ShieldAlert className="h-3 w-3" /> Restricted</span>}<span>{issueTypeLabel(issue.type)}</span><span>{priorityLabel(issue.priority)}</span><span>{severityLabel(issue.severity)}</span><span>{issue.assigneeLabel}</span></div></Link>)}
           {!loading && rows.length === 0 && <p className="p-8 text-center text-xs text-muted-foreground">No issues match these filters.</p>}
           {loading && rows.length === 0 && <Loader2 className="mx-auto my-8 h-4 w-4 animate-spin text-muted-foreground" />}
         </div>

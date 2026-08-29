@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Plus, Settings2, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, ChevronsLeft, ChevronsRight, CircleDot, Inbox, LayoutDashboard, Menu, Plus, Settings2, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 
 import { TraceLogo } from "@/components/tracebox/trace-mark";
 import { WorkspaceSwitcher, type ProjectSummary, type WorkspaceSummary } from "@/components/layout/workspace-switcher";
@@ -17,6 +17,7 @@ const primaryLinks = [
   { href: "/dashboard/triage", label: "Triage", icon: Inbox },
   { href: "/dashboard/readiness", label: "Readiness", icon: ShieldCheck },
   { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/security", label: "Security", icon: ShieldAlert },
 ];
 
 export type ShellNavProps = { organizations: WorkspaceSummary[]; projects: ProjectSummary[]; activeOrganizationId: string; activeProjectId: string | null };

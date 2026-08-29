@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, ShieldCheck } from "lucide-react";
 
 import { SettingsNavigation } from "@/components/settings/settings-navigation";
+import { LoadError } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
@@ -10,7 +11,11 @@ export default async function SettingsLayout({ children }: Readonly<{ children: 
   if (!context.activeProject) return children;
 
   const supabase = await createClient();
-  const { data: role } = await supabase.rpc("project_role", { p_project_id: context.activeProject.id });
+  const { data: role, error: roleError } = await supabase.rpc("project_role", { p_project_id: context.activeProject.id });
+  if (roleError) {
+    console.error("Settings authorization load failed", { code: roleError.code, message: roleError.message });
+    return <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><LoadError title="Settings unavailable" description="We could not verify your project settings access." retryHref="/dashboard/settings" /></main>;
+  }
   const canAccessDeveloperSettings = role === "DEVELOPER" || role === "MAINTAINER";
 
   return (

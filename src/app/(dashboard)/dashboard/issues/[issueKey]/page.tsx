@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Clock3 } from "lucide-react";
 import { Surface } from "@/components/tracebox/primitives";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { Button } from "@/components/ui/button";
 import { CommentsSection } from "@/components/issues/comments-section";
 import { IssueAttachmentsSection } from "@/components/issues/issue-attachments-section";
@@ -14,6 +15,8 @@ import { IssueSecuritySection } from "@/components/issues/issue-security-section
 import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
 import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
 import { IssueWatchButton } from "@/components/issues/issue-watch-button";
+import { IssueEditForm } from "@/components/issues/issue-edit-form";
+import { IssueRealtimeRefresh } from "@/components/issues/issue-realtime-refresh";
 import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, parseIssueKey, personLabel } from "@/lib/issues";
 import type { TimelineComment, TimelineEventRow } from "@/lib/issues";
@@ -35,48 +38,56 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
   const context = await getWorkspaceContext();
   const supabase = await createClient();
 
-  const { data: project } = await supabase
+  const { data: project, error: projectError } = await supabase
     .from("projects")
     .select("id")
     .eq("organization_id", context.activeOrganization.id)
     .eq("key", parsed.projectKey)
     .eq("is_archived", false)
     .maybeSingle();
+  if (projectError) {
+    console.error("Issue project lookup failed", { code: projectError.code, message: projectError.message });
+    return <LoadErrorPage title="Issue unavailable" description="We could not verify the project for this issue." retryHref={`/dashboard/issues/${rawKey}`} />;
+  }
   if (!project) notFound();
 
-  const { data: issue } = await supabase
+  const { data: issue, error: issueError } = await supabase
     .from("issues")
     .select("* , status:workflow_states (name, category), component:components (id, name)")
     .eq("project_id", project.id)
     .eq("issue_number", parsed.issueNumber)
     .maybeSingle();
+  if (issueError) {
+    console.error("Issue detail lookup failed", { code: issueError.code, message: issueError.message });
+    return <LoadErrorPage title="Issue unavailable" description="We could not load this issue. Your access was not inferred from an empty result." retryHref={`/dashboard/issues/${rawKey}`} />;
+  }
   if (!issue) notFound();
 
   const [
-    { data: events },
-    { data: comments },
-    { data: componentRows },
-    { data: viewerRole },
-    { data: workflowStateRows },
-    { data: transitionRows },
-    { data: labelRows },
-    { data: assignedLabelRows },
-    { data: versionRows },
-    { data: milestoneRows },
-    { data: watcherRows },
-    { data: attachmentRows },
-    { data: githubLinkRows },
-    { data: customFieldRows },
-    { data: customValueRows },
-    { data: projectMemberRows },
-    { data: accessRows },
+    { data: events, error: eventsError },
+    { data: comments, error: commentsError },
+    { data: componentRows, error: componentsError },
+    { data: viewerRole, error: roleError },
+    { data: workflowStateRows, error: workflowStatesError },
+    { data: transitionRows, error: transitionsError },
+    { data: labelRows, error: labelsError },
+    { data: assignedLabelRows, error: assignedLabelsError },
+    { data: versionRows, error: versionsError },
+    { data: milestoneRows, error: milestonesError },
+    { data: watcherRows, error: watchersError },
+    { data: attachmentRows, error: attachmentsError },
+    { data: githubLinkRows, error: githubLinksError },
+    { data: customFieldRows, error: customFieldsError },
+    { data: customValueRows, error: customValuesError },
+    { data: projectMemberRows, error: projectMembersError },
+    { data: accessRows, error: accessError },
   ] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("components").select("id, name").eq("project_id", project.id),
     supabase.rpc("project_role", { p_project_id: project.id }),
     supabase.from("workflow_states").select("id, name, category").eq("project_id", project.id).order("position"),
-    supabase.from("workflow_transitions").select("to_state_id").eq("project_id", project.id).eq("from_state_id", issue.status_id),
+    supabase.from("workflow_transitions").select("to_state_id, requires_resolution").eq("project_id", project.id).eq("from_state_id", issue.status_id),
     supabase.from("labels").select("id, name, color").eq("project_id", project.id).order("name"),
     supabase.from("issue_labels").select("label_id").eq("issue_id", issue.id),
     supabase.from("versions").select("id, name, is_released").eq("project_id", project.id).eq("is_archived", false).order("name"),
@@ -89,6 +100,11 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     supabase.from("project_members").select("user_id").eq("project_id", project.id),
     supabase.from("issue_access").select("user_id, granted_by").eq("issue_id", issue.id),
   ]);
+  const loadError = eventsError ?? commentsError ?? componentsError ?? roleError ?? workflowStatesError ?? transitionsError ?? labelsError ?? assignedLabelsError ?? versionsError ?? milestonesError ?? watchersError ?? attachmentsError ?? githubLinksError ?? customFieldsError ?? customValuesError ?? projectMembersError ?? accessError;
+  if (loadError) {
+    console.error("Issue detail dependencies failed", { code: loadError.code, message: loadError.message });
+    return <LoadErrorPage title="Issue details incomplete" description="We could not safely load the complete issue, activity, access, and planning data." retryHref={`/dashboard/issues/${rawKey}`} />;
+  }
   const componentNames = new Map((componentRows ?? []).map((component) => [component.id, component.name]));
   const actorIds = (events ?? []).map((event) => event.actor_id);
   const commentAuthorIds = (comments ?? []).map((comment) => comment.author_id);
@@ -97,6 +113,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
   const mergedNames = await displayNameMap([issue.reporter_id, issue.assignee_id, ...actorIds, ...commentAuthorIds, ...memberIds, ...accessUserIds]);
   const canComment = viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
   const canEditAnyComment = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
+  const canEditIssue = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER" || issue.reporter_id === context.userId;
 
   const issueKeyLabel = formatIssueKey(parsed.projectKey, issue.issue_number);
   const facts: [string, string][] = [
@@ -121,6 +138,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
 
   return (
     <main className="mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8">
+      <IssueRealtimeRefresh projectId={project.id} issueId={issue.id} enabled={!canEditIssue} />
       <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href="/dashboard/issues" className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Issues</Link>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" aria-hidden="true" />
@@ -153,7 +171,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
               currentStatusCategory={issue.status?.category ?? "OPEN"}
               currentResolution={issue.resolution}
               states={(workflowStateRows ?? []).map((s) => ({ id: s.id, name: s.name, category: s.category }))}
-              allowedTransitions={(transitionRows ?? []).map((t) => ({ toStateId: t.to_state_id }))}
+              allowedTransitions={(transitionRows ?? []).map((t) => ({ toStateId: t.to_state_id, requiresResolution: t.requires_resolution }))}
               canTransition={viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
               isMaintainer={viewerRole === "MAINTAINER"}
             />
@@ -170,6 +188,28 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             </div>
             <MarkdownContent body={issue.description ?? "No description provided."} />
           </Surface>
+
+          <IssueEditForm
+            issueId={issue.id}
+            projectId={project.id}
+            expectedUpdatedAt={issue.updated_at}
+            canEdit={canEditIssue}
+            initialValues={{
+              title: issue.title,
+              description: issue.description,
+              environment: issue.environment,
+              steps_to_reproduce: issue.steps_to_reproduce,
+              expected_behavior: issue.expected_behavior,
+              actual_behavior: issue.actual_behavior,
+              priority: issue.priority,
+              severity: issue.severity,
+              type: issue.type,
+              assignee_id: issue.assignee_id,
+              component_id: issue.component_id,
+            }}
+            components={(componentRows ?? []).map((component) => ({ id: component.id, name: component.name }))}
+            members={(projectMemberRows ?? []).map((member) => ({ userId: member.user_id, displayName: mergedNames.get(member.user_id) ?? member.user_id.slice(0, 8) }))}
+          />
 
           {sections.map(([label, value]) => value ? (
             <Surface key={label} className="p-4">
@@ -246,7 +286,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
           </Surface>
           <IssueSecuritySection key={`security-${issue.id}`}
             issueId={issue.id}
-            canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
+            canEdit={canEditIssue}
             initialVisibility={issue.visibility}
             initialGrants={(accessRows ?? []) as any}
             members={(projectMemberRows ?? []).map((member) => ({ userId: member.user_id, label: mergedNames.get(member.user_id) ?? member.user_id.slice(0, 8) }))}

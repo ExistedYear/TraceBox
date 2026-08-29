@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. GitHub operational visibility and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–2 are source-implemented as of 2026-08-28. The new migrations and multi-user membership journey still require disposable/local replay and hosted browser validation.
+- Completion-plan Phases 0–8 are source-implemented as of 2026-08-28. Migrations 045–050, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -23,7 +23,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: none
 - Owner area: Membership / Auth / Workspace and project settings
 - Status: EXTERNAL
-- Evidence: migrations `202608260002` and `202608260045`; `/dashboard/settings/members`; `/dashboard/settings/contributors`; `/invite/[token]`; `src/components/settings/{workspace-members-manager,project-members-manager,invitation-acceptance}.tsx`; persistent sidebar and issue-queue Contributors links; `tests/membership-migration.test.ts`
+- Evidence: migrations `202608260002`, `202608260045`, and `202608260046`; `/dashboard/settings/members`; `/dashboard/settings/contributors`; `/invite/[token]`; `src/components/settings/{workspace-members-manager,project-members-manager,invitation-acceptance}.tsx`; persistent sidebar and issue-queue Contributors links; `tests/membership-migration.test.ts`; `supabase/tests/membership_phase2.test.sql`
 - Acceptance: An owner can invite by email; a recipient can accept with expired, revoked, already-used, and wrong-account states; an authorized user can add an existing workspace member to a project, change roles, remove project/workspace access, and transfer ownership. A persistent project Contributors panel shows avatar/display name, organization role, project role, access state, pending invitations, and action failures. Tokens are hashed and expiring, protected tables remain RPC-only, role escalation and last-owner removal are impossible, and all mutations have immutable history.
 - Verification: Migration/RLS tests for authorization, token expiry and ownership invariants; RPC tests for every mutation; browser journey with two accounts covering invite, accept, role change, access removal, and Contributors-panel visibility.
 
@@ -32,8 +32,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-001
 - Owner area: Project settings / Workflow / Database
-- Status: OPEN
-- Evidence: `src/components/settings/project-settings.tsx`; `src/app/(dashboard)/dashboard/settings/page.tsx`; `supabase/migrations/202608260003_create_components_workflow.sql`
+- Status: EXTERNAL
+- Evidence: migrations `202608260003` and `202608260049`; `src/components/settings/{project-administration,project-settings,workflow-editor}.tsx`; `src/app/(dashboard)/dashboard/settings/page.tsx`; `tests/project-workflow-admin.test.ts`; `supabase/tests/project_workflow_admin.test.sql`
 - Acceptance: An authorized maintainer can edit project name/description, archive and restore a project, and configure workflow states and transitions (create, rename, reorder, initial/terminal flags, required roles, resolution behavior, safe deletion). Project-key immutability or a complete migration contract is explicit. Published workflows always have one initial state, no dangling transitions, valid roles, and no stranded issues.
 - Verification: RPC/RLS tests for role and archive guards; transaction tests for graph invariants and in-use state deletion; browser settings journey including publish, archive, restore, and issue lifecycle smoke checks.
 
@@ -42,8 +42,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-021
 - Owner area: Issues / API / Database
-- Status: OPEN
-- Evidence: migrations `202608260005` and `202608260042`; `src/lib/validation/issue-update.ts`; `src/components/issues/issue-table.tsx`; `src/app/(dashboard)/dashboard/issues/[issueKey]/page.tsx`; `src/app/api/v1/issues/[issueKey]/route.ts`. Phase 1 aligned the shared body-field contract; the dedicated detail editor remains Phase 4 work.
+- Status: EXTERNAL
+- Evidence: migrations `202608260005`, `202608260044`, and `202608260047`; `src/lib/validation/{issue,issue-update}.ts`; `src/components/issues/{issue-edit-form,new-issue-form,issue-table}.tsx`; issue detail; REST issue routes; `tests/issue-editing-migration.test.ts`; `supabase/tests/issue_editing_phase4.test.sql`
 - Acceptance: A permitted reporter can edit title, description, environment, reproduction steps, expected and actual behavior, type, priority, severity, component, assignee, and authorized planning fields in a dedicated detail-page mode. Browser and REST mutations expose exactly the same supported fields, reject unsupported PATCH fields, preserve normalization, authorization, archived-project guards, no-op behavior, per-field audit events, and `updated_at` updates.
 - Verification: Shared contract/schema tests; RPC and REST denial/unsupported-field tests; browser create/edit/reload journey confirming persisted values and timeline events.
 
@@ -52,8 +52,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: none
 - Owner area: Server-rendered routes / UI foundations
-- Status: OPEN
-- Evidence: dashboard, reports, readiness, settings, triage, and issue-detail pages under `src/app/(dashboard)/dashboard/`
+- Status: EXTERNAL
+- Evidence: safe route states across dashboard, issue queue/detail, reports, readiness, settings, triage, milestones, integrations, notifications, and security; shared layout handling in `src/app/(dashboard)/layout.tsx`; `src/components/tracebox/load-error.tsx`; `tests/general-load-states.test.ts`
 - Acceptance: Every critical query distinguishes successful empty data from not-found/unauthorized and server failure. Failures log structured server details, render a safe error state with retry, and never become “no issues,” “no members,” zero metrics, or “100% ready.” Partial query failure cannot produce misleading aggregates, and substantial server work has route loading surfaces.
 - Verification: Injected query/RLS failure tests for each listed route plus browser checks for empty, unauthorized, failure, retry, and success states.
 
@@ -62,8 +62,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-003, TB-004
 - Owner area: Issues / Realtime
-- Status: OPEN
-- Evidence: `src/hooks/use-realtime.ts` defines `useRealtimeIssueUpdates`, but no current queue/detail consumer was found.
+- Status: EXTERNAL
+- Evidence: `src/hooks/use-realtime.ts`; queue consumer in `src/components/issues/issue-table.tsx`; conflict-aware detail consumer in `issue-edit-form.tsx`; read-only detail consumer in `issue-realtime-refresh.tsx`; notification feed reconnect lifecycle
 - Acceptance: Two contributors see safe status, assignment, priority, severity, and body changes without refresh. Queue filters are re-evaluated, inaccessible rows are removed, complex associations refresh, reconnects and duplicate events are safe, project switching cleans subscriptions, and active local edits are never silently overwritten.
 - Verification: Rendered-hook tests with event/reconnect/cleanup cases and a two-browser hosted journey covering filter changes, lost access, restricted issues, and concurrent edits.
 
@@ -72,8 +72,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-004
 - Owner area: Notifications / Realtime / Settings
-- Status: OPEN
-- Evidence: `src/components/layout/notification-center.tsx`; migrations `202608260017`, `202608260022`, `202608260036`, and `202608260037`
+- Status: EXTERNAL
+- Evidence: migrations `202608260017`, `202608260022`, `202608260036`–`037`, and `202608260048`; `/dashboard/notifications`; `/dashboard/settings/notifications`; `src/components/notifications/notifications-inbox.tsx`; compact header center and shared notification feed; `tests/notifications-phase6.test.ts`; `supabase/tests/notifications_phase6.test.sql`
 - Acceptance: A personal settings page exposes every retained preference. `/dashboard/notifications` provides exact unread counts, full history with pagination/cursor loading, unread/all filtering, mark-one and mark-all read, realtime insertion, safe issue links, loading/error/retry states, and a compact header preview. Declared assignment, mention, comment, status, watcher, link, label, planning, and milestone events are preference-aware, avoid self-duplicates, and never leak restricted metadata; unsupported email promises are removed or implemented.
 - Verification: Trigger/dispatcher tests for each retained event and restricted issue; RLS tests for unread/history isolation; browser settings and inbox journey with realtime and failure cases.
 
@@ -82,8 +82,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-003, TB-006
 - Owner area: Issues / Security / Search
-- Status: OPEN
-- Evidence: `src/components/issues/issue-security-section.tsx`; issue detail page; migration `202608260027_phase18_restricted_issues.sql`
+- Status: EXTERNAL
+- Evidence: migrations `202608260027`, `202608260047`, and `202608260050`; restricted creation and reporter controls; main queue indicator/filter; `/dashboard/security`; immutable access audit; restricted-aware notifications/API search/Storage; `tests/restricted-security-phase8.test.ts`; `supabase/tests/restricted_security_phase8.test.sql`
 - Acceptance: Creation supports restricted visibility and initial grants atomically. Queues show restricted indicators and filters, a dedicated security queue is discoverable, access history is visible, and authorized reporters/admins receive only permitted controls. RLS, realtime, notifications, API, analytics, and Storage paths preserve restricted-data isolation.
 - Verification: Database/RLS/API/Storage denial tests; browser two-account creation, grant, revoke, queue, history, and notification checks.
 
@@ -223,7 +223,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: none
 - Owner area: Database tooling / TypeScript
 - Status: IN PROGRESS
-- Evidence: migrations `202608260040`–`202608260045`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale GitHub/API casts removed. Static checks pass, but this environment could not run Docker-backed migration replay or `npm run db:types`.
+- Evidence: migrations `202608260040`–`202608260050`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
 - Acceptance: A disposable replay of migrations 001–041 succeeds; regenerated types include GitHub App tables/fields/RPCs, issue-link additions, and all current API/custom-field contracts; avoidable GitHub `any` casts are removed. `check:migrations` verifies only, `sync:migrations` regenerates the bundle, and `supabase db reset` executes locally.
 - Verification: Fresh local Supabase replay, `npm run db:types`, typecheck, `npm run check:migrations`, and schema/type catalog comparison.
 
@@ -293,7 +293,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: TB-021, TB-022
 - Owner area: Quality / Database security
 - Status: OPEN
-- Evidence: `tests/phase12-20-features.test.ts`, `tests/issue-links.test.ts`, `tests/realtime.test.ts`, and `tests/integration-phase1-5.test.ts` are primarily synthetic or structural.
+- Evidence: `supabase/tests/` now contains pgTAP contracts for membership, issue editing, notifications, workflow administration, restricted RLS, and Storage, alongside the existing Vitest suite. They are not yet integrated into CI and could not execute in this checkout because Docker access is unavailable; broader API/webhook/realtime/browser service coverage remains open.
 - Acceptance: Tests exercise production functions and real disposable services for cross-organization reads, restricted access, Storage policies, API scopes, mutation authorization, issue-number concurrency, archived guards, webhook HMAC/idempotency, and realtime lifecycle. Tautological/local reimplementations no longer stand in for contract tests.
 - Verification: Committed integration suite with documented local dependencies and denial cases; targeted CI/local run against disposable database and Storage.
 

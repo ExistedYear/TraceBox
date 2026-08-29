@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Braces, FileText, Github, SlidersHorizontal, Users } from "lucide-react";
+import { Bell, Braces, FileText, Github, SlidersHorizontal, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const settingsLinks = [
   { href: "/dashboard/settings/custom-fields", label: "Custom fields & API", description: "Metadata and access tokens", icon: Braces },
   { href: "/dashboard/settings/members", label: "Workspace members", description: "Workspace roles and invitations", icon: Users },
   { href: "/dashboard/settings/contributors", label: "Contributors", description: "Project access and roles", icon: Users },
+  { href: "/dashboard/settings/notifications", label: "Notifications", description: "Personal in-app delivery", icon: Bell },
   { href: "/dashboard/settings/integrations", label: "Integrations", description: "GitHub repositories and automation", icon: Github, developerOnly: true },
 ];
 

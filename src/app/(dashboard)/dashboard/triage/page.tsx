@@ -6,6 +6,7 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { NewProjectButton } from "@/components/layout/workspace-switcher";
 import { TriageInbox, type TriageIssue } from "@/components/triage/triage-inbox";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
@@ -44,10 +45,10 @@ export default async function TriagePage() {
 
   // Concurrently fetch workflow states, triage issues, members, and permissions
   const [
-    { data: workflowStates },
-    { data: memberRows },
-    { data: componentRows },
-    { data: projectRole },
+    { data: workflowStates, error: workflowError },
+    { data: memberRows, error: membersError },
+    { data: componentRows, error: componentsError },
+    { data: projectRole, error: roleError },
   ] = await Promise.all([
     supabase
       .from("workflow_states")
@@ -59,6 +60,12 @@ export default async function TriagePage() {
     supabase.rpc("project_role", { p_project_id: projectId }),
   ]);
 
+  if (workflowError || membersError || componentsError || roleError) {
+    const error = workflowError ?? membersError ?? componentsError ?? roleError;
+    console.error("Triage load failed", { code: error?.code, message: error?.message });
+    return <LoadErrorPage title="Triage unavailable" description="We could not load the complete triage workspace. No partial queue is being shown." retryHref="/dashboard/triage" />;
+  }
+
   const states = workflowStates ?? [];
   const triageStateIds = states.filter((s) => s.category === "TRIAGE").map((s) => s.id);
   const openState = states.find((s) => s.category === "OPEN" || s.category === "IN_PROGRESS");
@@ -67,12 +74,16 @@ export default async function TriagePage() {
   // Fetch triage issues
   let issuesData: any[] = [];
   if (triageStateIds.length > 0) {
-    const { data } = await supabase
+    const { data, error: issuesError } = await supabase
       .from("issues")
       .select("*, component:components (id, name), status:workflow_states (name, category)")
       .eq("project_id", projectId)
       .in("status_id", triageStateIds)
       .order("created_at", { ascending: true });
+    if (issuesError) {
+      console.error("Triage issue queue load failed", { code: issuesError.code, message: issuesError.message });
+      return <LoadErrorPage title="Triage unavailable" description="We could not load the triage queue. Try again without losing your current workspace." retryHref="/dashboard/triage" />;
+    }
     issuesData = data ?? [];
   }
 

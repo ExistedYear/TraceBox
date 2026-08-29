@@ -20,7 +20,7 @@ export function InvitationAcceptance({ token, authenticated }: { token: string; 
       if (result.error) {
         const text = result.error.message;
         setState("error");
-        setMessage(text.includes("WRONG_ACCOUNT") ? "This invitation belongs to a different email address. Sign out and use the invited account." : text.includes("EXPIRED") ? "This invitation has expired. Ask a workspace administrator for a new link." : text.includes("REVOKED") ? "This invitation was revoked." : text.includes("USED") ? "This invitation has already been accepted." : "This invitation is invalid or no longer available.");
+        setMessage(text.includes("WRONG_ACCOUNT") ? "This invitation belongs to a different email address. Sign out and use the invited account." : text.includes("EXPIRED") ? "This invitation has expired. Ask a workspace administrator for a new link." : text.includes("REVOKED") ? "This invitation was revoked." : text.includes("USED") ? "This invitation has already been accepted." : text.includes("PROJECT_ARCHIVED") ? "This project is archived, so this invitation can no longer be accepted." : text.includes("NOT_FOUND") ? "This invitation is invalid or no longer available." : "We could not accept this invitation. Try again or ask a workspace administrator for a new link.");
         return;
       }
       setState("accepted");

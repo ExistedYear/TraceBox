@@ -11,15 +11,17 @@ type RealtimeConfig = {
   onUpdate?: (payload: unknown) => void;
   onDelete?: (payload: unknown) => void;
   onError?: () => void;
+  onReconnect?: () => void;
   enabled?: boolean;
 };
 
 export function useRealtimeSubscription(config: RealtimeConfig) {
-  const { table, filter, onInsert, onUpdate, onDelete, onError, enabled = true } = config;
+  const { table, filter, onInsert, onUpdate, onDelete, onError, onReconnect, enabled = true } = config;
   const onInsertRef = useRef(onInsert);
   const onUpdateRef = useRef(onUpdate);
   const onDeleteRef = useRef(onDelete);
   const onErrorRef = useRef(onError);
+  const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
     onInsertRef.current = onInsert;
@@ -33,12 +35,17 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+  useEffect(() => {
+    onReconnectRef.current = onReconnect;
+  }, [onReconnect]);
 
   useEffect(() => {
     if (!enabled || !table) return;
 
     const supabase = createClient();
-    const channelName = `realtime:${table}:${filter ?? "all"}`;
+    const channelName = `realtime:${table}:${filter ?? "all"}:${crypto.randomUUID()}`;
+    let disconnected = false;
+    let disposed = false;
 
     const channel = supabase
       .channel(channelName)
@@ -79,10 +86,18 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
         },
       )
       .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onErrorRef.current?.();
+        if (disposed) return;
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          disconnected = true;
+          onErrorRef.current?.();
+        } else if (status === "SUBSCRIBED" && disconnected) {
+          disconnected = false;
+          onReconnectRef.current?.();
+        }
       });
 
     return () => {
+      disposed = true;
       supabase.removeChannel(channel);
     };
   }, [table, filter, enabled]);
@@ -115,22 +130,26 @@ export function useRealtimeComments(
   });
 }
 
-export function useRealtimeIssueUpdates(projectId: string, onUpdate: (issue: unknown) => void) {
+export function useRealtimeIssueUpdates(projectId: string, onUpdate: (issue: unknown) => void, onDelete?: (issue: unknown) => void, onError?: () => void, onReconnect?: () => void, enabled = true) {
   useRealtimeSubscription({
     table: "issues",
     filter: `project_id=eq.${projectId}`,
     onUpdate,
     onInsert: onUpdate,
-    enabled: Boolean(projectId),
+    onDelete,
+    onError,
+    onReconnect,
+    enabled: Boolean(projectId) && enabled,
   });
 }
 
-export function useRealtimeNotifications(userId: string, onNotification: (notification: unknown) => void, onError?: () => void) {
+export function useRealtimeNotifications(userId: string, onNotification: (notification: unknown) => void, onError?: () => void, onReconnect?: () => void) {
   useRealtimeSubscription({
     table: "notifications",
     filter: `user_id=eq.${userId}`,
     onInsert: onNotification,
     onError,
+    onReconnect,
     enabled: Boolean(userId),
   });
 }

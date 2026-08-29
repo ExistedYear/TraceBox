@@ -200,6 +200,7 @@ export type IssueFilters = {
   priority?: string;
   severity?: string;
   type?: string;
+  visibility?: "PROJECT" | "RESTRICTED";
   componentId?: string;
   assigneeId?: string;
 };
@@ -213,6 +214,7 @@ export function encodeIssueFilters(filters: IssueFilters): Record<string, string
   if (filters.priority) result.priority = filters.priority;
   if (filters.severity) result.severity = filters.severity;
   if (filters.type) result.type = filters.type;
+  if (filters.visibility) result.visibility = filters.visibility;
   return result;
 }
 
@@ -233,11 +235,13 @@ export function decodeIssueSearchParams(
   const priority = PRIORITIES.find((value) => value === pick("priority"));
   const severity = SEVERITIES.find((value) => value === pick("severity"));
   const type = ISSUE_TYPES.find((value) => value === pick("type"));
+  const visibility = (["PROJECT", "RESTRICTED"] as const).find((value) => value === pick("visibility"));
   return {
     statusId: statusId && valid.stateIds.has(statusId) ? statusId : undefined,
     priority,
     severity,
     type,
+    visibility,
     componentId: componentId && valid.componentIds.has(componentId) ? componentId : undefined,
     assigneeId: assigneeId && (!valid.memberIds || valid.memberIds.has(assigneeId)) ? assigneeId : undefined,
   };

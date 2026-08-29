@@ -82,6 +82,8 @@ Remove schema drift and contract ambiguity before building more UI.
 
 ## Phase 2 — Membership, invitations, contributors, and ownership
 
+Status: source-complete on 2026-08-28. Migrations 045–046, RPC-only UI journeys, Vitest contracts, and pgTAP catalog tests are present; disposable database replay and the hosted two-account browser journey remain external validation.
+
 ### Scope
 
 Remove the critical requirement for administrator SQL before a second contributor can collaborate.
@@ -125,6 +127,8 @@ An owner can invite a fresh user, the user can accept without SQL intervention, 
 
 ## Phase 3 — Honest loading, empty, and error states
 
+Status: source-complete on 2026-08-28. Critical dashboard, issue, reports, readiness, settings, triage, milestone, integration, membership, security, notification, and shared workspace-context reads now fail closed with safe retry states. Hosted fault-injection remains external validation.
+
 ### Scope
 
 Prevent query failures from appearing as valid empty projects or zero metrics.
@@ -148,6 +152,8 @@ A failed query never renders as “no issues,” “no members,” or “100% re
 
 ## Phase 4 — Complete issue creation and editing
 
+Status: source-complete on 2026-08-28. Migration 047 provides conflict-aware full-field editing and atomic template/custom-field/restricted creation shared by browser and REST paths; detail editing, preview, draft protection, safe errors, and audit behavior are wired. Database replay and browser persistence checks remain external validation.
+
 ### Scope
 
 Deliver the complete “Edit own issue” journey and align issue creation with restricted visibility, templates, and custom fields.
@@ -169,6 +175,8 @@ A permitted reporter can create and edit the full issue body through the product
 
 ## Phase 5 — Realtime issue consistency
 
+Status: source-complete on 2026-08-28. Queue and detail consumers patch safe fields, refetch associations and filter-sensitive changes, remove deletes/newly restricted rows, isolate project subscriptions, recover on reconnect, and protect active drafts. The two-browser lost-access/concurrent-edit journey remains external validation.
+
 ### Scope
 
 Consume `useRealtimeIssueUpdates` in issue queues and issue detail.
@@ -187,6 +195,8 @@ Consume `useRealtimeIssueUpdates` in issue queues and issue detail.
 Two contributors see status, assignment, priority, and body changes without manual refresh, and navigation does not accumulate duplicate subscriptions.
 
 ## Phase 6 — Notification preferences and full inbox
+
+Status: source-complete on 2026-08-28. Migration 048, the full cursor inbox, compact header feed, exact unread count, personal preference UI, all retained event categories, realtime lifecycle handling, RPC-only writes, and restricted-safe links are implemented. Trigger/RLS pgTAP execution and hosted realtime validation remain external.
 
 ### Scope
 
@@ -208,6 +218,8 @@ Unread counts are exact, preferences change delivery, the full history is reacha
 
 ## Phase 7 — Project settings and workflow administration
 
+Status: source-complete on 2026-08-28. Migration 049 and project settings provide audited metadata changes, immutable keys, archive/restore discovery, and atomic draft-and-publish workflow editing with graph, role, resolution, reachability, and in-use-state validation. Database and browser lifecycle smoke tests remain external.
+
 ### Scope
 
 Complete project metadata, project lifecycle, workflow state editing, and transition editing.
@@ -228,6 +240,8 @@ Complete project metadata, project lifecycle, workflow state editing, and transi
 A maintainer can change project metadata and workflow without creating a graph that blocks issue creation or strands existing issues.
 
 ## Phase 8 — Restricted security issue completion
+
+Status: source-complete on 2026-08-28. Atomic creation/grants, reporter controls, queue indicators/filtering, a dedicated security queue, immutable access history, notification/API/search hardening, realtime fail-closed behavior, and active-project Storage policies are implemented in migrations 047/050 and UI. Dedicated RLS/Storage pgTAP tests are committed but could not run in this checkout because the Docker socket is unavailable; hosted multi-user validation remains external.
 
 ### Scope
 

@@ -4,6 +4,7 @@ import { FolderKanban } from "lucide-react";
 import { Surface } from "@/components/tracebox/primitives";
 import { NewProjectButton } from "@/components/layout/workspace-switcher";
 import { ReadinessDashboard, type ReadinessIssue } from "@/components/readiness/readiness-dashboard";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { createClient } from "@/lib/supabase/server";
 import { formatIssueKey, personLabel } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
@@ -41,7 +42,7 @@ export default async function ReadinessPage() {
   const projectName = context.activeProject.name;
   const projectKey = context.activeProject.key;
 
-  const [{ data: milestoneRows }, { data: versionRows }] = await Promise.all([
+  const [{ data: milestoneRows, error: milestonesError }, { data: versionRows, error: versionsError }] = await Promise.all([
     supabase
       .from("milestones")
       .select("id, name, status, due_at")
@@ -55,11 +56,18 @@ export default async function ReadinessPage() {
       .order("name"),
   ]);
   const issueRows: any[] = [];
+  let issueError: { code?: string; message: string } | null = null;
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("issues").select("id, issue_number, title, type, priority, severity, assignee_id, target_milestone_id, affected_version_id, status:workflow_states (name, category), component:components (name)").eq("project_id", projectId).order("created_at", { ascending: false }).range(from, from + 999);
-    if (error) break;
+    if (error) { issueError = error; break; }
     issueRows.push(...(data ?? []));
     if ((data ?? []).length < 1000) break;
+  }
+
+  if (milestonesError || versionsError || issueError) {
+    const error = milestonesError ?? versionsError ?? issueError;
+    console.error("Readiness load failed", { code: error?.code, message: error?.message });
+    return <LoadErrorPage title="Readiness unavailable" description="We could not load the complete release dataset. No partial score is being shown." retryHref="/dashboard/readiness" />;
   }
 
   const rawIssues = issueRows;

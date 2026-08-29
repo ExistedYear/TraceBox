@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Surface } from "@/components/tracebox/primitives";
+import { LoadErrorPage } from "@/components/tracebox/load-error";
 import { Button } from "@/components/ui/button";
 import { categoryClasses, formatIssueKey, personLabel } from "@/lib/issues";
 import { createClient } from "@/lib/supabase/server";
@@ -29,11 +30,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     return { title: "Milestone" };
   }
   const supabase = await createClient();
-  const { data: milestone } = await supabase
+  const { data: milestone, error: milestoneError } = await supabase
     .from("milestones")
     .select("name")
     .eq("id", milestoneId)
     .maybeSingle();
+
   return { title: milestone ? `Milestone: ${milestone.name}` : "Milestone" };
 }
 
@@ -44,22 +46,32 @@ export default async function MilestoneDetailPage({ params }: { params: Params }
   }
   const context = await getWorkspaceContext();
   const supabase = await createClient();
-  const { data: milestone } = await supabase
+  const { data: milestone, error: milestoneError } = await supabase
     .from("milestones")
     .select("*, project:projects (id, key, name, organization_id)")
     .eq("id", milestoneId)
     .maybeSingle();
 
+  if (milestoneError) {
+    console.error("Milestone load failed", { code: milestoneError.code, message: milestoneError.message });
+    return <LoadErrorPage title="Milestone unavailable" description="We could not load this milestone. Try again in a moment." retryHref={`/dashboard/milestones/${milestoneId}`} />;
+  }
+
   if (!milestone || milestone.project?.organization_id !== context.activeOrganization.id) {
     notFound();
   }
 
-  const { data: issues } = await supabase
+  const { data: issues, error: issuesError } = await supabase
     .from("issues")
     .select("id, issue_number, title, type, priority, severity, assignee_id, updated_at, status:workflow_states (name, category)")
     .eq("target_milestone_id", milestoneId)
     .eq("project_id", milestone.project.id)
     .order("updated_at", { ascending: false });
+
+  if (issuesError) {
+    console.error("Milestone issues load failed", { code: issuesError.code, message: issuesError.message });
+    return <LoadErrorPage title="Milestone issues unavailable" description="We could not load the complete issue list. No partial progress is being shown." retryHref={`/dashboard/milestones/${milestoneId}`} />;
+  }
 
   const totalCount = issues?.length ?? 0;
   let resolvedCount = 0;

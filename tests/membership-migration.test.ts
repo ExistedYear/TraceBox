@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../supabase/migrations/202608260045_membership_invitations.sql", import.meta.url), "utf8");
+const relationalGuards = readFileSync(new URL("../supabase/migrations/202608260046_phase2_membership_relational_guards.sql", import.meta.url), "utf8");
 
 describe("membership migration contract", () => {
   it("keeps invitation secrets hashed and time-bound", () => {
@@ -35,8 +36,25 @@ describe("membership migration contract", () => {
     expect(migration).toContain("membership_events_immutable");
   });
 
+  it("keeps security-definer membership functions behind authenticated RPC grants", () => {
+    expect(migration).toContain("if v_actor is null then raise exception 'AUTH_REQUIRED'");
+    expect(migration).toContain("revoke execute on function public.create_organization_invitation");
+    expect(migration).toContain("grant execute on function public.create_organization_invitation");
+    expect(migration).toContain("to authenticated;");
+    expect(migration).toContain("create policy \"Organization admins can read invitations\"");
+    expect(migration).toContain("create policy \"Organization members can read membership history\"");
+  });
+
   it("audits project membership upserts according to their actual mutation", () => {
     expect(migration).toContain("case when v_old_role is null then 'PROJECT_MEMBER_ADDED' else 'PROJECT_ROLE_CHANGED' end");
     expect(migration).toContain("if v_old_role is not null and v_old_role = p_role then return");
+  });
+
+  it("prevents cross-workspace project references at the table boundary", () => {
+    expect(relationalGuards).toContain("enforce_membership_project_organization");
+    expect(relationalGuards).toContain("p.organization_id = new.organization_id");
+    expect(relationalGuards).toContain("membership_events_project_organization_guard");
+    expect(relationalGuards).toContain("workspace_invitations_project_organization_guard");
+    expect(relationalGuards).toContain("revoke execute on function public.enforce_membership_project_organization()");
   });
 });
