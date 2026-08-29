@@ -22,7 +22,7 @@ Included today: email/password signup, login, logout, session refresh, workspace
 
 The header palette supports independent accent themes (blue by default, neutral, amber, purple, and emerald) while preserving the light/dark mode and semantic status colors.
 
-The authenticated REST surface, token scopes, examples, and error contract are documented in [`docs/api.md`](docs/api.md).
+The authenticated REST surface, token scopes, examples, and error contract are documented in [`docs/api.md`](docs/api.md). Before release, use [`docs/deployment-changes.md`](docs/deployment-changes.md) for required operator changes and [`docs/feature-testing-checklist.md`](docs/feature-testing-checklist.md) for the submission QA pass.
 
 ## Database workflow
 
