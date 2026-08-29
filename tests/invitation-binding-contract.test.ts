@@ -23,7 +23,7 @@ describe("invitation and GitHub automation contracts", () => {
     expect(bindingRoute).toContain('auth.getUser()');
     expect(bindingRoute).toContain('role !== "MAINTAINER"');
     expect(bindingRoute).toContain('rpc("bind_github_repository"');
-    expect(githubUi).toContain("Save automation");
+    expect(githubUi).toContain("Repository automation settings saved.");
     expect(githubUi).toContain('method: "PATCH"');
     expect(githubUi).not.toContain("service_role");
   });

@@ -29,6 +29,8 @@ Database state is represented by migrations `202608260001` through `202608260074
 
 Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Docker-backed execution and hosted multi-user/realtime/browser validation remain distinct external release checks.
 
+The GitHub integrations settings page uses the command-center layout with connection metrics, Active/Needs attention/History tabs, verified installation health, sanitized project-scoped webhook history, inaccessible/archived repository warnings, repository sync, primary selection, and per-repository automation saves.
+
 ## Important runtime configuration
 
 Required local/Vercel variables:

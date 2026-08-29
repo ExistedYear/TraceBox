@@ -20,16 +20,20 @@ export async function GET(request: NextRequest) {
   const db = supabase;
   const { data: installations, error: installationError } = await db
     .from("github_installations")
-    .select("id, github_installation_id, github_account_login, github_account_type, status, permissions, last_verified_at")
+    .select("id, github_installation_id, github_account_login, github_account_type, repository_selection, status, permissions, last_verified_at, created_at, suspended_at")
     .eq("organization_id", project.organization_id)
     .order("created_at");
   if (installationError) return NextResponse.json({ error: "Could not load GitHub installations." }, { status: 500 });
   const installationIds = (installations ?? []).map((installation: { id: string }) => installation.id);
   const [{ data: repositories, error: repositoryError }, { data: bindings, error: bindingError }] = await Promise.all([
     installationIds.length ? db.from("github_repositories").select("id, installation_id, github_repository_id, owner_login, name, full_name, private, archived, default_branch, html_url, is_accessible, last_synced_at").in("installation_id", installationIds).order("full_name") : Promise.resolve({ data: [], error: null }),
-    db.from("project_github_repositories").select("github_repository_id, is_primary, auto_resolve_enabled, target_branches").eq("project_id", projectId),
+    db.from("project_github_repositories").select("github_repository_id, is_primary, auto_resolve_enabled, target_branches, created_at, updated_at").eq("project_id", projectId),
   ]);
   if (repositoryError || bindingError) return NextResponse.json({ error: "Could not load GitHub repositories." }, { status: 500 });
+
+  const { data: operations, error: operationsError } = await supabase.rpc("get_github_operations", { p_project_id: projectId });
+  if (operationsError) return NextResponse.json({ error: "Could not load GitHub status." }, { status: 500 });
   const catalog = scopeGithubRepositoryCatalog({ role, installations: installations ?? [], repositories: repositories ?? [], bindings: bindings ?? [] });
-  return NextResponse.json({ installations: catalog.installations, repositories: catalog.repositories, bindings: catalog.bindings });
+  const operationData = (operations ?? {}) as { deliveries?: unknown[] };
+  return NextResponse.json({ installations: catalog.installations, repositories: catalog.repositories, bindings: catalog.bindings, webhookDeliveries: operationData.deliveries ?? [] });
 }

@@ -236,8 +236,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `src/lib/github-app.ts` | Server-side GitHub App JWT, user-code exchange, short-lived installation-token cache, classified API errors, PR/check helpers, and bounded requests |
 | `src/lib/github-connect-state.ts` | Signed, expiring TraceBox user/workspace/project state for GitHub App installation callbacks |
 | `src/lib/github-repository-sync.ts` | Installation repository reconciliation and access lifecycle updates |
-| `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding/primary control, PR search/linking, link verification, sync, webhook replay/cleanup, and cron reconciliation routes |
-| `src/components/settings/github-integration-manager.tsx` | Verified repository picker, installation health, multi-repository project bindings, and target-branch automation settings |
+| `src/app/api/github/` | Secure GitHub App connect/callback, repository listing/binding/primary control, sanitized webhook status metadata, PR search/linking, link verification, sync, webhook replay/cleanup, and cron reconciliation routes |
+| `src/components/settings/github-integration-manager.tsx` | Active/Needs attention/History GitHub dashboard, verified repository picker, installation health, multi-repository bindings, and per-repository automation settings |
 | `src/components/settings/issue-templates-manager.tsx` | Template defaults, label configuration, safe Markdown preview, archive/restore, duplication, and atomic saves |
 | `src/app/api/attachments/reconcile/route.ts` | Protected orphan attachment reconciliation endpoint; requires `CRON_SECRET` and is not in the default Vercel cron |
 | `src/app/(dashboard)/dashboard/settings/layout.tsx` | Shared project-settings administration shell, breadcrumb, permission context, and responsive two-column layout |
