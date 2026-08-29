@@ -70,8 +70,10 @@ jobs:
       - name: Configure the app for disposable Supabase
         run: |
           status_json="$(supabase status -o json)"
-          echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r '.API_URL' <<<\"$status_json\")" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r '.ANON_KEY' <<<\"$status_json\")" >> "$GITHUB_ENV"
+          api_url="$(jq -er '.API_URL' <<<"$status_json")"
+          public_key="$(jq -er '.PUBLISHABLE_KEY // .ANON_KEY' <<<"$status_json")"
+          echo "NEXT_PUBLIC_SUPABASE_URL=$api_url" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$public_key" >> "$GITHUB_ENV"
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run browser smoke journeys
