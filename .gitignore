@@ -11,6 +11,13 @@ info/
 .omp/
 qa/live/
 
+# Playwright artifacts and local browser state (never commit credentials)
+playwright-report/
+test-results/
+playwright/.auth/
+playwright/.storage/
+.env.playwright
+
 supabase/.branches/
 supabase/.temp/
 

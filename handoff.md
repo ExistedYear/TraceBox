@@ -27,7 +27,7 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 
 Database state is represented by migrations `202608260001` through `202608260064`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–045 cover GitHub reliability, shared issue API contracts, and explicit membership/invitations. Migrations 046–057 close membership, issue editing, notifications, workflow administration, restricted security, queue/saved views/triage, templates, custom fields, attachments, and API-token contracts. Migrations 058–061 add reports, release readiness, operational dashboard metrics, and a restricted-safe audit explorer. Migrations 062–063 add stable-identity mentions and account/avatar management. Migration 064 adds the sanitized GitHub operations read model, delivery-to-issue associations, and bounded Maintainer retry requests without changing webhook matching or resolution behavior.
 
-Completion-plan Phases 2–13 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, and GitHub operational visibility are implemented. Database replay and hosted multi-user/realtime/browser validation remain distinct external release checks.
+Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Docker-backed execution and hosted multi-user/realtime/browser validation remain distinct external release checks.
 
 ## Important runtime configuration
 
@@ -53,16 +53,19 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       168/168 passed across 30 test files
+Tests:       199/199 passed across 37 test files
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
-Migration check: 57 files are contiguous and `supabase/full_schema.sql` is synchronized
-Database tests: pgTAP suites are committed under `supabase/tests/`; execution is pending because this checkout cannot access the Docker socket
-Database types: committed types must be regenerated from a replayed local or linked schema after migrations 054–057 before deployment
+Migration check: 64 files are contiguous and `supabase/full_schema.sql` is synchronized
+Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
+Database tests: pgTAP and true concurrency suites are committed and wired into disposable-Supabase CI; local execution is pending because this account cannot access the Docker socket
+Database types: committed types must be regenerated from the linked schema after migrations 044–064 are applied
+
+Hosted Supabase drift snapshot on 2026-08-29: project `tvjqgzgpgdpzkhhhrfzr` records migrations 001–043 while the repository contains 001–064. Read-only schema probes confirm the corrected `create_project`, restricted-policy generation, GitHub check-summary model from 042, and bounded webhook retry repair from 043. Git history shows no evidence of a post-deployment edit to 001–043 that the hosted database missed. Supabase records applied versions and does not re-run a changed historical file; any future mismatch must be repaired in a new forward-only migration (065 or later), never by editing or replaying an applied version.
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
-The ignored `qa/live/` Playwright suite remains local-only. It was not fully run from this checkout because no ignored `qa/live/.env` credentials were present and the runner lacked the Chromium `libnspr4.so` dependency. Run it from a normal workstation with the deployment URL, disposable API token, and matching webhook secret configured locally.
+The committed `playwright/` suite provides credential-free public/protection smoke plus explicitly gated multi-user journeys. GitHub API/webhook tests use mocked network/auth boundaries and require no GitHub environment files. The older ignored `qa/live/` suite remains optional for deployment-specific probes and must never contribute credentials or artifacts to Git.
 
 Static source audits found and fixed migration syntax, API issue argument ordering, granular API scopes, restricted issue leaks, API token authorization, webhook key association and status updates, optional GitHub merge resolution, storage authorization, triage action permissions, report denominators, notification mutation handling, issue-link validation, typed custom-field validation, password recovery, Markdown rendering, theme handling, sidebar layout, and responsive table layout issues.
 
@@ -70,8 +73,8 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 
 ## Deployment checklist
 
-1. Create/link the intended Supabase project.
-2. Apply all migrations `001`–`057` in order from `supabase/full_schema.sql` or the individual files, then regenerate `src/types/database.ts` from that applied schema.
+1. Confirm the linked target is TraceBox project `tvjqgzgpgdpzkhhhrfzr` and compare its migration ledger/schema to the local chain before every push.
+2. The current hosted ledger stops at 043. Apply only pending migrations `044`–`064`, then regenerate `src/types/database.ts` from the linked schema. Never edit an applied migration; use a new forward reconciliation migration for any drift.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.

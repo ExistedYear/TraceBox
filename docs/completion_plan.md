@@ -378,6 +378,8 @@ A maintainer can determine whether GitHub is healthy, why automation failed, wha
 
 ## Phase 14 — Real database, API, realtime, and browser tests (can be skipped for now)
 
+Status: source-complete on 2026-08-29. A committed Playwright harness, production-hook realtime tests, API/webhook route tests, a 40-assertion pgTAP security suite, and a true concurrent issue allocator check are integrated with a disposable-Supabase CI job. Credential-free browser smoke passed locally (3 passed, 10 fixture-dependent journeys skipped); 199 Vitest tests, typecheck, build, migration consistency, and lint with only known compatibility warnings also pass. Local Docker-backed database execution remains external because this workstation account cannot access the Docker socket; the first CI database run and hosted multi-user journeys must still be recorded.
+
 ### Database and RLS
 
 Cover cross-organization denial, invitations and membership roles, ownership transfer, restricted visibility, access grants and revocation, Storage policies, API scopes, mutation authorization, issue-number concurrency, archived-project guards, workflow validity, notification leakage, and webhook service-role boundaries.
@@ -392,7 +394,7 @@ Render production hooks and verify subscription setup, payload handling, cleanup
 
 ### Browser
 
-Commit a secret-free Playwright harness while keeping credentials, browser state, fixtures containing secrets, and generated reports ignored. Cover authentication, workspace/project creation, invitation acceptance, issue creation/editing, assignment/transition, comments/notifications, two-user realtime, restricted denial, attachment authorization, API-token use, and optional protected GitHub journeys.
+Commit a secret-free Playwright harness while keeping credentials, browser state, fixtures containing secrets, and generated reports ignored. Cover authentication, workspace/project creation, invitation acceptance, issue creation/editing, assignment/transition, comments/notifications, two-user realtime, restricted denial, attachment authorization, and API-token use. Keep GitHub route/webhook verification credential-free through mocked network boundaries; do not require GitHub environment files.
 
 ### CI
 
@@ -426,7 +428,7 @@ npm run build
 npm run db:reset
 ```
 
-Also run the database, API, realtime, and browser commands introduced in Phase 14. (skipped)
+Also run the database, API, realtime, and browser commands introduced in Phase 14. If Docker or hosted credentials are unavailable, preserve the source-complete evidence and mark only those environment-dependent executions `EXTERNAL`.
 
 ### Exit criteria
 

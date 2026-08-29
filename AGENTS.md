@@ -97,6 +97,7 @@ npm run sync:migrations  # regenerate full_schema.sql from ordered migrations
 
 # Local Supabase (requires Supabase CLI)
 npm run db:start / db:stop / db:reset      # reset applies migrations + seed
+npm run db:test           # reset + pgTAP + true concurrent issue allocation
 npm run db:types          # regenerate src/types/database.ts from local DB
 npm run db:types:linked   # regenerate from linked hosted project
 ```
@@ -275,5 +276,17 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - Tests live in `tests/*.test.ts`; `vitest.config.ts` wires the `@` alias to `src` and a node environment. Relative imports also work.
 - Current Vitest scope includes pure helpers and schemas plus structural contracts for loading/error states, membership invariants, atomic issue editing/creation, notifications, workflow publication, and restricted security behavior.
 - `supabase/tests/*.test.sql` contains pgTAP catalog and authorization tests for membership, issue editing, notifications, workflows, restricted RLS, and Storage. Run them through a disposable Supabase stack; they do not replace hosted multi-user/realtime validation.
+- `scripts/test-db-concurrency.mjs` uses 12 simultaneous production RPC calls against local Supabase to verify gap-free atomic issue numbering; CI supplies a pinned Supabase CLI and disposable stack.
 - Pre-yield checklist: `npm run lint && npm run typecheck && npm test && npm run build && npm run check:migrations`.
-- A separate ignored black-box Playwright suite exists under `qa/live/`; it is installed and run independently with deployment credentials and must not be committed with secrets.
+- Committed Playwright browser harness lives under `playwright/`; run `npm run test:e2e:list` for discovery or `npm run test:e2e` for public/auth smoke. Authenticated journeys are explicitly skipped unless real environment-gated fixtures are supplied; GitHub route/webhook coverage stays credential-free, and browser reports, state, and credentials remain ignored.
+- API/webhook route contracts live in `tests/phase14-api-webhook.test.ts`; rendered realtime hook coverage in `tests/realtime.test.ts` uses Vitest’s jsdom environment with `@testing-library/react`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

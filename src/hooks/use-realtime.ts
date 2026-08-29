@@ -58,6 +58,7 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
           filter,
         },
         (payload: any) => {
+          if (disposed) return;
           onInsertRef.current?.(payload.new);
         },
       )
@@ -70,6 +71,7 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
           filter,
         },
         (payload: any) => {
+          if (disposed) return;
           onUpdateRef.current?.(payload.new);
         },
       )
@@ -82,6 +84,7 @@ export function useRealtimeSubscription(config: RealtimeConfig) {
           filter,
         },
         (payload: any) => {
+          if (disposed) return;
           onDeleteRef.current?.(payload.old);
         },
       )

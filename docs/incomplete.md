@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. Source-level operational visibility is implemented; hosted failure/retry, lifecycle, and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–13 are source-implemented as of 2026-08-29. Migrations 045–064, unit/contract tests, and pgTAP suites cover the new contracts; Docker-backed replay, pgTAP execution, and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–14 are source-implemented as of 2026-08-29. Migrations 045–064, 199 unit/contract tests, a committed Playwright harness, pgTAP security coverage, and disposable-Supabase CI cover the new contracts; Docker-backed execution and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -292,8 +292,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: TB-021, TB-022
 - Owner area: Quality / Database security
-- Status: OPEN
-- Evidence: `supabase/tests/` now contains pgTAP contracts for membership, issue editing, notifications, workflow administration, restricted RLS, and Storage, alongside the existing Vitest suite. They are not yet integrated into CI and could not execute in this checkout because Docker access is unavailable; broader API/webhook/realtime/browser service coverage remains open.
+- Status: EXTERNAL
+- Evidence: `supabase/tests/phase14_behavior.test.sql`; `scripts/test-db-concurrency.mjs`; production-route coverage in `tests/phase14-api-webhook.test.ts`; rendered production-hook coverage in `tests/realtime.test.ts`; disposable database replay in `.github/workflows/ci.yml`. The source suite is committed; local execution is blocked only by this workstation account's Docker socket access, and the first CI database run is not yet recorded.
 - Acceptance: Tests exercise production functions and real disposable services for cross-organization reads, restricted access, Storage policies, API scopes, mutation authorization, issue-number concurrency, archived guards, webhook HMAC/idempotency, and realtime lifecycle. Tautological/local reimplementations no longer stand in for contract tests.
 - Verification: Committed integration suite with documented local dependencies and denial cases; targeted CI/local run against disposable database and Storage.
 
@@ -302,8 +302,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-028
 - Owner area: Quality / Release engineering
-- Status: OPEN
-- Evidence: ignored local-only `qa/live/` suite referenced by `README.md`, `handoff.md`, and `deployment.md`
+- Status: DONE
+- Evidence: committed `playwright/` harness and `playwright.config.ts`; credential/state/report ignores; `npm run test:e2e` passed the three credential-free smoke journeys locally while ten authenticated fixture journeys skipped explicitly. GitHub route/webhook tests require no GitHub environment files.
 - Acceptance: The project documents how authorized maintainers obtain/configure the hosted QA suite from a fresh clone, or commits a credential-free equivalent. Secrets, browser state, reports, and test results remain excluded from Git.
 - Verification: Fresh-clone setup check and a documented hosted run covering public routes, OAuth redirect, API scopes/pagination, webhook signatures, and the multi-user workflow.
 
@@ -312,8 +312,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: Medium
 - Dependencies: TB-028
 - Owner area: CI / Quality
-- Status: OPEN
-- Evidence: `.github/workflows/ci.yml` runs JavaScript gates and migration-file consistency but not SQL/RLS/Storage/API/webhook/browser checks.
+- Status: IN PROGRESS
+- Evidence: `.github/workflows/ci.yml` now starts disposable Supabase with pinned CLI `2.116.0`, replays the schema, executes pgTAP plus real issue-number concurrency, runs credential-free browser smoke, and uploads Playwright artifacts; API/webhook/realtime tests run in the existing Vitest job. The first remote workflow run still needs to be recorded.
 - Acceptance: CI runs an appropriately isolated SQL/migration replay and committed authorization/API/webhook checks, with browser checks either safely integrated or explicitly documented as a protected external job. CI validates the proposed diff rather than only a clean-checkout `git diff --check`.
 - Verification: Pull-request run with intentional denial/failure fixtures and recorded artifacts.
 

@@ -9,11 +9,15 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:list": "playwright test --list",
+    "test:e2e:install": "playwright install --with-deps chromium",
     "check:migrations": "node scripts/check-migrations.mjs",
     "sync:migrations": "node scripts/check-migrations.mjs --write",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:test": "supabase db reset && supabase test db && node scripts/test-db-concurrency.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
     "db:types:linked": "supabase gen types typescript --linked > src/types/database.ts"
   },
@@ -42,6 +46,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/language-server": "^0.16.0",
     "@types/node": "^22.15.29",
     "@types/react": "^19.1.2",
@@ -49,6 +54,8 @@
     "autoprefixer": "^10.4.21",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.3",
+    "@testing-library/react": "^16.3.0",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
