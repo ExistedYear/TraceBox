@@ -81,7 +81,7 @@ export function NotificationCenter() {
           {feed.unreadCount > 0 ? <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] font-bold text-primary-foreground">{feed.unreadCount > 99 ? "99+" : feed.unreadCount}</span> : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 rounded-[10px] p-0">
+      <DropdownMenuContent align="end" className="w-80 max-w-[calc(100vw-1rem)] rounded-[10px] p-0">
         <div className="flex items-center justify-between border-b border-border/80 px-4 py-2.5">
           <div className="flex items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide">Notifications</span>{feed.unreadCount > 0 ? <span className="rounded-full bg-primary/15 px-1.5 py-0.2 font-mono text-[10px] font-medium text-primary">{feed.unreadCount} new</span> : null}</div>
           {feed.unreadCount > 0 ? <button type="button" onClick={() => void markAllRead()} disabled={feed.loading} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary">{feed.loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCheck className="h-3 w-3" />} Mark all read</button> : null}

@@ -18,6 +18,7 @@ export function IssueLinksSection({ issueId, projectId, projectKey, canEdit }: P
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [targetKey, setTargetKey] = useState("");
   const [relation, setRelation] = useState<string>("RELATES_TO");
   const [adding, setAdding] = useState(false);
@@ -25,6 +26,8 @@ export function IssueLinksSection({ issueId, projectId, projectKey, canEdit }: P
   useEffect(() => {
     let current = true;
     void (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const supabase = createClient();
         const { data, error } = await supabase.from("issue_links").select("*").or(`source_issue_id.eq.${issueId},target_issue_id.eq.${issueId}`);
@@ -43,7 +46,7 @@ export function IssueLinksSection({ issueId, projectId, projectKey, canEdit }: P
     return () => {
       current = false;
     };
-  }, [issueId]);
+  }, [issueId, retryNonce]);
 
   async function handleAdd() {
     const parsed = parseIssueKey(targetKey);
@@ -93,7 +96,7 @@ export function IssueLinksSection({ issueId, projectId, projectKey, canEdit }: P
   }
 
   if (loading) return <p className="text-xs text-muted-foreground">Loading links...</p>;
-  if (loadError) return <p className="text-xs text-destructive">Could not load linked issues.</p>;
+  if (loadError) return <div role="alert" aria-live="polite" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><span>Could not load linked issues.</span><Button type="button" variant="outline" size="sm" className="h-7 border-destructive/30 text-xs text-destructive hover:bg-destructive/10" onClick={() => { setLoading(true); setLoadError(false); setRetryNonce((value) => value + 1); }}>Try again</Button></div>;
   return <div className="space-y-3">
     {links.length === 0 ? <p className="text-xs text-muted-foreground">No linked issues.</p> : <ul className="space-y-1.5">{links.map((link) => <li key={link.id} className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-xs"><span className="flex min-w-0 items-center gap-2"><Link2 className="h-3 w-3 shrink-0 text-muted-foreground" /><span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{link.direction === "incoming" ? "Linked by" : link.relationship.replace(/_/g, " ")}</span><ArrowRight className={link.direction === "incoming" ? "h-3 w-3 shrink-0 rotate-180 text-muted-foreground" : "h-3 w-3 shrink-0 text-muted-foreground"} />{link.target ? <Link href={`/dashboard/issues/${formatIssueKey(projectKey, link.target.issue_number)}`} className="truncate font-medium text-primary hover:underline">{formatIssueKey(projectKey, link.target.issue_number)} {link.target.title && `· ${link.target.title}`}</Link> : <span className="text-muted-foreground">Linked issue</span>}</span>{canEdit && <Button variant="ghost" size="sm" className="h-6 shrink-0 px-1.5 text-muted-foreground hover:text-destructive" onClick={() => void handleRemove(link.id)} aria-label="Remove link"><Unlink className="h-3 w-3" /></Button>}</li>)}</ul>}
     {canEdit && <fieldset className="min-w-0 space-y-2"><legend className="sr-only">Add linked issue</legend><div className="space-y-1"><label htmlFor="issue-link-relation" className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Relationship</label><select id="issue-link-relation" aria-label="Link relationship" className="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs" value={relation} onChange={(event) => setRelation(event.target.value)}>{RELATIONS.map((item) => <option key={item} value={item}>{item.replace(/_/g, " ")}</option>)}</select></div><div className="space-y-1"><label htmlFor="issue-link-target" className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Target issue</label><Input id="issue-link-target" placeholder={`issue key (e.g. ${projectKey}-42)`} value={targetKey} onChange={(event) => setTargetKey(event.target.value.toUpperCase())} className="h-8 w-full min-w-0 font-mono text-xs" /></div><Button size="sm" className="h-8 w-full gap-1 text-xs" onClick={() => void handleAdd()} disabled={adding}>{adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />} Link issue</Button></fieldset>}

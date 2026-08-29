@@ -2065,6 +2065,13 @@ export type Database = {
         Args: { p_token: string }
         Returns: string
       }
+      accept_organization_invitation_context: {
+        Args: { p_token: string }
+        Returns: {
+          organization_id: string
+          project_id: string
+        }[]
+      }
       add_attachment: {
         Args: {
           p_filename: string

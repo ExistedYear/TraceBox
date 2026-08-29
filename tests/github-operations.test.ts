@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { deriveGithubInstallationHealth, expectedGithubPermissions, githubFailureCategory, isGithubDeliveryRetryEligible } from "../src/lib/github-operations";
+import { scopeGithubRepositoryCatalog } from "../src/lib/github-repository-visibility";
 
 const migration = readFileSync(new URL("../supabase/migrations/202608260064_phase13_github_operations.sql", import.meta.url), "utf8");
 const processor = readFileSync(new URL("../src/lib/github-webhook-processor.ts", import.meta.url), "utf8");
@@ -51,5 +52,27 @@ describe("GitHub operations read-model helpers", () => {
     expect(retryRoute).toContain('rpc("request_github_webhook_retry"');
     expect(migration).toContain("v_delivery.attempt_count >= 8");
     expect(migration).toContain("v_delivery.payload_cleared_at is not null");
+  });
+
+  it("scopes developer catalogs to bound repositories and their installations", () => {
+    const catalog = scopeGithubRepositoryCatalog({
+      role: "DEVELOPER",
+      installations: [{ id: "installation-a" }, { id: "installation-b" }],
+      repositories: [{ id: "repository-a", installation_id: "installation-a" }, { id: "repository-b", installation_id: "installation-b" }],
+      bindings: [{ github_repository_id: "repository-a" }],
+    });
+    expect(catalog.repositories).toEqual([{ id: "repository-a", installation_id: "installation-a" }]);
+    expect(catalog.installations).toEqual([{ id: "installation-a" }]);
+  });
+
+  it("keeps the organization catalog for maintainers", () => {
+    const catalog = scopeGithubRepositoryCatalog({
+      role: "MAINTAINER",
+      installations: [{ id: "installation-a" }, { id: "installation-b" }],
+      repositories: [{ id: "repository-a", installation_id: "installation-a" }, { id: "repository-b", installation_id: "installation-b" }],
+      bindings: [{ github_repository_id: "repository-a" }],
+    });
+    expect(catalog.repositories).toHaveLength(2);
+    expect(catalog.installations).toHaveLength(2);
   });
 });

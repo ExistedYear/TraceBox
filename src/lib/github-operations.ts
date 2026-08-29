@@ -1,4 +1,8 @@
 export const MAX_GITHUB_WEBHOOK_ATTEMPTS = 8;
+// Keep webhook ingestion bounded before JSON parsing and persistence. GitHub
+// push payloads can be sizeable, so use a 5 MiB ceiling while still protecting
+// the unauthenticated endpoint from unbounded request bodies.
+export const MAX_GITHUB_WEBHOOK_BODY_BYTES = 5 * 1024 * 1024;
 
 export type GithubInstallationHealth = "HEALTHY" | "ACTION_REQUIRED" | "PENDING_APPROVAL" | "REVOKED" | "SUSPENDED" | "PERMISSION_UPDATE_REQUIRED" | "NOT_CONNECTED";
 export type GithubFailureCategory = "AUTHORIZATION" | "RATE_LIMITED" | "REPOSITORY_ACCESS" | "RETRY_BUDGET_EXHAUSTED" | "UPSTREAM" | "PROCESSING";

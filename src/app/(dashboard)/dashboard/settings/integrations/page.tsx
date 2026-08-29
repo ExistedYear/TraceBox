@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { GithubIntegrationManager } from "@/components/settings/github-integration-manager";
 import { LoadError } from "@/components/tracebox/load-error";
+import { scopeGithubRepositoryCatalog } from "@/lib/github-repository-visibility";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspace-context";
 
@@ -37,5 +38,6 @@ export default async function IntegrationsSettingsPage() {
     console.error("GitHub repositories load failed", { code: repositoriesError.code, message: repositoriesError.message });
     return <LoadError title="Integrations unavailable" description="We could not load the repositories available to this workspace. Try again in a moment." retryHref="/dashboard/settings/integrations" />;
   }
-  return <GithubIntegrationManager projectId={context.activeProject.id} canManage={role === "MAINTAINER"} initialLegacyRepo={legacy?.repo_full_name ?? null} initialInstallations={(installations ?? []) as any} initialRepositories={(organizationRepositories ?? []) as any} initialBindings={(bindings ?? []) as any} />;
+  const catalog = scopeGithubRepositoryCatalog({ role, installations: installations ?? [], repositories: organizationRepositories ?? [], bindings: bindings ?? [] });
+  return <GithubIntegrationManager projectId={context.activeProject.id} canManage={role === "MAINTAINER"} initialLegacyRepo={legacy?.repo_full_name ?? null} initialInstallations={catalog.installations as any} initialRepositories={catalog.repositories as any} initialBindings={(bindings ?? []) as any} />;
 }

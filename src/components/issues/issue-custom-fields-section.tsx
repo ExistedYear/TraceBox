@@ -16,6 +16,7 @@ function display(value: unknown) {
 
 export function IssueCustomFieldsSection({ issueId, fields, initialValues, canEdit, members }: Props) {
   const [values, setValues] = useState(initialValues);
+  const [savedValues, setSavedValues] = useState(initialValues);
   const [saving, setSaving] = useState<string | null>(null);
   if (!fields.length) return null;
 
@@ -27,18 +28,27 @@ export function IssueCustomFieldsSection({ issueId, fields, initialValues, canEd
     setValues((items) => [...items.filter((item) => item.custom_field_id !== fieldId), { custom_field_id: fieldId, value }]);
   }
 
+  function restoreSaved(fieldId: string, saved: CustomValue | undefined) {
+    setValues((items) => {
+      const withoutField = items.filter((item) => item.custom_field_id !== fieldId);
+      return saved ? [...withoutField, saved] : withoutField;
+    });
+  }
+
   async function save(field: CustomField, value: unknown) {
+    const saved = savedValues.find((item) => item.custom_field_id === field.id);
     if (field.is_required && (value === "" || value === null || value === undefined || (Array.isArray(value) && value.length === 0))) {
+      restoreSaved(field.id, saved);
       toast.error(`${field.name} is required.`);
       return;
     }
     setSaving(field.id);
     try {
       const { error } = await createClient().rpc("set_issue_custom_value", { p_issue_id: issueId, p_custom_field_id: field.id, p_value: value as any });
-      if (error) { toast.error(`Could not save ${field.name}.`); return; }
-      setLocal(field.id, value);
+      if (error) { restoreSaved(field.id, saved); toast.error(`Could not save ${field.name}.`); return; }
+      setSavedValues((items) => [...items.filter((item) => item.custom_field_id !== field.id), { custom_field_id: field.id, value }]);
       toast.success(`${field.name} saved.`);
-    } catch { toast.error("Could not reach the server."); } finally { setSaving(null); }
+    } catch { restoreSaved(field.id, saved); toast.error("Could not reach the server."); } finally { setSaving(null); }
   }
 
   function editor(field: CustomField) {

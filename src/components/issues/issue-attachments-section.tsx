@@ -282,8 +282,8 @@ export function IssueAttachmentsSection({
             const canDelete = att.uploader_id === currentUserId || isMaintainerOrDev;
 
             return (
-              <li key={att.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs">
-                <div className="flex min-w-0 items-center gap-2.5">
+              <li key={att.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-xs">
+                <div className="flex min-w-0 flex-1 basis-40 items-center gap-2.5">
                   {getFileIcon(att.mime_type, att.filename)}
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{att.filename}</p>
@@ -293,7 +293,7 @@ export function IssueAttachmentsSection({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
                   {isImage && (
                     <Button
                       variant="ghost"

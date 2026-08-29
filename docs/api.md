@@ -43,6 +43,6 @@ Errors use `{ "error": "safe human-readable message" }`; some validation respons
 
 ## Token lifecycle and guarantees
 
-Tokens support optional future expiration. Settings shows expiration and `last_used_at`. Rotation requires an explicit replacement expiration or explicit “never expires” choice, confirms that the old token dies immediately, and shows the replacement once. Revocation immediately removes the token and reports a not-found failure if it is no longer owned. Only a SHA-256 hash is stored.
+Tokens support optional expiration. Settings shows expiration and `last_used_at`. Rotation requires an explicit replacement expiration or explicit “never expires” choice, confirms that the old token dies immediately, and shows the replacement once. Revocation immediately removes the token and reports a not-found failure if it is no longer owned. Only a SHA-256 hash is stored.
 
 TraceBox retains creation, expiration, and `last_used_at` only; it does not provide usage history. It does not currently promise an application rate limit or a request explorer.

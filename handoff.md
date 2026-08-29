@@ -25,7 +25,7 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 
-Database state is represented by migrations `202608260001` through `202608260072`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–064 contain the GitHub, completion-plan, analytics, collaboration, and operational-visibility contracts. Forward-only migrations 065–072 reconcile the live API-scope constraint, tighten function/RPC grants and advisor findings, add missing indexes and RLS planner fixes, repair linked-runtime SQL ambiguities, and correct function volatility. These reconciliation migrations are required because Supabase records migration versions but does not re-run an applied file after that file is edited.
+Database state is represented by migrations `202608260001` through `202608260074`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–064 contain the GitHub, completion-plan, analytics, collaboration, and operational-visibility contracts. Forward-only migrations 065–072 reconcile the live API-scope constraint, grants, advisor findings, runtime SQL, indexes/RLS planning, and volatility. Migrations 073–074 complete invited-project landing, persisted GitHub automation edits, and project-scoped repository confidentiality. Supabase records migration versions but does not re-run an applied file after that file is edited.
 
 Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Docker-backed execution and hosted multi-user/realtime/browser validation remain distinct external release checks.
 
@@ -53,15 +53,15 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       199/199 passed across 37 test files
+Tests:       204/204 passed across 38 test files
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
-Migration check: 72 files are contiguous and `supabase/full_schema.sql` is synchronized
+Migration check: 74 files are contiguous and `supabase/full_schema.sql` is synchronized
 Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
 Database tests: pgTAP and true concurrency suites are committed and wired into disposable-Supabase CI; local execution is pending because this account cannot access the Docker socket
-Database types: `src/types/database.ts` was regenerated from the linked schema after migration 072
+Database types: `src/types/database.ts` was regenerated from the linked schema after migration 074
 
-Hosted Supabase drift snapshot on 2026-08-29: project `tvjqgzgpgdpzkhhhrfzr` now records migrations 001–072. Before the push, the hosted ledger stopped at 043 and was compared with the local chain and live catalog. That audit found real historical-file drift: the stored migration-040 statement described the 11-scope API constraint while the live constraint still accepted the older eight-scope set. Pending migrations 044–064 were applied in order, and forward-only migrations 065–072 reconciled that drift plus linked SQL lint, grants, indexes, RLS planner behavior, and volatility. Linked database lint reports zero errors and linked types are regenerated. Historical migration edits are never a deployment mechanism; every discovered mismatch gets a new migration.
+Hosted Supabase drift snapshot on 2026-08-29: project `tvjqgzgpgdpzkhhhrfzr` now records migrations 001–074. Before each push, its ledger and live catalog were compared with the local chain; the final dry-run listed only 073–074. The earlier audit found real historical-file drift: the stored migration-040 statement described the 11-scope API constraint while the live constraint still accepted the older eight-scope set. Forward-only migrations 065–074 now reconcile that drift and subsequent contract/security fixes. Linked database lint reports zero errors and linked types are regenerated. Historical migration edits are never a deployment mechanism; every discovered mismatch gets a new migration.
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
@@ -74,7 +74,7 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Confirm the linked target is TraceBox project `tvjqgzgpgdpzkhhhrfzr` and compare its migration ledger/schema to the local chain before every push.
-2. Confirm the hosted ledger and local chain both end at 072, run a linked dry-run and schema lint, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
+2. Confirm the hosted ledger and local chain both end at 074, run a linked dry-run and schema lint, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.

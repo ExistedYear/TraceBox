@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminClient } from "@/lib/api-auth";
 import { processGithubWebhookDelivery } from "@/lib/github-webhook-processor";
+import { MAX_GITHUB_WEBHOOK_BODY_BYTES } from "@/lib/github-operations";
 
 function isValidSignature(body: string, signature: string | null, secret: string) {
   if (!signature?.startsWith("sha256=")) return false;
@@ -13,10 +14,36 @@ function isValidSignature(body: string, signature: string | null, secret: string
   return provided.length === expectedBuffer.length && timingSafeEqual(provided, expectedBuffer);
 }
 
+async function readBoundedBody(request: NextRequest) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let body = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_GITHUB_WEBHOOK_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    body += decoder.decode(value, { stream: true });
+  }
+  return body + decoder.decode();
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
-  const body = await request.text();
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    if (!/^\d+$/.test(contentLength)) return NextResponse.json({ error: "Invalid Content-Length header." }, { status: 400 });
+    const declaredBytes = Number(contentLength);
+    if (!Number.isSafeInteger(declaredBytes) || declaredBytes > MAX_GITHUB_WEBHOOK_BODY_BYTES) return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
+  }
+  const body = await readBoundedBody(request);
+  if (body === null) return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
   if (!isValidSignature(body, request.headers.get("x-hub-signature-256"), secret)) return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
   const deliveryId = request.headers.get("x-github-delivery");
   const event = request.headers.get("x-github-event");

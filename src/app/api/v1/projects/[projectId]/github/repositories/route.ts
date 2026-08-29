@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { authenticateApiRequest, canApiAccessProject } from "@/lib/api-auth";
+import { scopeGithubRepositoryCatalog } from "@/lib/github-repository-visibility";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type Params = Promise<{ projectId: string }>;
@@ -34,11 +35,11 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
   if (repositoryError || bindingError) return NextResponse.json({ error: "Could not load GitHub repositories." }, { status: 500 });
 
   const projectBindings = bindings ?? [];
-  const boundIds = new Set(projectBindings.map((binding) => binding.github_repository_id));
-  const visibleRepositories = auth.context.organizationRole === "OWNER" || auth.context.organizationRole === "ADMIN"
-    ? repositories ?? []
-    : (repositories ?? []).filter((repository) => boundIds.has(repository.id));
-  const visibleInstallationIds = new Set(visibleRepositories.map((repository) => repository.installation_id));
-  const visibleInstallations = (installations ?? []).filter((installation) => visibleInstallationIds.has(installation.id));
-  return NextResponse.json({ data: visibleRepositories, bindings: projectBindings, installations: visibleInstallations });
+  const catalog = scopeGithubRepositoryCatalog({
+    role: auth.context.organizationRole === "OWNER" || auth.context.organizationRole === "ADMIN" ? "MAINTAINER" : "DEVELOPER",
+    installations: installations ?? [],
+    repositories: repositories ?? [],
+    bindings: projectBindings,
+  });
+  return NextResponse.json({ data: catalog.repositories, bindings: projectBindings, installations: catalog.installations });
 }

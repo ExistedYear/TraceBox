@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { scopeGithubRepositoryCatalog } from "@/lib/github-repository-visibility";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -29,5 +30,6 @@ export async function GET(request: NextRequest) {
     db.from("project_github_repositories").select("github_repository_id, is_primary, auto_resolve_enabled, target_branches").eq("project_id", projectId),
   ]);
   if (repositoryError || bindingError) return NextResponse.json({ error: "Could not load GitHub repositories." }, { status: 500 });
-  return NextResponse.json({ installations: installations ?? [], repositories: repositories ?? [], bindings: bindings ?? [] });
+  const catalog = scopeGithubRepositoryCatalog({ role, installations: installations ?? [], repositories: repositories ?? [], bindings: bindings ?? [] });
+  return NextResponse.json({ installations: catalog.installations, repositories: catalog.repositories, bindings: catalog.bindings });
 }

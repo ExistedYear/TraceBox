@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_GITHUB_WEBHOOK_BODY_BYTES } from "@/lib/github-operations";
+
 const authRequest = vi.fn();
 const visibleIssues = vi.fn();
 const createAdmin = vi.fn();
@@ -125,5 +127,17 @@ describe("GitHub webhook route boundary", () => {
     const failed = await POST(signedRequest("{}") as never);
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({ error: "Could not record webhook delivery." });
+  });
+
+  it("rejects declared and actual oversized payloads before persistence", async () => {
+    const { POST } = await import("@/app/api/webhooks/github/route");
+    const declaredTooLarge = await POST(signedRequest("{}", { "content-length": String(MAX_GITHUB_WEBHOOK_BODY_BYTES + 1) }) as never);
+    expect(declaredTooLarge.status).toBe(413);
+    expect(createAdmin).not.toHaveBeenCalled();
+
+    const oversized = `{"message":"${"🙂".repeat(Math.ceil(MAX_GITHUB_WEBHOOK_BODY_BYTES / 4))}"}`;
+    const actualTooLarge = await POST(signedRequest(oversized, { "content-length": "1" }) as never);
+    expect(actualTooLarge.status).toBe(413);
+    expect(createAdmin).not.toHaveBeenCalled();
   });
 });

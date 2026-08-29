@@ -37,13 +37,13 @@
 ## 3. External deployment validation
 
 - **Status**: Partially complete; remaining items are environment verification, not the resolved GitHub callback/webhook defects.
-- Migrations `202608260041` through `202608260057` complete the current service-role, GitHub reliability, membership, issue-editing, notification, workflow, restricted-security, queue/saved-view, duplicate-triage, template, custom-field, attachment, and API-token work; apply the full chain `202608260001` through `202608260057` to the linked Supabase project.
+- The linked project is reconciled through migration `202608260074`, including forward-only drift repairs, invited-project landing context, persisted GitHub automation settings, and project-scoped repository confidentiality. Compare the linked ledger and live catalog before every future push.
 - The GitHub App installation, repository binding, webhook PR linking, and branch-aware merge resolution path are verified on the hosted deployment.
 - Still verify the private `issue-attachments` bucket, Storage policies, Realtime publication, Auth redirect URLs, API scopes, both reconciliation paths (including protected `/api/attachments/reconcile`, which is not in the existing Vercel cron), and broader multi-user/RLS behavior. Template, custom-field, attachment, and API-token browser journeys also remain external checks.
 
 ## 4. Live-test limitation
 
-Source-level gates and the core hosted GitHub flow pass. The local-only `qa/live/` suite checks route presence, OAuth redirect behavior, API scope behavior, webhook HMAC validation, and optional disposable writes; it still requires the production URL and secrets in its ignored `.env` file. Do not commit that file or generated Playwright artifacts.
+Source-level gates and the core hosted GitHub flow pass. The committed `playwright/` suite provides credential-free public/protection smoke and explicitly skips fixture-dependent account journeys when fixtures are absent. API and webhook tests mock GitHub boundaries and require no GitHub environment file. The older ignored `qa/live/` suite remains optional for deployment-specific checks; never commit its environment, browser state, or generated artifacts.
 
 ## 5. Persistent Contributors Panel and add public contributions for repos.
 

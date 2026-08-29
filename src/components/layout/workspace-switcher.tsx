@@ -43,7 +43,7 @@ type WorkspaceSwitcherProps = {
   onContextChange?: () => void;
 };
 
-function selectOrganization(id: string) {
+export function selectOrganization(id: string) {
   // One year, scoped to the app; server layout validates against real memberships.
   document.cookie = `tb_org=${id}; path=/; max-age=31536000; samesite=lax`;
   document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";

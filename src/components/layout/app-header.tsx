@@ -377,18 +377,18 @@ export function AppHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/80 bg-background/95 px-4 backdrop-blur sm:px-6">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-30 flex h-14 min-w-0 items-center justify-between gap-2 border-b border-border/80 bg-background/95 px-2 backdrop-blur sm:px-6">
+        <div className="flex min-w-0 items-center gap-1 sm:gap-3">
           <MobileSidebar
             organizations={organizations}
             projects={projects}
             activeOrganizationId={activeOrganizationId}
             activeProjectId={activeProjectId}
           />
-          <div className="flex items-center gap-2 font-medium">
+          <div className="flex min-w-0 items-center gap-2 font-medium">
             <span className="hidden text-muted-foreground md:inline">{workspaceName ?? "Workspace"}</span>
             {workspaceName && <span className="hidden text-muted-foreground/60 md:inline">/</span>}
-            <span className="font-semibold text-foreground">{getPageName(pathname)}</span>
+            <span className="truncate font-semibold text-foreground">{getPageName(pathname)}</span>
             {projectName && (
               <span className="hidden rounded-full border bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-muted-foreground lg:inline">
                 {projectName}
@@ -397,18 +397,18 @@ export function AppHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-3">
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="Open command palette"
-            className="flex h-8 w-44 items-center justify-between rounded-md border border-input bg-card/60 px-2.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:w-60"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-input bg-card/60 px-0 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground sm:w-44 sm:justify-between sm:px-2.5 lg:w-60"
           >
             <span className="flex items-center gap-2">
               <Search className="h-3.5 w-3.5" />
-              <span className="truncate">Search or jump to...</span>
+              <span className="hidden truncate sm:inline">Search or jump to...</span>
             </span>
-            <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+            <kbd className="hidden rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] sm:inline">⌘K</kbd>
           </button>
 
           <button

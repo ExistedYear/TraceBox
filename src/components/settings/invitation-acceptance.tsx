@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { selectOrganization, selectProject } from "@/components/layout/workspace-switcher";
 import { Surface } from "@/components/tracebox/primitives";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,15 +17,25 @@ export function InvitationAcceptance({ token, authenticated }: { token: string; 
   async function accept() {
     setState("accepting");
     try {
-      const result = await createClient().rpc("accept_organization_invitation", { p_token: token });
+      const result = await createClient().rpc("accept_organization_invitation_context", { p_token: token });
       if (result.error) {
         const text = result.error.message;
         setState("error");
         setMessage(text.includes("WRONG_ACCOUNT") ? "This invitation belongs to a different email address. Sign out and use the invited account." : text.includes("EXPIRED") ? "This invitation has expired. Ask a workspace administrator for a new link." : text.includes("REVOKED") ? "This invitation was revoked." : text.includes("USED") ? "This invitation has already been accepted." : text.includes("PROJECT_ARCHIVED") ? "This project is archived, so this invitation can no longer be accepted." : text.includes("NOT_FOUND") ? "This invitation is invalid or no longer available." : "We could not accept this invitation. Try again or ask a workspace administrator for a new link.");
         return;
       }
+      const context = (Array.isArray(result.data) ? result.data[0] : result.data) as { organization_id?: string; project_id?: string | null } | undefined;
+      if (!context?.organization_id) {
+        setState("error");
+        setMessage("The invitation was accepted, but its workspace context was unavailable. Open TraceBox and choose the workspace manually.");
+        return;
+      }
+      selectOrganization(context.organization_id);
+      if (context.project_id) selectProject(context.project_id);
       setState("accepted");
-      setMessage("You now have access to the workspace. Continue to the command center.");
+      setMessage(context.project_id ? "You now have access to the invited project. Opening it now." : "You now have access to the workspace. Opening it now.");
+      router.push(context.project_id ? "/dashboard/issues" : "/dashboard");
+      router.refresh();
     } catch {
       setState("error");
       setMessage("We could not reach the server. Try again.");

@@ -167,7 +167,7 @@ function MentionTextarea({
         value={value}
         aria-label={ariaLabel}
         aria-autocomplete="list"
-        aria-controls={open ? `${id ?? "comment"}-mention-list` : undefined}
+        aria-controls={open && candidates.length > 0 ? `${id ?? "comment"}-mention-list` : undefined}
         aria-activedescendant={open && candidates[activeIndex] ? `${id ?? "comment"}-mention-${activeIndex}` : undefined}
         placeholder={placeholder}
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -408,13 +408,15 @@ function EditableComment({
 
 export function CommentsSection({ issueId, projectId, projectKey: _projectKey, currentUserId, canComment, canEditAnyComment, comments: initialComments, events, displayNames, componentNames }: Props) {
   const router = useRouter();
-  const [prevInitial, setPrevInitial] = useState(initialComments);
   const [comments, setComments] = useState<TimelineComment[]>(initialComments);
 
-  if (initialComments !== prevInitial) {
-    setPrevInitial(initialComments);
-    setComments(initialComments);
-  }
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setComments(initialComments);
+    });
+    return () => { active = false; };
+  }, [initialComments]);
   const timeline = useMemo(() => buildTimeline(events, comments), [events, comments]);
 
   useRealtimeComments(issueId, {
