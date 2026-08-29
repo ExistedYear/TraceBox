@@ -13,7 +13,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Repository implementation is broad through roadmap Phase 20, but the product still has incomplete contributor, settings, editing, failure-state, notification, and operational workflows.
 - The hosted GitHub App installation → repository binding → PR webhook → merge-resolution path was manually verified on 2026-08-28. Source-level operational visibility is implemented; hosted failure/retry, lifecycle, and broader live validation remain outstanding.
 - The local unit suite and JavaScript quality gates do not replace database/RLS, Storage, API, webhook, realtime, or browser integration checks.
-- Completion-plan Phases 0–14 are source-implemented as of 2026-08-29. Migrations 045–064, 199 unit/contract tests, a committed Playwright harness, pgTAP security coverage, and disposable-Supabase CI cover the new contracts; Docker-backed execution and hosted multi-user/realtime/browser validation remain external.
+- Completion-plan Phases 0–14 are source-implemented as of 2026-08-29. Migrations 045–072, 199 unit/contract tests, a committed Playwright harness, pgTAP security coverage, and disposable-Supabase CI cover the new contracts. The hosted migration ledger, generated types, and zero-error SQL lint are reconciled through 072; Docker-backed execution and hosted multi-user/realtime/browser validation remain external.
 
 ## Authoritative items
 
@@ -222,8 +222,8 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Priority: High
 - Dependencies: none
 - Owner area: Database tooling / TypeScript
-- Status: IN PROGRESS
-- Evidence: migrations `202608260040`–`202608260057`; reconciled `src/types/database.ts`; synchronized `supabase/full_schema.sql`; stale issue/API casts removed. Static checks pass, but this environment could not access the Docker socket for migration replay or `npm run db:types`.
+- Status: EXTERNAL
+- Evidence: migrations `202608260040`–`202608260072`; linked-regenerated `src/types/database.ts`; synchronized `supabase/full_schema.sql`; linked ledger through 072; zero-error linked SQL lint. Forward migration 065 repairs the historical live API-scope drift that an already-applied migration file could not repair. Docker-backed clean replay remains unavailable to this workstation account.
 - Acceptance: A disposable replay of migrations 001–041 succeeds; regenerated types include GitHub App tables/fields/RPCs, issue-link additions, and all current API/custom-field contracts; avoidable GitHub `any` casts are removed. `check:migrations` verifies only, `sync:migrations` regenerates the bundle, and `supabase db reset` executes locally.
 - Verification: Fresh local Supabase replay, `npm run db:types`, typecheck, `npm run check:migrations`, and schema/type catalog comparison.
 
@@ -233,7 +233,7 @@ Only these status values are valid: `OPEN`, `IN PROGRESS`, `BLOCKED`, `DONE`, an
 - Dependencies: TB-021
 - Owner area: API security / Database
 - Status: EXTERNAL
-- Evidence: final constraint in migration `202608260040`; `src/lib/api-scopes.ts`; `src/components/settings/custom-fields-manager.tsx`; `src/lib/api-auth.ts`; `tests/api-contracts.test.ts` derives the accepted scope set from the latest defining migration.
+- Evidence: forward reconciliation migration `202608260065`; `src/lib/api-scopes.ts`; `src/components/settings/custom-fields-manager.tsx`; `src/lib/api-auth.ts`; linked live constraint accepts the same 11 scopes; `tests/api-contracts.test.ts` derives the accepted scope set from the latest defining migration.
 - Acceptance: The final database scope constraint, generated type, UI presets, and every API route agree. Every visible scope can be persisted and is enforced; unsupported scopes are rejected explicitly.
 - Verification: Matrix tests for each preset × route × read/write/organization/project/restricted case against the applied schema.
 

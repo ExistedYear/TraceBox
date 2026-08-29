@@ -67,7 +67,7 @@ begin
       v_old_text := v_old.title;
     elsif v_key in ('description', 'environment', 'steps_to_reproduce', 'expected_behavior', 'actual_behavior') then
       if jsonb_typeof(p_updates->v_key) not in ('string', 'null') then raise exception 'VALIDATION: Body fields must be text or null' using errcode = '22023'; end if;
-      if v_new_text is not null and char_length(v_new_text) > case v_key when 'description' then 10000 when 'environment' then 2000 else 5000 end then raise exception 'VALIDATION: Body field is too long' using errcode = '22023'; end if;
+      if v_new_text is not null and char_length(v_new_text) > (case v_key when 'description' then 10000 when 'environment' then 2000 else 5000 end) then raise exception 'VALIDATION: Body field is too long' using errcode = '22023'; end if;
       v_old_text := case v_key when 'description' then v_old.description when 'environment' then v_old.environment when 'steps_to_reproduce' then v_old.steps_to_reproduce when 'expected_behavior' then v_old.expected_behavior when 'actual_behavior' then v_old.actual_behavior end;
     elsif v_key = 'priority' then
       if jsonb_typeof(p_updates->v_key) <> 'string' or v_new_text not in ('P0','P1','P2','P3','P4') then raise exception 'VALIDATION: Invalid priority' using errcode = '22023'; end if;

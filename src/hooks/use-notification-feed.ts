@@ -49,8 +49,8 @@ export function useNotificationFeed({ unreadOnly = false, pageSize = 25, realtim
       const [{ data: authData, error: authError }, { data, error: pageError }] = await Promise.all([
         supabase.auth.getUser(),
         supabase.rpc("list_notifications", {
-          p_cursor_created_at: nextCursor?.createdAt ?? null,
-          p_cursor_id: nextCursor?.id ?? null,
+          p_cursor_created_at: nextCursor?.createdAt,
+          p_cursor_id: nextCursor?.id,
           p_unread_only: unreadOnly,
           p_limit: pageSize,
         }),

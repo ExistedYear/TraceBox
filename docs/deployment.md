@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 57) via SQL Script
+### 1.3 Apply Database Migrations (1 through 72) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 57 migrations directly in the Supabase web dashboard:
+You do **not** need the Supabase CLI. You can apply all 72 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 57 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 72 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -96,6 +96,23 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 55. `202608260055_phase10_custom_fields.sql`
 56. `202608260056_phase10_attachments.sql`
 57. `202608260057_phase10_api_tokens.sql`
+58. `202608260058_phase11_reports.sql`
+59. `202608260059_phase11_release_readiness.sql`
+60. `202608260060_phase11_dashboard_metrics.sql`
+61. `202608260061_phase11_audit_explorer.sql`
+62. `202608260062_phase12_mentions.sql`
+63. `202608260063_account_management.sql`
+64. `202608260064_phase13_github_operations.sql`
+65. `202608260065_reconcile_api_token_scopes.sql`
+66. `202608260066_security_advisor_hardening.sql`
+67. `202608260067_server_only_api_wrappers.sql`
+68. `202608260068_performance_advisor_cleanup.sql`
+69. `202608260069_runtime_function_repairs.sql`
+70. `202608260070_runtime_ambiguity_repairs.sql`
+71. `202608260071_invitation_runtime_repair.sql`
+72. `202608260072_function_volatility_contracts.sql`
+
+Before every linked push, run `npx supabase migration list --linked`, `npx supabase db push --linked --dry-run`, and linked database lint. The migration ledger is version-based, so editing a file whose version is already applied does not update the hosted function, policy, or constraint. Inspect the live catalog when drift is suspected and ship the correction as the next forward-only migration.
 
 ### 1.4 Configure Supabase Authentication
 

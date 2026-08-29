@@ -53,8 +53,8 @@ export default async function ReadinessPage() {
       .eq("project_id", projectId)
       .eq("is_archived", false)
       .order("name"),
-    supabase.rpc("calculate_release_readiness", { p_project_id: projectId, p_milestone_id: null, p_version_id: null }),
-    supabase.rpc("list_release_readiness_snapshots", { p_project_id: projectId, p_milestone_id: null, p_version_id: null, p_limit: 30 }),
+    supabase.rpc("calculate_release_readiness", { p_project_id: projectId }),
+    supabase.rpc("list_release_readiness_snapshots", { p_project_id: projectId, p_limit: 30 }),
   ]);
 
   if (milestonesError || versionsError || analysisError || snapshotsError) {

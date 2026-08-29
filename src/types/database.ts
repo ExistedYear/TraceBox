@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -124,6 +124,45 @@ export type Database = {
           },
         ]
       }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          display_label: string
+          mention_token: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          display_label: string
+          mention_token: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          display_label?: string
+          mention_token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_mentions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_mentions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
           author_id: string
@@ -165,45 +204,6 @@ export type Database = {
             columns: ["issue_id"]
             isOneToOne: false
             referencedRelation: "issues"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comment_mentions: {
-        Row: {
-          comment_id: string
-          created_at: string
-          display_label: string
-          mention_token: string
-          user_id: string
-        }
-        Insert: {
-          comment_id: string
-          created_at?: string
-          display_label: string
-          mention_token: string
-          user_id: string
-        }
-        Update: {
-          comment_id?: string
-          created_at?: string
-          display_label?: string
-          mention_token?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comment_mentions_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comment_mentions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -955,6 +955,36 @@ export type Database = {
           },
         ]
       }
+      issue_template_labels: {
+        Row: {
+          label_id: string
+          template_id: string
+        }
+        Insert: {
+          label_id: string
+          template_id: string
+        }
+        Update: {
+          label_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_template_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_template_labels_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "issue_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_templates: {
         Row: {
           body_template: string
@@ -1017,51 +1047,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      issue_template_labels: {
-        Row: { template_id: string; label_id: string }
-        Insert: { template_id: string; label_id: string }
-        Update: { template_id?: string; label_id?: string }
-        Relationships: [
-          { foreignKeyName: "issue_template_labels_template_id_fkey"; columns: ["template_id"]; isOneToOne: false; referencedRelation: "issue_templates"; referencedColumns: ["id"] },
-          { foreignKeyName: "issue_template_labels_label_id_fkey"; columns: ["label_id"]; isOneToOne: false; referencedRelation: "labels"; referencedColumns: ["id"] }
-        ]
-      }
-      release_readiness_snapshots: {
-        Row: {
-          id: string
-          project_id: string
-          milestone_id: string | null
-          version_id: string | null
-          score: number
-          status: string
-          breakdown: Json
-          created_by: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          milestone_id?: string | null
-          version_id?: string | null
-          score: number
-          status: string
-          breakdown?: Json
-          created_by: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          milestone_id?: string | null
-          version_id?: string | null
-          score?: number
-          status?: string
-          breakdown?: Json
-          created_by?: string
-          created_at?: string
-        }
-        Relationships: []
       }
       issue_watchers: {
         Row: {
@@ -1255,6 +1240,60 @@ export type Database = {
           },
         ]
       }
+      membership_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          new_role: string | null
+          old_role: string | null
+          organization_id: string
+          project_id: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          new_role?: string | null
+          old_role?: string | null
+          organization_id: string
+          project_id?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          new_role?: string | null
+          old_role?: string | null
+          organization_id?: string
+          project_id?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestones: {
         Row: {
           created_at: string
@@ -1344,50 +1383,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      membership_events: {
-        Row: {
-          id: string
-          organization_id: string
-          project_id: string | null
-          actor_id: string | null
-          target_user_id: string | null
-          event_type: string
-          old_role: string | null
-          new_role: string | null
-          metadata: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          organization_id: string
-          project_id?: string | null
-          actor_id?: string | null
-          target_user_id?: string | null
-          event_type: string
-          old_role?: string | null
-          new_role?: string | null
-          metadata?: Json | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          organization_id?: string
-          project_id?: string | null
-          actor_id?: string | null
-          target_user_id?: string | null
-          event_type?: string
-          old_role?: string | null
-          new_role?: string | null
-          metadata?: Json | null
-          created_at?: string
-        }
-        Relationships: [
-          { foreignKeyName: "membership_events_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
-          { foreignKeyName: "membership_events_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
-          { foreignKeyName: "membership_events_actor_id_fkey"; columns: ["actor_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
-          { foreignKeyName: "membership_events_target_user_id_fkey"; columns: ["target_user_id"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
         ]
       }
       notifications: {
@@ -1752,6 +1747,64 @@ export type Database = {
           },
         ]
       }
+      release_readiness_snapshots: {
+        Row: {
+          breakdown: Json
+          created_at: string
+          created_by: string
+          id: string
+          milestone_id: string | null
+          project_id: string
+          score: number
+          status: string
+          version_id: string | null
+        }
+        Insert: {
+          breakdown?: Json
+          created_at?: string
+          created_by: string
+          id?: string
+          milestone_id?: string | null
+          project_id: string
+          score: number
+          status: string
+          version_id?: string | null
+        }
+        Update: {
+          breakdown?: Json
+          created_at?: string
+          created_by?: string
+          id?: string
+          milestone_id?: string | null
+          project_id?: string
+          score?: number
+          status?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_readiness_snapshots_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "release_readiness_snapshots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "release_readiness_snapshots_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_views: {
         Row: {
           created_at: string
@@ -1761,7 +1814,7 @@ export type Database = {
           name: string
           project_id: string
           updated_at: string
-          visibility: "PRIVATE" | "PROJECT" | "ORGANIZATION"
+          visibility: string
         }
         Insert: {
           created_at?: string
@@ -1771,7 +1824,7 @@ export type Database = {
           name: string
           project_id: string
           updated_at?: string
-          visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
+          visibility?: string
         }
         Update: {
           created_at?: string
@@ -1781,7 +1834,7 @@ export type Database = {
           name?: string
           project_id?: string
           updated_at?: string
-          visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
+          visibility?: string
         }
         Relationships: [
           {
@@ -1942,55 +1995,65 @@ export type Database = {
       }
       workspace_invitations: {
         Row: {
-          id: string
-          organization_id: string
-          project_id: string | null
-          email: string
-          organization_role: string
-          project_role: string | null
-          token_hash: string
-          expires_at: string
-          invited_by: string
-          accepted_by: string | null
           accepted_at: string | null
-          revoked_at: string | null
+          accepted_by: string | null
           created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          organization_id: string
+          organization_role: string
+          project_id: string | null
+          project_role: string | null
+          revoked_at: string | null
+          token_hash: string
         }
         Insert: {
-          id?: string
-          organization_id: string
-          project_id?: string | null
-          email: string
-          organization_role?: string
-          project_role?: string | null
-          token_hash: string
-          expires_at?: string
-          invited_by: string
-          accepted_by?: string | null
           accepted_at?: string | null
-          revoked_at?: string | null
+          accepted_by?: string | null
           created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          organization_id: string
+          organization_role?: string
+          project_id?: string | null
+          project_role?: string | null
+          revoked_at?: string | null
+          token_hash: string
         }
         Update: {
-          id?: string
-          organization_id?: string
-          project_id?: string | null
-          email?: string
-          organization_role?: string
-          project_role?: string | null
-          token_hash?: string
-          expires_at?: string
-          invited_by?: string
-          accepted_by?: string | null
           accepted_at?: string | null
-          revoked_at?: string | null
+          accepted_by?: string | null
           created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          organization_id?: string
+          organization_role?: string
+          project_id?: string | null
+          project_role?: string | null
+          revoked_at?: string | null
+          token_hash?: string
         }
         Relationships: [
-          { foreignKeyName: "workspace_invitations_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
-          { foreignKeyName: "workspace_invitations_project_id_fkey"; columns: ["project_id"]; isOneToOne: false; referencedRelation: "projects"; referencedColumns: ["id"] },
-          { foreignKeyName: "workspace_invitations_invited_by_fkey"; columns: ["invited_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
-          { foreignKeyName: "workspace_invitations_accepted_by_fkey"; columns: ["accepted_by"]; isOneToOne: false; referencedRelation: "users"; referencedColumns: ["id"] },
+          {
+            foreignKeyName: "workspace_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1998,6 +2061,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_organization_invitation: {
+        Args: { p_token: string }
+        Returns: string
+      }
       add_attachment: {
         Args: {
           p_filename: string
@@ -2013,7 +2080,11 @@ export type Database = {
         Returns: string
       }
       add_comment_with_mentions: {
-        Args: { p_body: string; p_issue_id: string; p_mentioned_user_ids?: string[] | null }
+        Args: {
+          p_body: string
+          p_issue_id: string
+          p_mentioned_user_ids?: string[]
+        }
         Returns: string
       }
       add_github_link: {
@@ -2036,13 +2107,9 @@ export type Database = {
         }
         Returns: string
       }
-      resolve_duplicate_issue: {
-        Args: { p_canonical_issue_id: string; p_duplicate_issue_id: string }
-        Returns: {
-          canonical_issue_id: string
-          canonical_issue_number: number
-          duplicate_issue_id: string
-        }[]
+      add_project_member: {
+        Args: { p_project_id: string; p_role?: string; p_user_id: string }
+        Returns: undefined
       }
       api_add_comment: {
         Args: { p_body: string; p_issue_id: string; p_token_hash: string }
@@ -2096,6 +2163,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      bulk_set_issue_custom_value: {
+        Args: {
+          p_custom_field_id: string
+          p_issue_ids: string[]
+          p_value: Json
+        }
+        Returns: number
+      }
+      bulk_update_issue_fields: {
+        Args: { p_issue_ids: string[]; p_project_id: string; p_updates: Json }
+        Returns: number
+      }
+      calculate_release_readiness: {
+        Args: {
+          p_milestone_id?: string
+          p_project_id: string
+          p_version_id?: string
+        }
+        Returns: Json
+      }
       can_comment_on_issue: { Args: { p_issue_id: string }; Returns: boolean }
       can_manage_project: { Args: { p_project_id: string }; Returns: boolean }
       can_transition_issue: {
@@ -2108,10 +2195,6 @@ export type Database = {
         Returns: boolean
       }
       cleanup_github_webhook_payloads: { Args: never; Returns: number }
-      get_github_operations: {
-        Args: { p_project_id: string }
-        Returns: Json
-      }
       create_api_token: {
         Args: {
           p_expires_at?: string
@@ -2131,10 +2214,6 @@ export type Database = {
         }
         Returns: string
       }
-      create_organization_invitation: {
-        Args: { p_email: string; p_organization_id: string; p_organization_role?: string; p_project_id?: string; p_project_role?: string }
-        Returns: { id: string; email: string; token: string; expires_at: string }[]
-      }
       create_custom_field: {
         Args: {
           p_config?: Json
@@ -2144,10 +2223,6 @@ export type Database = {
           p_project_id: string
         }
         Returns: string
-      }
-      bulk_set_issue_custom_value: {
-        Args: { p_issue_ids: string[]; p_custom_field_id: string; p_value: Json }
-        Returns: number
       }
       create_issue: {
         Args: {
@@ -2166,6 +2241,14 @@ export type Database = {
         }
         Returns: number
       }
+      create_issue_complete: {
+        Args: { p_payload: Json; p_project_id: string }
+        Returns: number
+      }
+      create_issue_complete_base: {
+        Args: { p_payload: Json; p_project_id: string }
+        Returns: number
+      }
       create_issue_template: {
         Args: {
           p_body_template?: string
@@ -2182,9 +2265,9 @@ export type Database = {
       create_issue_template_complete: {
         Args: {
           p_body_template: string
-          p_default_component_id: string | null
-          p_default_priority: string | null
-          p_default_severity: string | null
+          p_default_component_id: string
+          p_default_priority: string
+          p_default_severity: string
           p_description: string
           p_issue_type: string
           p_label_ids?: string[]
@@ -2216,6 +2299,21 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
+      create_organization_invitation: {
+        Args: {
+          p_email: string
+          p_organization_id: string
+          p_organization_role?: string
+          p_project_id?: string
+          p_project_role?: string
+        }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          token: string
+        }[]
+      }
       create_project: {
         Args: {
           p_description?: string
@@ -2225,20 +2323,12 @@ export type Database = {
         }
         Returns: string
       }
-      create_issue_complete: {
-        Args: { p_payload: Json; p_project_id: string }
-        Returns: number
-      }
-      create_issue_complete_base: {
-        Args: { p_payload: Json; p_project_id: string }
-        Returns: number
-      }
       create_saved_view: {
         Args: {
           p_filters?: Json
           p_name: string
           p_project_id: string
-          p_visibility?: "PRIVATE" | "PROJECT" | "ORGANIZATION"
+          p_visibility?: string
         }
         Returns: string
       }
@@ -2257,22 +2347,12 @@ export type Database = {
         Returns: undefined
       }
       delete_custom_field: { Args: { p_field_id: string }; Returns: undefined }
-      update_custom_field: {
-        Args: { p_field_id: string; p_name: string; p_field_type: string; p_config?: Json; p_is_required?: boolean }
-        Returns: undefined
-      }
-      validate_custom_field_definition: { Args: { p_config: Json; p_field_type: string }; Returns: undefined }
-      validate_custom_field_value: { Args: { p_field_id: string; p_value: Json }; Returns: undefined }
       delete_issue_template: {
         Args: { p_template_id: string }
         Returns: undefined
       }
-      duplicate_issue_template: { Args: { p_name: string; p_template_id: string }; Returns: string }
       delete_label: { Args: { p_label_id: string }; Returns: undefined }
       delete_saved_view: { Args: { p_view_id: string }; Returns: undefined }
-      rename_saved_view: { Args: { p_name: string; p_view_id: string }; Returns: undefined }
-      update_saved_view_filters: { Args: { p_filters: Json; p_view_id: string }; Returns: undefined }
-      update_saved_view_visibility: { Args: { p_view_id: string; p_visibility: "PRIVATE" | "PROJECT" | "ORGANIZATION" }; Returns: undefined }
       dispatch_issue_notification: {
         Args: {
           p_actor_id: string
@@ -2283,12 +2363,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      duplicate_issue_template: {
+        Args: { p_name: string; p_template_id: string }
+        Returns: string
+      }
       edit_comment: {
         Args: { p_body: string; p_comment_id: string }
         Returns: undefined
       }
       edit_comment_with_mentions: {
-        Args: { p_body: string; p_comment_id: string; p_mentioned_user_ids?: string[] | null }
+        Args: {
+          p_body: string
+          p_comment_id: string
+          p_mentioned_user_ids?: string[]
+        }
         Returns: undefined
       }
       find_duplicate_candidates: {
@@ -2300,47 +2388,40 @@ export type Database = {
           title: string
         }[]
       }
-      get_unread_notifications_count: { Args: never; Returns: number }
+      get_dashboard_metrics: {
+        Args: { p_project_id: string }
+        Returns: {
+          assigned_to_me: number
+          awaiting_triage: number
+          critical_count: number
+          due_milestones: number
+          in_progress_count: number
+          open_count: number
+          total_count: number
+        }[]
+      }
+      get_github_operations: { Args: { p_project_id: string }; Returns: Json }
       get_issue_reports: {
         Args: { p_project_id: string; p_window_days?: number }
         Returns: Json
       }
-      calculate_release_readiness: {
-        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null }
-        Returns: Json
-      }
-      save_release_readiness_snapshot: {
-        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null }
-        Returns: string
-      }
-      list_release_readiness_snapshots: {
-        Args: { p_project_id: string; p_milestone_id?: string | null; p_version_id?: string | null; p_limit?: number }
-        Returns: { id: string; milestone_id: string | null; version_id: string | null; score: number; status: string; breakdown: Json; created_by: string; created_at: string }[]
-      }
-      get_dashboard_metrics: {
-        Args: { p_project_id: string }
-        Returns: { assigned_to_me: number; awaiting_triage: number; due_milestones: number; open_count: number; in_progress_count: number; critical_count: number; total_count: number }[]
-      }
-      list_project_audit_events: {
-        Args: { p_actor_id?: string; p_event_type?: string; p_from?: string; p_issue_id?: string; p_limit?: number; p_offset?: number; p_project_id: string; p_to?: string }
-        Returns: { actor_id: string | null; created_at: string; event_type: string; field_name: string | null; id: string; issue_id: string; metadata: Json | null; new_value: Json | null; old_value: Json | null; total_count: number }[]
-      }
       get_notification_preferences: {
         Args: never
         Returns: {
-          user_id: string
-          mentions: boolean
           assignments: boolean
           comments: boolean
-          status_changes: boolean
-          watch_updates: boolean
           issue_links: boolean
           labels: boolean
-          planning: boolean
+          mentions: boolean
           milestones: boolean
-          updated_at: string | null
+          planning: boolean
+          status_changes: boolean
+          updated_at: string
+          user_id: string
+          watch_updates: boolean
         }[]
       }
+      get_unread_notifications_count: { Args: never; Returns: number }
       grant_issue_access: {
         Args: { p_issue_id: string; p_user_id: string }
         Returns: undefined
@@ -2349,15 +2430,7 @@ export type Database = {
       is_org_member: { Args: { p_organization_id: string }; Returns: boolean }
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       is_service_role_request: { Args: never; Returns: boolean }
-      issue_id_from_storage_path: { Args: { p_name: string }; Returns: string | null }
-      list_organization_invitations: {
-        Args: { p_organization_id: string }
-        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[]
-      }
-      list_project_invitations: {
-        Args: { p_project_id: string }
-        Returns: { id: string; email: string; organization_role: string; project_id: string | null; project_role: string | null; expires_at: string; accepted_at: string | null; revoked_at: string | null; created_at: string }[]
-      }
+      issue_id_from_storage_path: { Args: { p_name: string }; Returns: string }
       link_github_artifact: {
         Args: {
           p_github_artifact_id: string
@@ -2366,6 +2439,140 @@ export type Database = {
           p_source?: string
         }
         Returns: string
+      }
+      list_github_webhook_deliveries: {
+        Args: { p_limit?: number; p_offset?: number; p_project_id: string }
+        Returns: {
+          action: string
+          attempt_count: number
+          delivery_id: string
+          event_name: string
+          failed_at: string
+          failure_category: string
+          github_installation_id: number
+          github_repository_id: number
+          last_attempt_at: string
+          next_retry_at: string
+          payload_cleared_at: string
+          processed_at: string
+          received_at: string
+          retry_requested_at: string
+          status: string
+        }[]
+      }
+      list_missing_attachment_objects: {
+        Args: never
+        Returns: {
+          attachment_id: string
+          storage_path: string
+        }[]
+      }
+      list_notifications: {
+        Args: {
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_limit?: number
+          p_unread_only?: boolean
+        }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          created_at: string
+          data: Json
+          has_more: boolean
+          id: string
+          issue_id: string
+          issue_number: number
+          issue_title: string
+          next_cursor_created_at: string
+          next_cursor_id: string
+          project_key: string
+          read_at: string
+          type: string
+        }[]
+      }
+      list_organization_invitations: {
+        Args: { p_organization_id: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          organization_role: string
+          project_id: string
+          project_role: string
+          revoked_at: string
+        }[]
+      }
+      list_project_audit_events: {
+        Args: {
+          p_actor_id?: string
+          p_event_type?: string
+          p_from?: string
+          p_issue_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_project_id: string
+          p_to?: string
+        }
+        Returns: {
+          actor_id: string
+          created_at: string
+          event_type: string
+          field_name: string
+          id: string
+          issue_id: string
+          metadata: Json
+          new_value: Json
+          old_value: Json
+          total_count: number
+        }[]
+      }
+      list_project_invitations: {
+        Args: { p_project_id: string }
+        Returns: {
+          accepted_at: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          organization_role: string
+          project_id: string
+          project_role: string
+          revoked_at: string
+        }[]
+      }
+      list_project_mention_candidates: {
+        Args: {
+          p_issue_id?: string
+          p_limit?: number
+          p_project_id: string
+          p_query?: string
+        }
+        Returns: {
+          display_label: string
+          mention_token: string
+          user_id: string
+        }[]
+      }
+      list_release_readiness_snapshots: {
+        Args: {
+          p_limit?: number
+          p_milestone_id?: string
+          p_project_id: string
+          p_version_id?: string
+        }
+        Returns: {
+          breakdown: Json
+          created_at: string
+          created_by: string
+          id: string
+          milestone_id: string
+          score: number
+          status: string
+          version_id: string
+        }[]
       }
       mark_all_notifications_read: { Args: never; Returns: undefined }
       mark_github_webhook_delivery:
@@ -2381,96 +2588,31 @@ export type Database = {
         | {
             Args: {
               p_delivery_id: string
-              p_error: string | null
-              p_failure_category: string | null
-              p_retry_at: string | null
+              p_error: string
+              p_failure_category: string
+              p_retry_at: string
               p_status: string
             }
             Returns: undefined
           }
-      list_github_webhook_deliveries: {
-        Args: { p_limit?: number; p_offset?: number; p_project_id: string }
-        Returns: {
-          delivery_id: string
-          event_name: string
-          action: string | null
-          github_installation_id: number | null
-          github_repository_id: number | null
-          received_at: string
-          last_attempt_at: string | null
-          processed_at: string | null
-          status: string
-          attempt_count: number
-          next_retry_at: string | null
-          failure_category: string
-          failed_at: string | null
-          retry_requested_at: string | null
-          payload_cleared_at: string | null
-        }[]
-      }
       mark_notification_read: {
         Args: { p_notification_id: string }
         Returns: undefined
       }
-      list_notifications: {
-        Args: {
-          p_cursor_created_at?: string | null
-          p_cursor_id?: string | null
-          p_limit?: number
-          p_unread_only?: boolean
-        }
-        Returns: {
-          id: string
-          issue_id: string | null
-          type: string
-          data: Json | null
-          actor_id: string | null
-          actor_name: string | null
-          issue_number: number | null
-          project_key: string | null
-          issue_title: string | null
-          read_at: string | null
-          created_at: string
-          next_cursor_created_at: string | null
-          next_cursor_id: string | null
-          has_more: boolean
-        }[]
-      }
-      list_missing_attachment_objects: {
-        Args: Record<PropertyKey, never>
-        Returns: { attachment_id: string; storage_path: string }[]
-      }
-      update_current_profile: {
-        Args: { p_avatar_url: string | null; p_display_name: string }
-        Returns: {
-          id: string
-          display_name: string
-          avatar_url: string | null
-          updated_at: string
-        }[]
-      }
-      update_notification_preferences: {
-        Args: {
-          p_mentions: boolean
-          p_assignments: boolean
-          p_comments: boolean
-          p_status_changes: boolean
-          p_watch_updates: boolean
-          p_issue_links: boolean
-          p_labels: boolean
-          p_planning: boolean
-          p_milestones: boolean
-        }
-        Returns: undefined
-      }
       membership_role_rank: { Args: { p_role: string }; Returns: number }
-      normalize_mention_token: { Args: { p_display_label: string }; Returns: string }
-      organization_role: { Args: { p_organization_id: string; p_user_id?: string }; Returns: string }
-      project_role: { Args: { p_project_id: string }; Returns: string }
-      list_project_mention_candidates: {
-        Args: { p_issue_id?: string | null; p_limit?: number; p_project_id: string; p_query?: string | null }
-        Returns: { user_id: string; display_label: string; mention_token: string }[]
+      normalize_mention_token: {
+        Args: { p_display_label: string }
+        Returns: string
       }
+      notification_recipient_can_view_issue: {
+        Args: { p_issue_id: string; p_recipient_id: string }
+        Returns: boolean
+      }
+      organization_role: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: string
+      }
+      project_role: { Args: { p_project_id: string }; Returns: string }
       reconcile_auto_github_links: {
         Args: {
           p_desired_links?: Json
@@ -2478,16 +2620,6 @@ export type Database = {
           p_project_id: string
         }
         Returns: number
-      }
-      record_github_webhook_delivery_issue: {
-        Args: {
-          p_delivery_id: string
-          p_issue_event_id?: string | null
-          p_issue_id: string
-          p_relationship?: string
-          p_resolution_applied?: boolean
-        }
-        Returns: undefined
       }
       record_github_webhook: {
         Args: {
@@ -2513,31 +2645,60 @@ export type Database = {
         }
         Returns: string
       }
+      record_github_webhook_delivery_issue: {
+        Args: {
+          p_delivery_id: string
+          p_issue_event_id?: string
+          p_issue_id: string
+          p_relationship?: string
+          p_resolution_applied?: boolean
+        }
+        Returns: undefined
+      }
+      redact_audit_json: { Args: { p_value: Json }; Returns: Json }
       remove_github_integration: {
         Args: { p_project_id: string }
+        Returns: undefined
+      }
+      remove_github_link: { Args: { p_link_id: string }; Returns: undefined }
+      remove_issue_link: { Args: { p_link_id: string }; Returns: undefined }
+      remove_organization_member: {
+        Args: { p_organization_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      remove_project_member: {
+        Args: { p_project_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      rename_saved_view: {
+        Args: { p_name: string; p_view_id: string }
+        Returns: undefined
+      }
+      reopen_issue: {
+        Args: { p_comment?: string; p_issue_id: string }
+        Returns: undefined
+      }
+      replace_project_workflow: {
+        Args: { p_project_id: string; p_states: Json; p_transitions: Json }
         Returns: undefined
       }
       request_github_webhook_retry: {
         Args: { p_delivery_id: string; p_project_id: string }
         Returns: {
-          request_id: string
           delivery_id: string
-          status: string
-          requested_at: string
           request_count: number
+          request_id: string
+          requested_at: string
+          status: string
         }[]
       }
-      retry_github_webhook_delivery: {
-        Args: { p_delivery_id: string; p_project_id: string }
-        Returns: boolean
-      }
-      remove_github_link: { Args: { p_link_id: string }; Returns: undefined }
-      remove_issue_link: { Args: { p_link_id: string }; Returns: undefined }
-      remove_organization_member: { Args: { p_organization_id: string; p_user_id: string }; Returns: undefined }
-      remove_project_member: { Args: { p_project_id: string; p_user_id: string }; Returns: undefined }
-      reopen_issue: {
-        Args: { p_comment?: string; p_issue_id: string }
-        Returns: undefined
+      resolve_duplicate_issue: {
+        Args: { p_canonical_issue_id: string; p_duplicate_issue_id: string }
+        Returns: {
+          canonical_issue_id: string
+          canonical_issue_number: number
+          duplicate_issue_id: string
+        }[]
       }
       resolve_issue_from_github:
         | {
@@ -2557,18 +2718,35 @@ export type Database = {
             }
             Returns: boolean
           }
-      revoke_api_token: { Args: { p_token_id: string }; Returns: undefined }
-      rotate_api_token: {
-        Args: { p_expires_at?: string; p_token_hash: string; p_token_id: string }
-        Returns: string
+      retry_github_webhook_delivery: {
+        Args: { p_delivery_id: string; p_project_id: string }
+        Returns: boolean
       }
+      revoke_api_token: { Args: { p_token_id: string }; Returns: undefined }
       revoke_issue_access: {
         Args: { p_issue_id: string; p_user_id: string }
         Returns: undefined
       }
-      revoke_organization_invitation: { Args: { p_invitation_id: string }; Returns: undefined }
-      accept_organization_invitation: { Args: { p_token: string }; Returns: string }
-      add_project_member: { Args: { p_project_id: string; p_user_id: string; p_role?: string }; Returns: undefined }
+      revoke_organization_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      rotate_api_token: {
+        Args: {
+          p_expires_at?: string
+          p_token_hash: string
+          p_token_id: string
+        }
+        Returns: string
+      }
+      save_release_readiness_snapshot: {
+        Args: {
+          p_milestone_id?: string
+          p_project_id: string
+          p_version_id?: string
+        }
+        Returns: string
+      }
       set_github_installation_status: {
         Args: { p_github_installation_id: number; p_status: string }
         Returns: undefined
@@ -2589,10 +2767,16 @@ export type Database = {
         Args: { p_custom_field_id: string; p_issue_id: string; p_value: Json }
         Returns: undefined
       }
-      set_issue_template_archived: { Args: { p_archived: boolean; p_template_id: string }; Returns: undefined }
-      set_issue_template_labels: { Args: { p_label_ids: string[]; p_template_id: string }; Returns: undefined }
       set_issue_labels: {
         Args: { p_issue_id: string; p_label_ids: string[] }
+        Returns: undefined
+      }
+      set_issue_template_archived: {
+        Args: { p_archived: boolean; p_template_id: string }
+        Returns: undefined
+      }
+      set_issue_template_labels: {
+        Args: { p_label_ids: string[]; p_template_id: string }
         Returns: undefined
       }
       set_issue_visibility: {
@@ -2607,6 +2791,10 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
       toggle_watch_issue: { Args: { p_issue_id: string }; Returns: boolean }
       touch_api_token: { Args: { p_token_hash: string }; Returns: undefined }
+      transfer_organization_ownership: {
+        Args: { p_new_owner_id: string; p_organization_id: string }
+        Returns: undefined
+      }
       transition_issue: {
         Args: {
           p_issue_id: string
@@ -2630,25 +2818,35 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_current_profile: {
+        Args: { p_avatar_url: string; p_display_name: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          updated_at: string
+        }[]
+      }
+      update_custom_field: {
+        Args: {
+          p_config?: Json
+          p_field_id: string
+          p_field_type: string
+          p_is_required?: boolean
+          p_name: string
+        }
+        Returns: undefined
+      }
       update_issue_fields:
+        | { Args: { p_issue_id: string; p_updates: Json }; Returns: undefined }
         | {
-            Args: { p_issue_id: string; p_updates: Json }
+            Args: {
+              p_expected_updated_at: string
+              p_issue_id: string
+              p_updates: Json
+            }
             Returns: undefined
           }
-        | {
-            Args: { p_expected_updated_at: string; p_issue_id: string; p_updates: Json }
-            Returns: undefined
-          }
-      update_organization_member_role: { Args: { p_organization_id: string; p_user_id: string; p_role: string }; Returns: undefined }
-      update_project_member_role: { Args: { p_project_id: string; p_user_id: string; p_role: string }; Returns: undefined }
-      update_project_settings: {
-        Args: { p_description?: string | null; p_name: string; p_project_id: string }
-        Returns: undefined
-      }
-      replace_project_workflow: {
-        Args: { p_project_id: string; p_states: Json; p_transitions: Json }
-        Returns: undefined
-      }
       update_issue_planning: {
         Args: {
           p_affected_version_id?: string
@@ -2673,9 +2871,9 @@ export type Database = {
       update_issue_template_complete: {
         Args: {
           p_body_template: string
-          p_default_component_id: string | null
-          p_default_priority: string | null
-          p_default_severity: string | null
+          p_default_component_id: string
+          p_default_priority: string
+          p_default_severity: string
           p_description: string
           p_issue_type: string
           p_label_ids?: string[]
@@ -2703,6 +2901,40 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_notification_preferences: {
+        Args: {
+          p_assignments: boolean
+          p_comments: boolean
+          p_issue_links: boolean
+          p_labels: boolean
+          p_mentions: boolean
+          p_milestones: boolean
+          p_planning: boolean
+          p_status_changes: boolean
+          p_watch_updates: boolean
+        }
+        Returns: undefined
+      }
+      update_organization_member_role: {
+        Args: { p_organization_id: string; p_role: string; p_user_id: string }
+        Returns: undefined
+      }
+      update_project_member_role: {
+        Args: { p_project_id: string; p_role: string; p_user_id: string }
+        Returns: undefined
+      }
+      update_project_settings: {
+        Args: { p_description?: string; p_name: string; p_project_id: string }
+        Returns: undefined
+      }
+      update_saved_view_filters: {
+        Args: { p_filters: Json; p_view_id: string }
+        Returns: undefined
+      }
+      update_saved_view_visibility: {
+        Args: { p_view_id: string; p_visibility: string }
+        Returns: undefined
+      }
       update_version: {
         Args: {
           p_description?: string
@@ -2714,7 +2946,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      transfer_organization_ownership: { Args: { p_organization_id: string; p_new_owner_id: string }; Returns: undefined }
       upsert_github_artifact: {
         Args: {
           p_artifact_type: string
@@ -2791,6 +3022,14 @@ export type Database = {
           p_private?: boolean
         }
         Returns: string
+      }
+      validate_custom_field_definition: {
+        Args: { p_config: Json; p_field_type: string }
+        Returns: undefined
+      }
+      validate_custom_field_value: {
+        Args: { p_field_id: string; p_value: Json }
+        Returns: undefined
       }
       watch_issue: { Args: { p_issue_id: string }; Returns: undefined }
     }

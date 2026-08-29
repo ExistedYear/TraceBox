@@ -6,6 +6,15 @@
 drop function if exists public.create_saved_view(uuid, text, jsonb, boolean);
 drop function if exists public.update_saved_view_sharing(uuid, boolean);
 
+-- Remove every legacy policy that references is_shared before retiring the
+-- column. PostgreSQL correctly blocks a column drop while policy expressions
+-- still depend on it.
+drop policy if exists "Project members can read saved views" on public.saved_views;
+drop policy if exists "Project members can create saved views" on public.saved_views;
+drop policy if exists "Owners can update/delete their saved views" on public.saved_views;
+drop policy if exists "Owners can update their saved views" on public.saved_views;
+drop policy if exists "Owners can delete their saved views" on public.saved_views;
+
 alter table public.saved_views add column if not exists visibility text;
 update public.saved_views
    set visibility = case when is_shared then 'PROJECT' else 'PRIVATE' end
@@ -19,12 +28,6 @@ alter table public.saved_views drop column if exists is_shared;
 
 create index if not exists saved_views_visibility_project_idx
   on public.saved_views (project_id, visibility, created_at desc);
-
-drop policy if exists "Project members can read saved views" on public.saved_views;
-drop policy if exists "Project members can create saved views" on public.saved_views;
-drop policy if exists "Owners can update/delete their saved views" on public.saved_views;
-drop policy if exists "Owners can update their saved views" on public.saved_views;
-drop policy if exists "Owners can delete their saved views" on public.saved_views;
 
 create policy "Authorized members can read saved views"
   on public.saved_views for select to authenticated

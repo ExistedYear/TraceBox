@@ -9901,7 +9901,7 @@ begin
       v_old_text := v_old.title;
     elsif v_key in ('description', 'environment', 'steps_to_reproduce', 'expected_behavior', 'actual_behavior') then
       if jsonb_typeof(p_updates->v_key) not in ('string', 'null') then raise exception 'VALIDATION: Body fields must be text or null' using errcode = '22023'; end if;
-      if v_new_text is not null and char_length(v_new_text) > case v_key when 'description' then 10000 when 'environment' then 2000 else 5000 end then raise exception 'VALIDATION: Body field is too long' using errcode = '22023'; end if;
+      if v_new_text is not null and char_length(v_new_text) > (case v_key when 'description' then 10000 when 'environment' then 2000 else 5000 end) then raise exception 'VALIDATION: Body field is too long' using errcode = '22023'; end if;
       v_old_text := case v_key when 'description' then v_old.description when 'environment' then v_old.environment when 'steps_to_reproduce' then v_old.steps_to_reproduce when 'expected_behavior' then v_old.expected_behavior when 'actual_behavior' then v_old.actual_behavior end;
     elsif v_key = 'priority' then
       if jsonb_typeof(p_updates->v_key) <> 'string' or v_new_text not in ('P0','P1','P2','P3','P4') then raise exception 'VALIDATION: Invalid priority' using errcode = '22023'; end if;
@@ -11691,6 +11691,15 @@ grant execute on function public.bulk_update_issue_fields(uuid, uuid[], jsonb) t
 drop function if exists public.create_saved_view(uuid, text, jsonb, boolean);
 drop function if exists public.update_saved_view_sharing(uuid, boolean);
 
+-- Remove every legacy policy that references is_shared before retiring the
+-- column. PostgreSQL correctly blocks a column drop while policy expressions
+-- still depend on it.
+drop policy if exists "Project members can read saved views" on public.saved_views;
+drop policy if exists "Project members can create saved views" on public.saved_views;
+drop policy if exists "Owners can update/delete their saved views" on public.saved_views;
+drop policy if exists "Owners can update their saved views" on public.saved_views;
+drop policy if exists "Owners can delete their saved views" on public.saved_views;
+
 alter table public.saved_views add column if not exists visibility text;
 update public.saved_views
    set visibility = case when is_shared then 'PROJECT' else 'PRIVATE' end
@@ -11704,12 +11713,6 @@ alter table public.saved_views drop column if exists is_shared;
 
 create index if not exists saved_views_visibility_project_idx
   on public.saved_views (project_id, visibility, created_at desc);
-
-drop policy if exists "Project members can read saved views" on public.saved_views;
-drop policy if exists "Project members can create saved views" on public.saved_views;
-drop policy if exists "Owners can update/delete their saved views" on public.saved_views;
-drop policy if exists "Owners can update their saved views" on public.saved_views;
-drop policy if exists "Owners can delete their saved views" on public.saved_views;
 
 create policy "Authorized members can read saved views"
   on public.saved_views for select to authenticated
@@ -14169,3 +14172,260 @@ revoke execute on function public.mark_github_webhook_delivery(text, text, text,
 grant execute on function public.mark_github_webhook_delivery(text, text, text, timestamptz), public.mark_github_webhook_delivery(text, text, text, timestamptz, text) to service_role;
 revoke execute on function public.request_github_webhook_retry(uuid, text), public.retry_github_webhook_delivery(uuid, text), public.list_github_webhook_deliveries(uuid, integer, integer), public.get_github_operations(uuid) from anon, public;
 grant execute on function public.request_github_webhook_retry(uuid, text), public.retry_github_webhook_delivery(uuid, text), public.list_github_webhook_deliveries(uuid, integer, integer), public.get_github_operations(uuid) to authenticated;
+-- Forward-only repair for hosted schema drift: the migration ledger contains
+-- the 11-scope contract from 040, but the live constraint was later observed
+-- at the older eight-scope definition. Never rewrite or replay 040.
+
+alter table public.api_tokens drop constraint if exists api_tokens_scopes_check;
+alter table public.api_tokens add constraint api_tokens_scopes_check check (
+  cardinality(scopes) between 1 and 11
+  and scopes <@ array[
+    'read', 'write', 'projects:read', 'issues:read', 'issues:write',
+    'comments:write', 'milestones:read', 'search:read',
+    'integrations:read', 'github_links:read', 'github_links:write'
+  ]::text[]
+);
+
+comment on constraint api_tokens_scopes_check on public.api_tokens is
+  'Canonical public API scopes; reconciled forward after hosted constraint drift.';
+-- Resolve actionable hosted security-advisor findings without weakening the
+-- intentional RPC authorization model. Trigger functions are never public API
+-- endpoints, and API token primitives are server-only implementation details.
+
+alter function public.membership_role_rank(text) set search_path = public;
+
+revoke execute on function public.authenticate_api_token(text) from public, anon, authenticated;
+revoke execute on function public.touch_api_token(text) from public, anon, authenticated;
+grant execute on function public.authenticate_api_token(text) to service_role;
+grant execute on function public.touch_api_token(text) to service_role;
+
+do $$
+declare
+  v_function record;
+begin
+  for v_function in
+    select n.nspname, p.proname, pg_get_function_identity_arguments(p.oid) as arguments
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prorettype = 'trigger'::regtype
+  loop
+    execute format(
+      'revoke execute on function %I.%I(%s) from public, anon, authenticated',
+      v_function.nspname,
+      v_function.proname,
+      v_function.arguments
+    );
+  end loop;
+end;
+$$;
+-- Public REST routes authenticate bearer tokens in server-only Next.js code
+-- and invoke these wrappers with the service-role client. Browser sessions do
+-- not need a second direct PostgREST entry point for token-hash mutations.
+
+revoke execute on function public.api_create_issue(text, jsonb) from public, anon, authenticated;
+revoke execute on function public.api_update_issue(text, uuid, jsonb) from public, anon, authenticated;
+revoke execute on function public.api_add_comment(text, uuid, text) from public, anon, authenticated;
+
+grant execute on function public.api_create_issue(text, jsonb) to service_role;
+grant execute on function public.api_update_issue(text, uuid, jsonb) to service_role;
+grant execute on function public.api_add_comment(text, uuid, text) to service_role;
+-- Resolve concrete hosted performance-advisor findings. Unused-index notices
+-- are deliberately excluded because the project has too little production
+-- traffic for those statistics to justify destructive index removal.
+
+create index if not exists api_tokens_organization_id_idx on public.api_tokens (organization_id);
+create index if not exists github_installations_installed_by_idx on public.github_installations (installed_by);
+create index if not exists github_webhook_retry_requests_requested_by_idx on public.github_webhook_retry_requests (requested_by);
+create index if not exists issue_links_created_by_idx on public.issue_links (created_by);
+create index if not exists issue_templates_created_by_idx on public.issue_templates (created_by);
+create index if not exists issues_reporter_id_idx on public.issues (reporter_id);
+create index if not exists membership_events_actor_id_idx on public.membership_events (actor_id);
+create index if not exists membership_events_target_user_id_idx on public.membership_events (target_user_id);
+create index if not exists notifications_actor_id_idx on public.notifications (actor_id);
+create index if not exists project_events_actor_id_idx on public.project_events (actor_id);
+create index if not exists project_github_repositories_created_by_idx on public.project_github_repositories (created_by);
+create index if not exists projects_created_by_idx on public.projects (created_by);
+create index if not exists release_readiness_snapshots_created_by_idx on public.release_readiness_snapshots (created_by);
+create index if not exists release_readiness_snapshots_milestone_id_idx on public.release_readiness_snapshots (milestone_id);
+create index if not exists release_readiness_snapshots_version_id_idx on public.release_readiness_snapshots (version_id);
+create index if not exists workspace_invitations_accepted_by_idx on public.workspace_invitations (accepted_by);
+create index if not exists workspace_invitations_invited_by_idx on public.workspace_invitations (invited_by);
+create index if not exists workspace_invitations_project_id_idx on public.workspace_invitations (project_id);
+
+drop policy if exists "Users can read own api tokens" on public.api_tokens;
+create policy "Users can read own api tokens"
+  on public.api_tokens for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "Creators can read their readiness snapshots" on public.release_readiness_snapshots;
+create policy "Creators can read their readiness snapshots"
+  on public.release_readiness_snapshots for select to authenticated
+  using (created_by = (select auth.uid()) and public.is_project_member(project_id));
+
+drop policy if exists "Project members and grantees can read issue watchers" on public.issue_watchers;
+
+drop index if exists public.idx_issue_links_target_issue_id;
+drop index if exists public.idx_issues_affected_version_id;
+drop index if exists public.idx_issues_target_milestone_id;
+-- Repair runtime defects detected by plpgsql_check on the fully migrated hosted
+-- schema. Each dynamic rewrite is guarded: the migration fails instead of
+-- silently doing nothing if the expected canonical function body changes.
+
+create or replace function public.find_duplicate_candidates(
+  p_project_id uuid,
+  p_title text,
+  p_limit integer default 5
+)
+returns table (issue_id uuid, issue_number bigint, title text, similarity double precision)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_title text := nullif(trim(coalesce(p_title, '')), '');
+  v_limit integer := least(greatest(coalesce(p_limit, 5), 1), 20);
+begin
+  if auth.uid() is null then raise exception 'AUTH_REQUIRED' using errcode = '42501'; end if;
+  if not public.is_project_member(p_project_id) then raise exception 'NOT_ALLOWED' using errcode = '42501'; end if;
+  if v_title is null or char_length(v_title) < 3 then raise exception 'VALIDATION: Title must be at least 3 characters' using errcode = '22023'; end if;
+  return query
+    select i.id, i.issue_number, i.title, similarity(i.title, v_title)::double precision
+    from public.issues i
+    where i.project_id = p_project_id
+      and public.can_view_issue(i.id)
+      and i.title % v_title
+      and similarity(i.title, v_title) > 0.2
+    order by similarity(i.title, v_title) desc
+    limit v_limit;
+end;
+$$;
+
+-- pgcrypto is installed in extensions on hosted Supabase. These functions use
+-- unqualified gen_random_bytes/digest calls, so expose that trusted schema only
+-- through their fixed function-local search paths.
+alter function public.create_organization_invitation(uuid, text, text, uuid, text)
+  set search_path = public, extensions;
+alter function public.accept_organization_invitation(text)
+  set search_path = public, extensions;
+
+do $$
+declare
+  v_definition text;
+  v_fixed text;
+begin
+  select pg_get_functiondef('public.replace_project_workflow(uuid,jsonb,jsonb)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'select id, row_number() over (order by id)::integer as row_number_value' || chr(10) ||
+    '    from public.workflow_states where project_id = p_project_id',
+    'select staged_state.id, row_number() over (order by staged_state.id)::integer as row_number_value' || chr(10) ||
+    '    from public.workflow_states staged_state where staged_state.project_id = p_project_id'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: replace_project_workflow'; end if;
+  execute v_fixed;
+
+  select pg_get_functiondef('public.list_notifications(timestamptz,uuid,boolean,integer)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'boundary as (select created_at as boundary_created_at, id as boundary_id from page where rn = v_limit)',
+    'boundary as (select page.created_at as boundary_created_at, page.id as boundary_id from page where page.rn = v_limit)'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: list_notifications'; end if;
+  execute v_fixed;
+
+  select pg_get_functiondef('public.get_issue_reports(uuid,integer)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(v_definition, 'order by x.resolution_at desc, x.issue_number desc', 'order by x.resolved_at desc, x.issue_number desc');
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: get_issue_reports'; end if;
+  execute v_fixed;
+
+  select pg_get_functiondef('public.request_github_webhook_retry(uuid,text)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'returning id, requested_at, request_count into v_request_id, v_requested_at, v_count',
+    'returning github_webhook_retry_requests.id, github_webhook_retry_requests.requested_at, github_webhook_retry_requests.request_count into v_request_id, v_requested_at, v_count'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: request_github_webhook_retry'; end if;
+  execute v_fixed;
+end;
+$$;
+
+revoke execute on function public.find_duplicate_candidates(uuid, text, integer) from public, anon;
+grant execute on function public.find_duplicate_candidates(uuid, text, integer) to authenticated;
+-- Finish the plpgsql_check ambiguity repairs exposed after the first runtime
+-- repair pass. Guard every canonical text rewrite against silent drift.
+
+do $$
+declare
+  v_definition text;
+  v_fixed text;
+begin
+  select pg_get_functiondef('public.create_organization_invitation(uuid,text,text,uuid,text)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'select id from public.workspace_invitations' || chr(10) ||
+    '    where organization_id = p_organization_id and email = v_email' || chr(10) ||
+    '      and accepted_at is null and revoked_at is null',
+    'select invitation.id from public.workspace_invitations invitation' || chr(10) ||
+    '    where invitation.organization_id = p_organization_id and invitation.email = v_email' || chr(10) ||
+    '      and invitation.accepted_at is null and invitation.revoked_at is null'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: create_organization_invitation'; end if;
+  execute v_fixed;
+
+  select pg_get_functiondef('public.replace_project_workflow(uuid,jsonb,jsonb)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'set name = ''#'' || left(id::text, 39), position = 1000000 + row_number_value, is_initial = false',
+    'set name = ''#'' || left(workflow_states.id::text, 39), position = 1000000 + staged.row_number_value, is_initial = false'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: replace_project_workflow'; end if;
+  execute v_fixed;
+
+  select pg_get_functiondef('public.request_github_webhook_retry(uuid,text)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'request_count = request_count + 1',
+    'request_count = github_webhook_retry_requests.request_count + 1'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: request_github_webhook_retry'; end if;
+  execute v_fixed;
+end;
+$$;
+-- Qualify the final invitation output-column collision found by plpgsql_check.
+
+do $$
+declare
+  v_definition text;
+  v_fixed text;
+begin
+  select pg_get_functiondef('public.create_organization_invitation(uuid,text,text,uuid,text)'::regprocedure)
+    into v_definition;
+  v_fixed := replace(
+    v_definition,
+    'update public.workspace_invitations set revoked_at = timezone(''utc''::text, now()) where id = v_old_invitation',
+    'update public.workspace_invitations invitation set revoked_at = timezone(''utc''::text, now()) where invitation.id = v_old_invitation'
+  );
+  if v_fixed = v_definition then raise exception 'REPAIR_TARGET_MISSING: create_organization_invitation update'; end if;
+  execute v_fixed;
+end;
+$$;
+-- Match optimizer volatility declarations to the visibility/auth helpers each
+-- read model invokes. VOLATILE is the safe contract when a function depends on
+-- request-local identity or helpers that PostgreSQL classifies as volatile.
+
+alter function public.get_github_operations(uuid) volatile;
+alter function public.get_unread_notifications_count() volatile;
+alter function public.list_notifications(timestamptz, uuid, boolean, integer) volatile;
+alter function public.get_issue_reports(uuid, integer) volatile;
+alter function public.get_dashboard_metrics(uuid) volatile;
+alter function public.list_project_audit_events(uuid, integer, integer, uuid, text, uuid, timestamptz, timestamptz) volatile;
+alter function public.list_project_mention_candidates(uuid, text, integer, uuid) volatile;
+alter function public.redact_audit_json(jsonb) stable;

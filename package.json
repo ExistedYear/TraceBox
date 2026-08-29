@@ -14,12 +14,12 @@
     "test:e2e:install": "playwright install --with-deps chromium",
     "check:migrations": "node scripts/check-migrations.mjs",
     "sync:migrations": "node scripts/check-migrations.mjs --write",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:test": "supabase db reset && supabase test db && node scripts/test-db-concurrency.mjs",
-    "db:types": "supabase gen types typescript --local > src/types/database.ts",
-    "db:types:linked": "supabase gen types typescript --linked > src/types/database.ts"
+    "db:start": "npx --yes supabase start",
+    "db:stop": "npx --yes supabase stop",
+    "db:reset": "npx --yes supabase db reset",
+    "db:test": "npx --yes supabase db reset && npx --yes supabase test db && node scripts/test-db-concurrency.mjs",
+    "db:types": "npx --yes supabase gen types typescript --local > src/types/database.ts",
+    "db:types:linked": "npx --yes supabase gen types typescript --linked > src/types/database.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

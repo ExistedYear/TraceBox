@@ -71,7 +71,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (64 ordered), pgTAP tests/, seed.sql (empty)
+supabase/                  config.toml, migrations/ (72 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, gap, and feature plans
@@ -139,7 +139,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Personal accounts**: `/dashboard/account` owns profile, avatar, email, password, recovery, notification, and global-session controls. Profile writes use `update_current_profile`; new avatars must already exist in the owner-scoped public `profile-avatars` bucket, while Auth-sensitive changes stay in Supabase Auth.
 - **Mutations go through SQL RPCs**: trusted `security definer` functions own privileged/transactional writes, including membership/invitations, atomic issue creation/editing, notification preferences/read state, project lifecycle/workflow publication, restricted grants, components, comments, and planning. Clients call `supabase.rpc(...)`; direct browser writes to protected tables and audit history remain revoked.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed contract is reconciled through migration 064, but must be regenerated after replaying migrations 046–064 locally or on the linked project. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract and hosted ledger are reconciled through migration 072. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
 - **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
 - **Issue editing and realtime**: full issue creation is one `create_issue_complete` transaction covering template defaults, required custom values, visibility, grants, labels, watchers, and audit. Detail edits use the optimistic `updated_at` overload and never overwrite a dirty draft on realtime changes. Filter/visibility-sensitive queue events always refetch through RLS; newly restricted rows are removed before refetch.
 - **Notifications**: the full inbox and header preview share the cursor/exact-count feed. Preference and read mutations are RPC-only; retained categories are mentions, assignments, comments, status, watched updates, links, labels, planning, and milestones. Restricted notification rows are returned only while `can_view_issue` remains true; title/actor/payload are redacted while key/number preserve an authorized link.
@@ -248,6 +248,12 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260062_phase12_mentions.sql` | RPC-only stable comment mentions and restricted-safe candidate/notification contracts |
 | `supabase/migrations/202608260063_account_management.sql` | Canonical profile RPC and owner-scoped public avatar Storage policies |
 | `supabase/migrations/202608260064_phase13_github_operations.sql` | Canonical GitHub model declaration, sanitized operational read model, delivery-to-issue audit associations, and idempotent Maintainer retry queue |
+| `supabase/migrations/202608260065_reconcile_api_token_scopes.sql` | Forward-only reconciliation of the live 11-scope API-token constraint |
+| `supabase/migrations/202608260066_security_advisor_hardening.sql` | Function search-path and execute-grant hardening for internal helpers/triggers |
+| `supabase/migrations/202608260067_server_only_api_wrappers.sql` | Service-role-only execute grants for REST mutation wrapper RPCs |
+| `supabase/migrations/202608260068_performance_advisor_cleanup.sql` | Foreign-key indexes, RLS init-plan optimization, and duplicate policy/index cleanup |
+| `supabase/migrations/202608260069_runtime_function_repairs.sql`–`202608260071_invitation_runtime_repair.sql` | Guarded linked-runtime repairs for duplicate search, invitations, workflow publication, notifications, reports, and GitHub retries |
+| `supabase/migrations/202608260072_function_volatility_contracts.sql` | Correct volatility declarations for data-reading and redaction functions |
 | `src/app/(dashboard)/dashboard/settings/integrations/operations/page.tsx` / `src/components/settings/github-operations-dashboard.tsx` | Project-scoped GitHub health, repository sync, safe delivery history, affected-issue, and retry UI |
 | `src/app/api/github/retry/route.ts` | Authenticated Maintainer boundary for queuing an eligible delivery through the database retry contract |
 | `src/components/audit/audit-explorer.tsx` / `src/app/(dashboard)/dashboard/audit/page.tsx` | Restricted-safe, paginated project audit explorer with actor/action/date/issue filters and CSV export |

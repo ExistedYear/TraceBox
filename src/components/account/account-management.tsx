@@ -77,7 +77,7 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
   async function updateProfile(nextName: string, nextAvatarUrl: string | null) {
     const { error } = await createClient().rpc("update_current_profile", {
       p_display_name: nextName,
-      p_avatar_url: nextAvatarUrl,
+      p_avatar_url: nextAvatarUrl ?? "",
     });
     return error;
   }

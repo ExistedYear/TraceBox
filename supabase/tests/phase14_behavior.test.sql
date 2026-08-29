@@ -5,7 +5,7 @@
 -- JWT claims so a clean migration replay catches cross-tenant regressions.
 begin;
 
-select plan(40);
+select plan(62);
 
 select ok(not has_table_privilege('authenticated', 'public.organizations', 'insert,update,delete'), 'workspace rows are RPC-only');
 select ok(not has_table_privilege('authenticated', 'public.issues', 'insert,update,delete'), 'issue rows are RPC-only');
@@ -14,6 +14,12 @@ select ok(not has_function_privilege('anon', 'public.create_issue_complete(uuid,
 select ok(not has_function_privilege('anon', 'public.create_api_token(uuid,text,text,text[],timestamptz)', 'execute'), 'anonymous callers cannot create API tokens');
 select ok(not has_function_privilege('authenticated', 'public.record_github_webhook(uuid,uuid,text,text,text,text,text,integer)', 'execute'), 'browser callers cannot record webhook links');
 select ok(has_function_privilege('service_role', 'public.record_github_webhook(uuid,uuid,text,text,text,text,text,integer)', 'execute'), 'service role can record webhook links');
+select ok(not has_function_privilege('anon', 'public.authenticate_api_token(text)', 'execute'), 'anonymous callers cannot invoke the token authentication primitive');
+select ok(not has_function_privilege('authenticated', 'public.authenticate_api_token(text)', 'execute'), 'browser callers cannot invoke the token authentication primitive');
+select ok(not has_function_privilege('authenticated', 'public.api_create_issue(text,jsonb)', 'execute'), 'browser callers cannot invoke bearer-token issue wrappers directly');
+select ok(has_function_privilege('service_role', 'public.api_create_issue(text,jsonb)', 'execute'), 'server API client can invoke bearer-token issue wrappers');
+select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prorettype = 'trigger'::regtype and has_function_privilege('anon', p.oid, 'execute')), 'anonymous callers cannot execute trigger functions as RPCs');
+select ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prorettype = 'trigger'::regtype and has_function_privilege('authenticated', p.oid, 'execute')), 'browser callers cannot execute trigger functions as RPCs');
 select has_policy('storage', 'objects', 'Members can upload issue attachments', 'Storage upload policy exists');
 select has_policy('storage', 'objects', 'Issue viewers can download attachments', 'Storage read policy exists');
 select has_function('public', 'create_issue_complete', array['uuid','jsonb'], 'atomic issue creation RPC exists');
@@ -22,6 +28,21 @@ select has_function('public', 'transfer_organization_ownership', array['uuid','u
 select has_function('public', 'create_organization_invitation', array['uuid','text','text','uuid','text'], 'invitation RPC exists');
 select has_function('public', 'set_project_archived', array['uuid','boolean'], 'archive guard RPC exists');
 select has_function('public', 'replace_project_workflow', array['uuid','jsonb','jsonb'], 'workflow validation RPC exists');
+select has_index('public', 'api_tokens', 'api_tokens_organization_id_idx', 'API token organization foreign key is indexed');
+select has_index('public', 'issues', 'issues_reporter_id_idx', 'issue reporter foreign key is indexed');
+select is((select count(*) from pg_policies where schemaname = 'public' and tablename = 'issue_watchers' and cmd = 'SELECT'), 1::bigint, 'watchers have one visibility-select policy');
+select ok(not exists (select 1 from pg_indexes where schemaname = 'public' and indexname in ('idx_issue_links_target_issue_id','idx_issues_affected_version_id','idx_issues_target_milestone_id')), 'duplicate foreign-key indexes are removed');
+select ok(position('::double precision' in pg_get_functiondef('public.find_duplicate_candidates(uuid,text,integer)'::regprocedure)) > 0, 'duplicate similarity matches the declared return type');
+select is((select proconfig from pg_proc where oid = 'public.create_organization_invitation(uuid,text,text,uuid,text)'::regprocedure), array['search_path=public, extensions']::text[], 'invitation creation resolves trusted pgcrypto functions');
+select is((select proconfig from pg_proc where oid = 'public.accept_organization_invitation(text)'::regprocedure), array['search_path=public, extensions']::text[], 'invitation acceptance resolves trusted pgcrypto functions');
+select ok(position('staged_state.id' in pg_get_functiondef('public.replace_project_workflow(uuid,jsonb,jsonb)'::regprocedure)) > 0, 'workflow staging uses qualified identifiers');
+select ok(position('page.created_at as boundary_created_at' in pg_get_functiondef('public.list_notifications(timestamptz,uuid,boolean,integer)'::regprocedure)) > 0, 'notification cursor boundary is qualified');
+select ok(position('order by x.resolved_at desc' in pg_get_functiondef('public.get_issue_reports(uuid,integer)'::regprocedure)) > 0, 'resolved report drilldown orders by its real alias');
+select ok(position('github_webhook_retry_requests.requested_at' in pg_get_functiondef('public.request_github_webhook_retry(uuid,text)'::regprocedure)) > 0, 'GitHub retry returning columns are qualified');
+select ok(position('select invitation.id' in pg_get_functiondef('public.create_organization_invitation(uuid,text,text,uuid,text)'::regprocedure)) > 0, 'invitation supersession uses qualified identifiers');
+select ok(position('where invitation.id = v_old_invitation' in pg_get_functiondef('public.create_organization_invitation(uuid,text,text,uuid,text)'::regprocedure)) > 0, 'invitation revocation qualifies its target id');
+select ok(position('left(workflow_states.id::text' in pg_get_functiondef('public.replace_project_workflow(uuid,jsonb,jsonb)'::regprocedure)) > 0, 'workflow temporary rename qualifies the target id');
+select ok(position('github_webhook_retry_requests.request_count + 1' in pg_get_functiondef('public.request_github_webhook_retry(uuid,text)'::regprocedure)) > 0, 'GitHub retry increment qualifies the persisted count');
 
 -- Seed two tenants as a privileged migration/test session.  All assertions
 -- below that concern access run as authenticated users under RLS.
@@ -70,6 +91,7 @@ select isnt(public.create_api_token('71000000-0000-4000-8000-000000000001', 'rea
 -- The UUID is generated; assert its durable scope and hash instead of relying
 -- on the return value being stable.
 select is((select scopes from public.api_tokens where user_id = '70000000-0000-4000-8000-000000000001' and name = 'read-only'), array['issues:read']::text[], 'API token scope is persisted exactly');
+select isnt(public.create_api_token('71000000-0000-4000-8000-000000000001', 'github-read', repeat('d',64), array['integrations:read','github_links:read','github_links:write']), null::uuid, 'current GitHub integration scopes satisfy the persisted constraint');
 select throws_ok($$select public.create_api_token('71000000-0000-4000-8000-000000000001', 'invalid', repeat('c',64), array['admin'])$$, '22023', null, 'invalid API scopes are rejected by the RPC contract');
 
 select lives_ok($$select public.create_organization_invitation('71000000-0000-4000-8000-000000000001','new-member@example.test','MEMBER',null,null)$$, 'workspace owner/admin can create an invitation');

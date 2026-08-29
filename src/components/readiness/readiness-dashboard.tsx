@@ -95,8 +95,8 @@ export function ReadinessDashboard({
       try {
         const { data, error } = await createClient().rpc("calculate_release_readiness", {
           p_project_id: projectId,
-          p_milestone_id: selectedMilestoneId === "all" ? null : selectedMilestoneId,
-          p_version_id: selectedVersionId === "all" ? null : selectedVersionId,
+          p_milestone_id: selectedMilestoneId === "all" ? undefined : selectedMilestoneId,
+          p_version_id: selectedVersionId === "all" ? undefined : selectedVersionId,
         });
         if (!active) return;
         if (error) {
@@ -130,14 +130,12 @@ export function ReadinessDashboard({
       const client = createClient();
       const { data, error } = await client.rpc("save_release_readiness_snapshot", {
         p_project_id: projectId,
-        p_milestone_id: selectedMilestoneId === "all" ? null : selectedMilestoneId,
-        p_version_id: selectedVersionId === "all" ? null : selectedVersionId,
+        p_milestone_id: selectedMilestoneId === "all" ? undefined : selectedMilestoneId,
+        p_version_id: selectedVersionId === "all" ? undefined : selectedVersionId,
       });
       if (error || !data) { setQueryError("Snapshot could not be saved. Try again."); return; }
       const { data: rows, error: historyError } = await client.rpc("list_release_readiness_snapshots", {
         p_project_id: projectId,
-        p_milestone_id: null,
-        p_version_id: null,
         p_limit: 30,
       });
       if (!historyError && rows) {

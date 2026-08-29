@@ -1,3 +1,5 @@
+begin;
+
 select plan(19);
 
 select has_table('public', 'github_webhook_retry_requests', 'idempotent retry request table exists');
