@@ -1,0 +1,3 @@
+export type ReleaseIssueForContext = { id: string; keyLabel: string; title: string; type: string; priority: string; severity: string; statusCategory: string; componentName?: string | null };
+export type ReleaseContextInput = { milestoneName?: string | null; versionName?: string | null; readiness: unknown; topIssues: ReleaseIssueForContext[] };
+export function buildReleaseContext(input: ReleaseContextInput) { return { release: { milestone: input.milestoneName ?? null, version: input.versionName ?? null, readiness: input.readiness }, top_risks: input.topIssues.slice(0, 8).map(({ id: _id, ...issue }) => ({ ...issue, title: issue.title.slice(0, 120) })) }; }

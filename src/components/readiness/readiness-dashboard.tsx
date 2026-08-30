@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
+import { ReleaseBriefPanel } from "@/components/intelligence/release-brief";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeReadinessAnalysis, readinessCsv, readinessRiskGroups, type ReadinessAnalysis, type ReadinessIssue } from "@/lib/readiness";
@@ -43,6 +44,7 @@ type Props = {
   snapshots: ReadinessSnapshot[];
   milestones: MilestoneOption[];
   versions: VersionOption[];
+  aiConfigured?: boolean;
 };
 
 export type ReadinessSnapshot = {
@@ -69,6 +71,7 @@ export function ReadinessDashboard({
   snapshots,
   milestones,
   versions,
+  aiConfigured = true,
 }: Props) {
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string>("all");
   const [selectedVersionId, setSelectedVersionId] = useState<string>("all");
@@ -210,6 +213,15 @@ export function ReadinessDashboard({
 
       {displayedError && <div role="alert" className="mb-4 rounded-[10px] border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{displayedError}</div>}
       {displayedLoading && <div className="mb-4 rounded-[10px] border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">Recalculating release readiness…</div>}
+      <div className="mb-6">
+        <ReleaseBriefPanel
+          projectId={projectId}
+          milestoneId={selectedMilestoneId === "all" ? null : selectedMilestoneId}
+          versionId={selectedVersionId === "all" ? null : selectedVersionId}
+          targetLabel={selectedMilestone ? `milestone ${selectedMilestone.name}` : selectedVersion ? `version ${selectedVersion.name}` : undefined}
+          aiConfigured={aiConfigured}
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         {/* Score & Rubric Panel */}

@@ -111,6 +111,22 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [ ] Missing/malformed bearer token, wrong organization/project, insufficient scope, malformed JSON/UUID/filter/pagination, archived project, and restricted issue return safe status codes.
 - [ ] Browser-visible code and responses contain no service-role, GitHub, cron, or token secrets.
 
+## Trace Intelligence
+
+- [ ] Defect report quality scores BUG, REGRESSION, PERFORMANCE, and SECURITY reports locally; TASK and ENHANCEMENT remain unscored.
+- [ ] Restricted/security issues show deterministic quality where applicable but never invoke Groq.
+- [ ] Analyze is explicit and returns validated component, severity, priority, assignee, regression, follow-up, and duplicate advice without changing the issue.
+- [ ] Suggested component/assignee/duplicate IDs outside the supplied project allowlists are discarded.
+- [ ] Applying selected suggestions uses one atomic request, respects current role/assignment rules, and rejects stale `updated_at` without partial changes.
+- [ ] Duplicate comparison is side by side; Mark duplicate uses the trusted atomic duplicate workflow.
+- [ ] Natural search returns named editable chips for every supported queue-filter group and applies the canonical URL contract without raw UUID labels.
+- [ ] Release briefs require a selected milestone/version, use the database readiness score unchanged, and include only bounded safe top risks.
+- [ ] Blast radius follows visible blocking/dependency links, handles cycles/bounds, exposes a text tree, and links to correct issue keys.
+- [ ] Missing key, timeout, malformed provider output, 429, concurrent Analyze, and provider failure leave deterministic workflows available.
+- [ ] Cache hits are viewer-scoped, expire, include model/schema/prompt versions, and become unreadable after project or any contributing issue access is lost.
+- [ ] Direct cache/ledger DML, cross-user completion, cross-project claims, request-budget bypass, and partial atomic-apply failures are denied.
+- [ ] Browser bundles and responses contain no `GROQ_API_KEY`, prompts, raw provider output, issue comments, attachment bodies, webhook payloads, emails, or integration secrets.
+
 ## Reliability, responsive UX, and release gate
 
 - [ ] Principal journey works at 375px, 768px, and 1440px with no header/dropdown/attachment overflow.
@@ -122,5 +138,3 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [x] `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run check:migrations` pass.
 - [x] Linked migration dry-run is empty and linked SQL lint has zero errors.
 - [ ] Production smoke covers signup → workspace → project → issue → triage → collaboration → restricted access → attachment → planning → GitHub → reports/readiness → API → logout.
-
-AI/Trace Intelligence is intentionally excluded from this checklist because [`last_day_plan.md`](last_day_plan.md) is audited future scope and is not implemented or advertised in the current build. The security and lifecycle corrections required before future implementation are recorded in [`last-day-plan-audit.md`](last-day-plan-audit.md).

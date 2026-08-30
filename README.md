@@ -20,11 +20,12 @@ TraceBox is built for teams that need more than a list of tickets. Each issue ha
   <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white" alt="Next.js 16">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="Strict TypeScript">
   <img src="https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth%20%7C%20Storage%20%7C%20Realtime-3ECF8E?logo=supabase&logoColor=white" alt="Supabase">
+  <img src="https://img.shields.io/badge/Groq-structured%20AI-F55036" alt="Groq structured AI">
   <img src="https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
   <img src="https://img.shields.io/badge/Vercel-production-black?logo=vercel&logoColor=white" alt="Vercel">
 </p>
 
-The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui-style primitives, Lucide, Zod, React Hook Form, Supabase PostgreSQL/Auth/Storage/Realtime, and GitHub App APIs. Vitest, Playwright, pgTAP, and GitHub Actions provide the verification layers.
+The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui-style primitives, Lucide, Zod, React Hook Form, Supabase PostgreSQL/Auth/Storage/Realtime, Groq structured output, and GitHub App APIs. Vitest, Playwright, pgTAP, and GitHub Actions provide the verification layers.
 
 ## Feature matrix
 
@@ -39,6 +40,7 @@ The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui
 | Relationships | `BLOCKS`, `DEPENDS_ON`, `RELATES_TO`, `DUPLICATE_OF`, `CAUSED_BY`, `REGRESSION_OF` | Self-links, duplicates, unauthorized targets, and unsafe unlinking are rejected |
 | Security & files | Restricted issues, access grants/history, private attachments, signed previews/downloads, orphan cleanup | `can_view_issue` and active-project checks protect every issue-owned surface and Storage object |
 | Reports & readiness | Dashboard metrics, backlog history, MTTR, age/breakdowns, CSV export, readiness score and snapshots | Aggregates are backend-authoritative, visibility-filtered, explainable, and bounded |
+| Trace Intelligence | Report quality, advisory triage, duplicate explanations, natural search, release briefs, blast radius | Explicit user invocation, strict schemas, live-access cache checks, request budgets, deterministic fallbacks, and no restricted/security inference |
 | GitHub App | Verified installations, repository bindings, PR/check metadata, webhooks, auto-links, retries, reconciliation | Stable IDs, signed/idempotent deliveries, branch-aware resolution, and server-only credentials |
 | REST API | `/api/v1` projects, issues, comments, milestones, search, and GitHub resources | Granular organization-scoped tokens; SQL-enforced scopes, membership, visibility, and safe errors |
 | Account & UI | Profile/avatar, password/recovery, session controls, themes, command palette, responsive/accessibility support | Auth-sensitive writes stay in Auth; keyboard actions have visible equivalents and failure states are explicit |
@@ -99,6 +101,18 @@ The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui
 - Calculate an explainable 0–100 release-readiness score with factor-level risk lists, milestone/version validation, historical snapshots, and creator-private snapshot history.
 - Keep dashboard aggregates honest with distinct loading, empty, not-found, failure, and retry states.
 
+### Trace Intelligence
+
+- Score defect-report quality locally from reproduction, expected/actual behavior, environment, version, diagnostic, and regression evidence. Tasks and enhancements are not misleadingly scored.
+- Request advisory triage for component, severity, priority, assignee, regression likelihood, follow-up questions, and the top three deterministic duplicate candidates. Suggested IDs are validated against the exact project allowlists before display or application.
+- Review selected suggestions and apply them through one optimistic, atomic RPC. Existing role checks, archive guards, assignment eligibility, audit events, and stale-issue rejection remain authoritative.
+- Compare duplicate candidates side by side and resolve a confirmed duplicate through the existing transactional duplicate workflow.
+- Translate natural language into the existing validated issue-filter contract, review named editable chips, and apply them through canonical queue URLs. The model cannot generate SQL or invent accepted IDs.
+- Generate a release-risk explanation only for a selected milestone or version. The canonical readiness score remains the existing database calculation; the model receives a bounded summary and the highest-ranked safe risks.
+- Traverse the permission-filtered dependency graph on demand to show direct/transitive blocking impact, affected components/milestones, critical issues, and accessible issue links without external inference.
+- Keep inference server-only and explicit. Results use strict JSON Schema plus Zod validation, an eight-second timeout, bounded context/output, recursive secret redaction, per-user/project budgets, single-flight leases, and viewer-scoped expiring caches whose source-issue access is rechecked on every read.
+- Block external inference when the primary or any contributing issue is restricted or has type `SECURITY`. Comments, attachment bodies, webhook payloads, email addresses, tokens, and integration configuration are never sent to Groq. If Groq is absent or unavailable, the rest of TraceBox continues to work.
+
 ### GitHub App integration
 
 - Connect a verified GitHub App installation separately from GitHub sign-in; callback state is signed and bound to the TraceBox user, workspace, and project.
@@ -126,7 +140,7 @@ The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui
 - `can_view_issue` is the shared visibility boundary for issue-owned data, including restricted comments, files, notifications, analytics, API responses, and realtime behavior.
 - Issue numbers are allocated atomically; workflow publication and duplicate resolution are transactional; audit history is immutable.
 - Server-only service-role access is confined to API, webhook, and protected maintenance boundaries.
-- Forward-only migrations preserve deployed history. The current chain contains 79 ordered migrations and the linked Supabase project is reconciled through migration 079.
+- Forward-only migrations preserve deployed history. The current chain contains 81 ordered migrations, all deployed to the linked project; migration 081 is the forward correction for the audited five-hop blast-radius contract.
 
 ## Architecture
 
@@ -144,6 +158,10 @@ flowchart TD
   DB --> Realtime[Supabase Realtime]
   Realtime --> Browser
   GitHub[GitHub App + webhooks] --> Server
+  App --> Intelligence[Trace Intelligence routes]
+  Intelligence --> Cache[RPC-only cache + request budgets]
+  Intelligence --> Groq[Groq structured output]
+  Cache --> DB
 ```
 
 Browser components use a typed Supabase client for authorized reads and RPC calls. Server components resolve the authenticated workspace/project context from validated cookies. Service-role credentials never enter client code.
@@ -155,7 +173,7 @@ Requirements: Node.js 22+, npm, and the Supabase CLI.
 ```bash
 npm install
 cp .env.example .env.local
-# Add Supabase URL and publishable/anon key; add server-only values for API/GitHub routes.
+# Add Supabase URL and publishable/anon key. GROQ_API_KEY is optional and server-only.
 npm run db:start
 npm run db:reset
 npm run dev
@@ -174,15 +192,15 @@ npm run check:migrations
 npm run test:e2e
 ```
 
-The verified release candidate passes the JavaScript quality gates, 204 Vitest checks, production build, contiguous migration/full-schema check, and credential-free browser smoke. GitHub Actions run `33264345126` additionally passed a fresh 001–079 Supabase replay, 231 pgTAP assertions, true concurrent issue allocation, production build, and browser smoke. Authenticated multi-user/provider journeys remain environment-gated because they require real deployment credentials.
+The current checkout passes the JavaScript quality gates, production build, contiguous 001–081 migration/full-schema check, and credential-free tests without GitHub, Groq, or real application environment files. The linked Supabase ledger is aligned through 081, the final dry run reports no pending migrations, linked SQL lint reports zero errors, and linked database types were regenerated after migration 080 (081 does not change the type contract). The existing GitHub Actions evidence covers a fresh 001–079 replay, 231 pgTAP assertions, true concurrent issue allocation, production build, and browser smoke; migration 080 adds a 35-assertion authorization/concurrency suite for the next Docker-enabled CI run. Authenticated multi-user and live provider journeys remain operator-run because they require disposable accounts and external credentials.
 
 ## Deployment
 
 The live deployment is [trace-box.vercel.app](https://trace-box.vercel.app/). For a new environment:
 
-1. Create a Supabase project and apply the ordered migrations through 079.
+1. Create a Supabase project and apply the ordered migrations through 081.
 2. Configure Auth site/redirect URLs, private attachment Storage, Realtime publication, and the required Vercel variables.
-3. Configure the GitHub App callback, webhook, permissions, and server-only secrets if GitHub integration is enabled.
+3. Configure the GitHub App callback, webhook, permissions, and server-only secrets if GitHub integration is enabled. Configure server-only `GROQ_API_KEY` only after reviewing provider data controls; otherwise Trace Intelligence degrades cleanly.
 4. Connect the repository to Vercel and deploy the `main` branch.
 5. Run the authenticated, two-user, Storage, Realtime, API, and webhook checks against the deployed environment.
 
@@ -198,7 +216,7 @@ The active documentation set is intentionally small:
 - [Schema decisions](docs/schema-decisions.md) — deliberate differences between historical plans and the shipped schema.
 - [Handoff](handoff.md) — current verification evidence and operational context.
 
-Historical audits, completed implementation plans, release logs, and the excluded Trace Intelligence proposal are retained in [docs/archive](docs/archive/). The AI plan is not implemented or part of the current submission.
+Historical audits, completed implementation plans, and release logs are retained in [docs/archive](docs/archive/). The retained [Trace Intelligence plan](docs/last_day_plan.md) and [implementation audit](docs/last-day-plan-audit.md) document the shipped feature boundary and its security corrections.
 
 ## License
 

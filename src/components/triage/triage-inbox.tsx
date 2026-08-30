@@ -7,6 +7,7 @@ import { AlertTriangle, CheckCircle2, Copy, ExternalLink, Inbox, Keyboard, Loade
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
+import { TraceAiPanel } from "@/components/intelligence/trace-ai-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export type TriageIssue = {
   title: string;
   description: string | null;
   type: string;
+  visibility: string;
   priority: string;
   severity: string;
   statusId: string;
@@ -57,9 +59,10 @@ type Props = {
   closedStateId: string | null;
   members: MemberOption[];
   canManage: boolean;
+  aiConfigured?: boolean;
 };
 
-export function TriageInbox({ projectId, projectKey, issues: initialIssues, openStateId, closedStateId, components, members, canManage }: Props) {
+export function TriageInbox({ projectId, projectKey, issues: initialIssues, openStateId, closedStateId, components, members, canManage, aiConfigured = true }: Props) {
 
   const router = useRouter();
   const [issues, setIssues] = useState(initialIssues);
@@ -256,6 +259,22 @@ export function TriageInbox({ projectId, projectKey, issues: initialIssues, open
             </Surface>
 
             {findingDuplicates ? <div className="flex items-center gap-2 rounded-lg border border-border/70 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />Scanning for similar issues...</div> : duplicateSearchError ? <div role="status" className="rounded-lg border border-border/70 p-3 text-xs text-muted-foreground">Duplicate suggestions are temporarily unavailable. Manual duplicate resolution still works.</div> : duplicateCandidates.length > 0 ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"><div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400"><AlertTriangle className="h-3.5 w-3.5" />Possible duplicates</div><div className="mt-2 grid gap-2 sm:grid-cols-2">{duplicateCandidates.map((candidate) => <div key={candidate.issue_id} className="flex items-center justify-between gap-2 rounded border border-amber-500/20 bg-background/80 p-2 text-xs"><div className="min-w-0"><span className="font-mono font-semibold text-primary">{formatIssueKey(projectKey, candidate.issue_number)}</span><p className="truncate text-muted-foreground">{candidate.title}</p></div><Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => void handleConfirmDuplicate(formatIssueKey(projectKey, candidate.issue_number))} disabled={!canManage}>Mark duplicate</Button></div>)}</div></div> : null}
+
+            <TraceAiPanel
+              key={`trace-ai-${activeIssue.id}`}
+              issueId={activeIssue.id}
+              projectKey={projectKey}
+              expectedUpdatedAt={activeIssue.updatedAt}
+              aiConfigured={aiConfigured}
+              canApply={canManage}
+              reportQualityIssue={{ type: activeIssue.type, visibility: activeIssue.visibility, title: activeIssue.title, description: activeIssue.description, steps_to_reproduce: activeIssue.stepsToReproduce, expected_behavior: activeIssue.expectedBehavior, actual_behavior: activeIssue.actualBehavior, environment: activeIssue.environment }}
+              allowedComponents={components}
+              allowedAssignees={members}
+              duplicateCandidates={duplicateCandidates}
+              primaryIssue={{ keyLabel: activeIssue.keyLabel, title: activeIssue.title, description: activeIssue.description }}
+              onApplied={() => router.refresh()}
+              onMarkDuplicate={(candidateId, keyLabel) => { void candidateId; void handleConfirmDuplicate(keyLabel); }}
+            />
 
             <Surface className="p-4 sm:p-5"><div className="mb-4 border-b border-border/70 pb-3"><span className="font-mono text-xs font-semibold text-primary">{activeIssue.keyLabel}</span><h2 className="text-lg font-semibold">{activeIssue.title}</h2><div className="mt-2 flex flex-wrap gap-2 font-mono text-[10px] text-muted-foreground"><span>{activeIssue.type}</span><span>{activeIssue.priority}</span><span>{activeIssue.severity}</span><span>{activeIssue.componentName ?? "No component"}</span></div></div><div className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-card/40 p-3 text-xs sm:grid-cols-4"><div><span className="text-muted-foreground">Reporter</span><p className="font-medium">{activeIssue.reporterLabel}</p></div><div><span className="text-muted-foreground">Assignee</span><p className="font-medium">{activeIssue.assigneeLabel}</p></div><div><span className="text-muted-foreground">Created</span><p className="font-medium">{new Date(activeIssue.createdAt).toLocaleDateString()}</p></div><div><span className="text-muted-foreground">Status</span><p className="font-medium">{activeIssue.statusName}</p></div></div><div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</h3><p className="mt-1 whitespace-pre-wrap rounded border border-border/60 bg-background/50 p-3 text-xs leading-relaxed">{activeIssue.description ?? "No description provided."}</p></div>{activeIssue.environment && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Environment</h3><p className="mt-1 font-mono text-xs text-muted-foreground">{activeIssue.environment}</p></div>}</Surface>
           </div>}

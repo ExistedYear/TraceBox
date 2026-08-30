@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 79) via SQL Script
+### 1.3 Apply Database Migrations (1 through 80) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 79 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
+You do **not** need the Supabase CLI. You can apply all 81 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 79 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 81 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -118,6 +118,8 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 77. `202608260077_tenant_catalog_privacy.sql`
 78. `202608260078_api_project_membership_boundary.sql`
 79. `202608260079_ci_contract_hardening.sql`
+80. `202608260080_trace_intelligence_security.sql`
+81. `202608260081_trace_intelligence_blast_depth.sql`
 
 Before every linked push, run `npx supabase migration list --linked`, `npx supabase db push --linked --dry-run`, and linked database lint. The migration ledger is version-based, so editing a file whose version is already applied does not update the hosted function, policy, or constraint. Inspect the live catalog when drift is suspected and ship the correction as the next forward-only migration.
 
@@ -177,6 +179,7 @@ In your Supabase Dashboard:
    NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-public-key>
    SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+   GROQ_API_KEY=<server-only-groq-api-key>
    GITHUB_WEBHOOK_SECRET=<random-webhook-secret>
    GITHUB_APP_ID=<github-app-id>
    GITHUB_APP_SLUG=<github-app-slug>
@@ -187,7 +190,7 @@ In your Supabase Dashboard:
    GITHUB_API_VERSION=2022-11-28
    CRON_SECRET=<random-vercel-cron-secret>
    ```
-2. Keep `SUPABASE_SERVICE_ROLE_KEY` and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
+2. Keep `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
 3. Start the local server:
    ```bash
    npm run dev
@@ -223,6 +226,7 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Browser + server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key | Browser + server |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret | Server-only API routes |
+| `GROQ_API_KEY` | Groq API key for explicit Trace Intelligence requests | Server-only intelligence routes |
 | `GITHUB_WEBHOOK_SECRET` | Random webhook signing secret | Server-only webhook route |
 | `GITHUB_APP_ID` | GitHub App numeric ID | Server-only JWT signing |
 | `GITHUB_APP_SLUG` | GitHub App URL slug | Installation redirect |
@@ -234,6 +238,8 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 | `CRON_SECRET` | Vercel Cron bearer secret | Server-only reconciliation route |
 
 The service-role key is required by `/api/v1/*` and `/api/webhooks/github`. Vercel server functions may use it, but it must never be named `NEXT_PUBLIC_*`, exposed in client code, returned by an endpoint, logged, or committed.
+
+Trace Intelligence uses `openai/gpt-oss-120b` through Groq only after a user chooses Analyze, Parse, or Generate. Before enabling `GROQ_API_KEY` in production, review the provider's current data controls and regional terms and enable Zero Data Retention where available. Restricted and security issues are blocked from external inference; comments, attachment bodies, webhook payloads, credentials, and email addresses are never provider context. Without `GROQ_API_KEY`, deterministic report quality, advanced filters, readiness scoring, duplicate candidates, and the local blast-radius graph remain available.
 
 ### 3.5 API and webhook contract
 
@@ -267,39 +273,7 @@ The GitHub webhook accepts signed `pull_request`, `push`, `check_run`, `check_su
 
 ---
 
-## Step 4: How to Reset / Remove Migration History Without Deleting Data
-
-If you need to clear or reset the recorded migration history (for example, to re-baseline migrations, resolve out-of-sync CLI records, or clean up tracking metadata) **without dropping tables or losing any existing rows in your database**:
-
-### Method 1: Clear the Migration Tracking Table in SQL Editor (Web Dashboard)
-Supabase tracks applied migrations in an internal table called `supabase_migrations.schema_migrations`. Your actual application data lives in the `public` schema (`public.issues`, `public.projects`, `public.profiles`, etc.).
-
-To clear the recorded migration history without touching any table or row data:
-1. Open Supabase Dashboard → **SQL Editor**.
-2. Run:
-   ```sql
-   -- This only clears the migration tracking log; your tables and data in public.* remain 100% intact.
-   TRUNCATE TABLE supabase_migrations.schema_migrations;
-   ```
-3. To remove only specific migration versions from the record:
-   ```sql
-   DELETE FROM supabase_migrations.schema_migrations
-   WHERE version >= '202608260015';
-   ```
-
-### Method 2: Mark Migrations as Reverted via Supabase CLI (Without Running Down DDL)
-If you are using the CLI and want to mark migrations as unapplied in the tracking state without modifying tables:
-```bash
-npx supabase migration repair --status reverted <migration_version>
-```
-To mark migrations as already applied (so Supabase skips executing them again while keeping your existing schema and data intact):
-```bash
-npx supabase migration repair --status applied <migration_version>
-```
-
----
-
-## Step 5: Live End-to-End Verification Walkthrough
+## Step 4: Live End-to-End Verification Walkthrough
 
 Once deployed (or running locally), verify the full user experience across all 20 phases. This checkout contains an ignored, local-only Playwright suite under `qa/live/`; run it first with a disposable API token and webhook secret, then perform the authenticated browser flow below. Do not push its `.env`, browser state, `test-results/`, or `playwright-report/` artifacts.
 

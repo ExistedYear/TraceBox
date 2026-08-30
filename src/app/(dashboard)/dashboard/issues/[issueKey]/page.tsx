@@ -15,6 +15,8 @@ import { IssueSecuritySection } from "@/components/issues/issue-security-section
 import { IssuePlanningSection } from "@/components/issues/issue-planning-section";
 import { IssueStatusTransition } from "@/components/issues/issue-status-transition";
 import { IssueWatchButton } from "@/components/issues/issue-watch-button";
+import { BlastRadiusGraph } from "@/components/intelligence/blast-radius-graph";
+import { TraceAiPanel } from "@/components/intelligence/trace-ai-panel";
 import { IssueEditForm } from "@/components/issues/issue-edit-form";
 import { IssueRealtimeRefresh } from "@/components/issues/issue-realtime-refresh";
 import { createClient } from "@/lib/supabase/server";
@@ -82,6 +84,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     { data: customValueRows, error: customValuesError },
     { data: projectMemberRows, error: projectMembersError },
     { data: accessRows, error: accessError },
+    { data: duplicateRows, error: duplicatesError },
   ] = await Promise.all([
     supabase.from("issue_events").select("*").eq("issue_id", issue.id).order("created_at"),
     supabase.from("comments").select("*").eq("issue_id", issue.id).order("created_at"),
@@ -100,8 +103,11 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     supabase.from("issue_custom_values").select("custom_field_id, value").eq("issue_id", issue.id),
     supabase.from("project_members").select("user_id").eq("project_id", project.id),
     supabase.from("issue_access").select("user_id, granted_by").eq("issue_id", issue.id),
+    supabase.rpc("find_duplicate_candidates", { p_project_id: project.id, p_title: issue.title, p_limit: 3 }),
   ]);
   let commentMentionRows: CommentMention[] = [];
+  let duplicateDetailRows: Array<{ id: string; description: string | null }> = [];
+  let duplicateDetailsError: { code: string; message: string } | null = null;
   let mentionsError: { code: string; message: string } | null = null;
   if (!commentsError && (comments ?? []).length > 0) {
     const result = await supabase
@@ -111,7 +117,13 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     commentMentionRows = (result.data ?? []) as CommentMention[];
     mentionsError = result.error;
   }
-  const loadError = eventsError ?? commentsError ?? mentionsError ?? componentsError ?? roleError ?? workflowStatesError ?? transitionsError ?? labelsError ?? assignedLabelsError ?? versionsError ?? milestonesError ?? watchersError ?? attachmentsError ?? githubLinksError ?? customFieldsError ?? customValuesError ?? projectMembersError ?? accessError;
+  const duplicateCandidates = (duplicateRows ?? []) as unknown as Array<{ issue_id: string; issue_number: number; title: string; similarity?: number | null }>;
+  if (!duplicatesError && duplicateCandidates.length > 0) {
+    const result = await supabase.from("issues").select("id, description").in("id", duplicateCandidates.map((candidate) => candidate.issue_id));
+    duplicateDetailRows = result.data ?? [];
+    duplicateDetailsError = result.error;
+  }
+  const loadError = eventsError ?? commentsError ?? mentionsError ?? componentsError ?? roleError ?? workflowStatesError ?? transitionsError ?? labelsError ?? assignedLabelsError ?? versionsError ?? milestonesError ?? watchersError ?? attachmentsError ?? githubLinksError ?? customFieldsError ?? customValuesError ?? projectMembersError ?? accessError ?? duplicatesError ?? duplicateDetailsError;
   if (loadError) {
     console.error("Issue detail dependencies failed", { code: loadError.code, message: loadError.message });
     return <LoadErrorPage title="Issue details incomplete" description="We could not safely load the complete issue, activity, access, and planning data." retryHref={`/dashboard/issues/${rawKey}`} />;
@@ -129,6 +141,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
   const memberIds = (projectMemberRows ?? []).map((member) => member.user_id);
   const accessUserIds = (accessRows ?? []).map((grant) => grant.user_id);
   const mergedNames = await displayNameMap([issue.reporter_id, issue.assignee_id, ...actorIds, ...commentAuthorIds, ...memberIds, ...accessUserIds]);
+  const duplicateDescriptions = new Map(duplicateDetailRows.map((candidate) => [candidate.id, candidate.description]));
   const canComment = viewerRole === "REPORTER" || viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
   const canEditAnyComment = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER";
   const canEditIssue = viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER" || issue.reporter_id === context.userId;
@@ -250,6 +263,23 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             canEdit={viewerRole === "DEVELOPER" || viewerRole === "MAINTAINER"}
             members={(projectMemberRows ?? []).map((member) => ({ id: member.user_id, label: mergedNames.get(member.user_id) ?? member.user_id.slice(0, 8) }))}
           />
+
+          <TraceAiPanel
+            key={`intelligence-${issue.id}-${issue.updated_at}`}
+            issueId={issue.id}
+            projectKey={parsed.projectKey}
+            expectedUpdatedAt={issue.updated_at}
+            aiConfigured={Boolean(process.env.GROQ_API_KEY)}
+            canApply={canEditIssue}
+            reportQualityIssue={{ type: issue.type, visibility: issue.visibility, title: issue.title, description: issue.description, steps_to_reproduce: issue.steps_to_reproduce, expected_behavior: issue.expected_behavior, actual_behavior: issue.actual_behavior, environment: issue.environment, affected_version_id: issue.affected_version_id }}
+            attachments={(attachmentRows ?? []).map((row) => ({ filename: (row as { filename?: string | null }).filename ?? null, mime_type: (row as { mime_type?: string | null }).mime_type ?? null }))}
+            allowedComponents={(componentRows ?? []).map((component) => ({ id: component.id, name: component.name }))}
+            allowedAssignees={(projectMemberRows ?? []).map((member) => ({ userId: member.user_id, displayName: mergedNames.get(member.user_id) ?? null }))}
+            duplicateCandidates={duplicateCandidates.filter((candidate) => candidate.issue_id !== issue.id).map((candidate) => ({ issue_id: candidate.issue_id, issue_number: candidate.issue_number, title: candidate.title, description: duplicateDescriptions.get(candidate.issue_id) ?? null, similarity: candidate.similarity }))}
+            primaryIssue={{ keyLabel: issueKeyLabel, title: issue.title, description: issue.description }}
+          />
+
+          <BlastRadiusGraph key={`blast-radius-${issue.id}`} issueId={issue.id} projectKey={parsed.projectKey} />
 
           <CommentsSection key={`comments-${issue.id}`}
             issueId={issue.id}

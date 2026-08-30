@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleDot, ListFilter, Plus, Users } from "lucide-react";
 
-import { IssueTable } from "@/components/issues/issue-table";
+import { IssuesWithNaturalSearch } from "@/components/intelligence/issues-with-natural-search";
 import { Button } from "@/components/ui/button";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
 import { createClient } from "@/lib/supabase/server";
@@ -98,7 +98,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
       {(states ?? []).length === 0 ? (
         <Surface className="p-8 text-center text-sm text-muted-foreground">This project has no workflow states yet.</Surface>
       ) : (
-        <IssueTable
+        <IssuesWithNaturalSearch
           key={projectId}
           projectKey={context.activeProject.key}
           projectId={projectId}
@@ -117,6 +117,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           stateCategoryIds={stateCategoryIds}
           initialFilters={filters}
           initialSearchQuery={typeof filterParams.q === "string" ? filterParams.q : ""}
+          aiConfigured={Boolean(process.env.GROQ_API_KEY)}
         />
       )}
     </main>

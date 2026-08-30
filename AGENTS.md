@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/archive/tracebox-main-plan.md`**: workspaces + projects with cookie-backed switchers, project components, a seeded default workflow, issue creation with atomic KEY-N allocation and an immutable audit trail, a dense TanStack issue table (filters/sorting/pagination/inline editing), **comments + unified activity timeline** (RPC-only `comments` table, `COMMENT_ADDED`/`COMMENT_EDITED` audit events, merged chronological timeline with mention/issue-ref styling), **workflow transitions & assignments** (resolution modal, reopen), **planning metadata** (labels, versions, milestones), **watchers & notification center**, **realtime subscriptions**, **search & saved views** (pg_trgm + tsvector), **issue links & duplicate detection**, **triage inbox** (J/K/A/R/D keyboard flow), **file attachments** (50MB storage + image lightboxes), **reports & velocity analytics** (MTTR, age distribution), **release readiness engine** (explainable 0-100% score), **advanced command palette & global shortcuts**, **issue templates**, **restricted security issues** (issue_access RLS), **GitHub App integration & PR links**, and **custom fields + public REST API** with scoped tokens.
+TraceBox — a developer-focused bug/issue tracking platform (Bugzilla-inspired), through **Phase 20 of `docs/archive/tracebox-main-plan.md`** plus the implemented Trace Intelligence layer: workspaces/projects, configurable workflows, atomic issue lifecycle and audit, dense queues, collaboration, planning, notifications/realtime, search/saved views, relationships/triage, attachments, reports/readiness, restricted issues, GitHub App integration, custom fields, scoped REST API, deterministic report quality, advisory structured triage/duplicates, natural-language filter parsing, release briefs, and permission-filtered blast radius.
 
 ## Architecture & Data Flow
 
@@ -52,6 +52,8 @@ src/components/
                            issue table, comments timeline, planning and security controls
   notifications/           full notification inbox
   security/                restricted issue queue and access history
+  intelligence/            report quality, explicit AI controls, duplicate comparison,
+                           natural search, release brief, and blast-radius UI
   settings/project-settings.tsx   components/planning manager + workflow editor tabs
   settings/project-administration.tsx project metadata and archive/restore
   settings/*members-manager.tsx  workspace invitations, ownership, and project contributors
@@ -72,14 +74,18 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-supabase/                  config.toml, migrations/ (79 ordered), pgTAP tests/, seed.sql (empty)
+  ai/                      server-only Groq client, strict schemas/prompts, redaction,
+                           canonical hashing, safe errors, and RPC cache adapter
+  features/intelligence/   deterministic quality, context builders, filter sanitation,
+                           and bounded graph traversal
+supabase/                  config.toml, migrations/ (81 ordered), pgTAP tests/, seed.sql (empty)
 tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 .github/workflows/ci.yml   quality gate
 docs/                      active deployment, API, schema, and feature-checklist docs
 README.md                  production submission overview, complete feature catalog, architecture, setup, and verification
   feature-testing-checklist.md submission QA matrix for all implemented product surfaces
-  last_day_plan.md         excluded future Trace Intelligence proposal; not implemented
-  last-day-plan-audit.md   review of the excluded future Trace Intelligence plan
+  last_day_plan.md         retained Trace Intelligence implementation specification
+  last-day-plan-audit.md   shipped boundary, security controls, and verification status
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/archive/              historical audits, implementation plans, and release records
@@ -144,7 +150,9 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Mutations go through SQL RPCs**: trusted `security definer` functions own privileged/transactional writes, including membership/invitations, atomic issue creation/editing, notification preferences/read state, project lifecycle/workflow publication, restricted grants, components, comments, and planning. Clients call `supabase.rpc(...)`; direct browser writes to protected tables and audit history remain revoked.
 - **Active workspace/project selection** lives in `tb_org`/`tb_project` cookies written by the switcher; the dashboard layout re-validates them against real memberships server-side before use.
 - **Server authentication errors**: Supabase's `AuthSessionMissingError` is the normal anonymous state, not an infrastructure failure. Use `isMissingAuthSession` at middleware/page/route boundaries so anonymous users redirect or receive 401 while genuine Auth lookup failures fail closed with safe logging.
-- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract and hosted ledger are reconciled through migration 079. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract is generated through migration 080; forward migration 081 corrects blast-radius depth without changing types. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
+- **Trace Intelligence**: provider calls are explicit, server-only, bounded, recursively redacted, strict-JSON-Schema constrained, and Zod validated. Never send restricted/SECURITY issues, comments, attachment bodies, webhook payloads, emails, credentials, or integration configuration. Returned IDs must be revalidated against request-specific allowlists. Deterministic scoring/readiness/duplicate retrieval remains canonical.
+- **AI cache and application**: browser roles have no direct cache/ledger DML. Use migration 080 RPCs for viewer-scoped cache reads, request claims, completion/failure, budgets, leases, and cleanup. Every contributing issue ID must be supplied to the claim so access loss invalidates cached output. Human-approved triage changes use the narrow optimistic `apply_issue_triage_updates`; AI never writes automatically.
 - **Tenant directories and integration catalogs**: profile SELECT is limited to self and users sharing a workspace. GitHub installation/repository SELECT is limited to organization catalog managers or repositories bound to a project the caller belongs to; server routes must preserve the same project-scoped catalog boundary.
 - **Public API reads**: issue list/search authorization, filtering, counting, and bounds execute inside service-role-only SQL wrappers before rows reach Next.js. API routes distinguish database failures from empty/not-found results and never scan a whole project in application memory.
 - **Membership and invitations**: ordinary workspace members have explicit project membership, with existing access backfilled by migration 045. Membership and invitation mutations are RPC-only; invitation tokens are returned once and stored only as SHA-256 digests. The supported UI journeys are `/dashboard/settings/members`, `/dashboard/settings/contributors`, and `/invite/[token]`.
@@ -267,6 +275,8 @@ At the end of **every run/session that changes the repository**, update this fil
 | `supabase/migrations/202608260077_tenant_catalog_privacy.sql` | Shared-workspace profile visibility and role/project-scoped GitHub installation/repository RLS |
 | `supabase/migrations/202608260078_api_project_membership_boundary.sql` | Live token-owner project membership boundary for REST issue list/search wrappers |
 | `supabase/migrations/202608260079_ci_contract_hardening.sql` | Total restricted-issue visibility semantics and RPC-only DML grants verified by disposable CI |
+| `supabase/migrations/202608260080_trace_intelligence_security.sql` | Viewer-scoped RPC-only AI cache/ledger, live context authorization, bounded request leases/budgets, blast-radius context, and atomic human-approved triage application |
+| `supabase/migrations/202608260081_trace_intelligence_blast_depth.sql` | Forward-only correction aligning permission-safe blast-radius traversal with the specified five-hop bound |
 | `src/app/(dashboard)/dashboard/settings/integrations/operations/page.tsx` / `src/components/settings/github-operations-dashboard.tsx` | Project-scoped GitHub health, repository sync, safe delivery history, affected-issue, and retry UI |
 | `src/app/api/github/retry/route.ts` | Authenticated Maintainer boundary for queuing an eligible delivery through the database retry contract |
 | `src/components/audit/audit-explorer.tsx` / `src/app/(dashboard)/dashboard/audit/page.tsx` | Restricted-safe, paginated project audit explorer with actor/action/date/issue filters and CSV export |

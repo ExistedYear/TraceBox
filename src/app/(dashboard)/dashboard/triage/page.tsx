@@ -103,6 +103,7 @@ export default async function TriagePage() {
     title: i.title,
     description: i.description,
     type: i.type,
+    visibility: i.visibility,
     priority: i.priority,
     severity: i.severity,
     statusId: i.status_id,
@@ -138,6 +139,7 @@ export default async function TriagePage() {
       components={(componentRows ?? []).map((component) => ({ id: component.id, name: component.name }))}
       members={members}
       canManage={projectRole === "DEVELOPER" || projectRole === "MAINTAINER"}
+      aiConfigured={Boolean(process.env.GROQ_API_KEY)}
     />
   );
 }

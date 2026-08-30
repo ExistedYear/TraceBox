@@ -1,5 +1,7 @@
 # TraceBox — Last Day Execution Plan
 
+> Status: implemented on 2026-08-30 with the security and lifecycle corrections recorded in [`last-day-plan-audit.md`](last-day-plan-audit.md). Operator-only production/provider checks remain evidence gates, not source-completion claims.
+
 ## Purpose
 
 This file is the final implementation and submission plan for TraceBox.

@@ -1,0 +1,2 @@
+export type DuplicateExplain = { issue_id: string; likelihood: number; evidence: string[]; differences: string[] };
+export function normalizeDuplicateAnalysis(analysis: { duplicate_analysis?: DuplicateExplain[] } | null | undefined, allowedIds: Set<string>): DuplicateExplain[] { return (analysis?.duplicate_analysis ?? []).filter((e) => allowedIds.has(e.issue_id)).slice(0, 3).map((e) => ({ issue_id: e.issue_id, likelihood: Math.max(0, Math.min(100, e.likelihood)), evidence: e.evidence.slice(0, 6), differences: e.differences.slice(0, 6) })); }

@@ -24,12 +24,13 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 18. Restricted security issues with explicit access grants and RLS
 19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
+21. Trace Intelligence: deterministic report quality, advisory triage and duplicate explanations, natural-language filter parsing, release-risk briefs, and a permission-filtered blast-radius graph
 
-Database state is represented by migrations `202608260001` through `202608260079`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migrations 042–064 contain the GitHub, completion-plan, analytics, collaboration, and operational-visibility contracts. Forward-only migrations 065–074 reconcile the live API-scope constraint, grants, advisor findings, runtime SQL, invitations, automation, and repository confidentiality. Migrations 075–079 bound API issue list/search work in SQL, repair the deployed search expression without rewriting history, restrict profile/GitHub catalogs to authorized collaborators, enforce live project membership for API reads, make restricted visibility predicates total, and revoke residual browser DML from RPC-owned tables. Supabase records migration versions but does not re-run an applied file after that file is edited.
+Database state is represented by migrations `202608260001` through `202608260081`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 080 adds the RPC-only viewer-scoped intelligence cache, live source-issue access checks, bounded expiry/results, request budgets, single-flight leases, permission-filtered graph context, and the narrow optimistic atomic triage-apply wrapper. Migration 081 is the forward-only five-hop blast-radius correction. Supabase records migration versions but does not re-run an applied file after that file is edited.
 
 Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Disposable database execution is verified in CI; hosted multi-user/realtime/browser validation remains a distinct external release check.
 
-The submission README now contains the product overview, architecture, live deployment, technology summary, current verification, and honest limitations. `docs/last_day_plan.md` remains untouched excluded Trace Intelligence scope: no AI dependency, environment contract, migration, route, or UI is present. Its security, privacy, caching, rate-control, atomic-apply, and provider-schema risks are reviewed separately in `docs/last-day-plan-audit.md`; none are advertised as implemented.
+The submission README contains the product overview, full feature catalog, architecture, live deployment, technology summary, verification boundary, and Trace Intelligence safety model. `docs/last_day_plan.md` remains the retained implementation specification; `docs/last-day-plan-audit.md` records the actual shipped boundary and corrections.
 
 The GitHub integrations settings page uses the command-center layout with connection metrics, Active/Needs attention/History tabs, verified installation health, sanitized project-scoped webhook history, inaccessible/archived repository warnings, repository sync, primary selection, and per-repository automation saves.
 
@@ -41,6 +42,7 @@ Required local/Vercel variables:
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-or-publishable-key>
 SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
+GROQ_API_KEY=<optional-server-only-groq-key>
 GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
 GITHUB_APP_ID=<github-app-id>
 GITHUB_APP_SLUG=<github-app-slug>
@@ -52,20 +54,20 @@ GITHUB_API_VERSION=2022-11-28
 CRON_SECRET=<server-only-vercel-cron-secret>
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. Never expose it through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
+`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. `GROQ_API_KEY` is used only by `src/lib/ai/client.ts`; omitting it leaves deterministic product paths available and hides provider actions. Never expose either through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
 
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       204/204 passed across 38 test files
+Tests:       218/218 passed across 41 test files
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
-Migration check: 79 files are contiguous and `supabase/full_schema.sql` is synchronized
+Migration check: 81 files are contiguous and `supabase/full_schema.sql` is synchronized
 Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
 Database tests: GitHub Actions run 33264345126 passed a fresh 001–079 replay, 231 pgTAP assertions, and true concurrent issue allocation
-Database types: `src/types/database.ts` was regenerated from the linked schema after migration 079; its generated content was unchanged
+Database types: `src/types/database.ts` was regenerated from the linked schema after migration 080
 
-Hosted Supabase drift snapshot on 2026-08-29: project `tvjqgzgpgdpzkhhhrfzr` now records migrations 001–079. Before each push, its ledger and live catalog were compared with the local chain. The audit found real historical-file drift in the API scope constraint and later caught an invalid first search implementation only after migration 075 had applied; migrations 065 and 076 repaired both forward-only. Migration 077 closes broad profile and direct GitHub catalog policies, 078 closes the token-owner project-membership boundary, and 079 makes restricted visibility total while enforcing RPC-only writes. The final linked dry-run reports `upToDate: true`, linked database lint reports zero errors, and linked types are regenerated. Historical migration edits are never a deployment mechanism; every discovered mismatch gets a new migration.
+Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079, and `db push --dry-run` reported only migration 080. Migration 080 applied successfully and linked types were regenerated from its live contract. The final audit found that 080 stopped blast-radius recursion at three hops; forward-only migration 081 corrected the specified five-hop contract without changing generated types. Migration 081 then applied successfully, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. A local/linked schema diff and pgTAP execution could not run on this machine because the current user lacks Docker socket access; the next Docker-enabled CI run must replay 001–081 and execute the new 35-assertion intelligence suite. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
@@ -78,11 +80,11 @@ The local-only `qa/live/` Playwright suite was added for hosted checks. It is ig
 ## Deployment checklist
 
 1. Confirm the linked target is TraceBox project `tvjqgzgpgdpzkhhhrfzr` and compare its migration ledger/schema to the local chain before every push.
-2. Confirm the hosted ledger and local chain both end at 079, run a linked dry-run and schema lint, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
+2. Confirm the hosted ledger and local chain both end at 081, rerun a linked dry-run and schema lint before future pushes, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
-6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables.
+6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables. Add server-only `GROQ_API_KEY` only after provider data-control review and Zero Data Retention configuration where available.
 7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
 9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.

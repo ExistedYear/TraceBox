@@ -39,6 +39,166 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_analysis_cache: {
+        Row: {
+          completed_at: string | null
+          context_issue_ids: string[]
+          created_at: string
+          error_code: string | null
+          expires_at: string
+          feature: string
+          id: string
+          input_hash: string
+          issue_id: string | null
+          lease_until: string | null
+          model_version: string
+          project_id: string
+          prompt_version: string
+          result: Json | null
+          schema_version: string
+          status: string
+          updated_at: string
+          viewer_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          context_issue_ids?: string[]
+          created_at?: string
+          error_code?: string | null
+          expires_at: string
+          feature: string
+          id?: string
+          input_hash: string
+          issue_id?: string | null
+          lease_until?: string | null
+          model_version: string
+          project_id: string
+          prompt_version: string
+          result?: Json | null
+          schema_version: string
+          status?: string
+          updated_at?: string
+          viewer_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          context_issue_ids?: string[]
+          created_at?: string
+          error_code?: string | null
+          expires_at?: string
+          feature?: string
+          id?: string
+          input_hash?: string
+          issue_id?: string | null
+          lease_until?: string | null
+          model_version?: string
+          project_id?: string
+          prompt_version?: string
+          result?: Json | null
+          schema_version?: string
+          status?: string
+          updated_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analysis_cache_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_analysis_cache_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_request_ledger: {
+        Row: {
+          cache_id: string | null
+          completed_at: string | null
+          context_issue_ids: string[]
+          created_at: string
+          failure_code: string | null
+          feature: string
+          id: string
+          input_hash: string
+          issue_id: string | null
+          lease_until: string
+          model_version: string
+          project_id: string
+          prompt_version: string
+          requester_id: string
+          schema_version: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cache_id?: string | null
+          completed_at?: string | null
+          context_issue_ids?: string[]
+          created_at?: string
+          failure_code?: string | null
+          feature: string
+          id?: string
+          input_hash: string
+          issue_id?: string | null
+          lease_until: string
+          model_version: string
+          project_id: string
+          prompt_version: string
+          requester_id: string
+          schema_version: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cache_id?: string | null
+          completed_at?: string | null
+          context_issue_ids?: string[]
+          created_at?: string
+          failure_code?: string | null
+          feature?: string
+          id?: string
+          input_hash?: string
+          issue_id?: string | null
+          lease_until?: string
+          model_version?: string
+          project_id?: string
+          prompt_version?: string
+          requester_id?: string
+          schema_version?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_request_ledger_cache_id_fkey"
+            columns: ["cache_id"]
+            isOneToOne: false
+            referencedRelation: "ai_analysis_cache"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_request_ledger_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_request_ledger_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_tokens: {
         Row: {
           created_at: string
@@ -2118,6 +2278,14 @@ export type Database = {
         Args: { p_project_id: string; p_role?: string; p_user_id: string }
         Returns: undefined
       }
+      ai_context_issues_allowed: {
+        Args: { p_issue_ids: string[]; p_project_id: string }
+        Returns: boolean
+      }
+      ai_issue_context_allowed: {
+        Args: { p_issue_id: string; p_project_id: string }
+        Returns: boolean
+      }
       api_add_comment: {
         Args: { p_body: string; p_issue_id: string; p_token_hash: string }
         Returns: string
@@ -2174,6 +2342,14 @@ export type Database = {
       }
       api_update_issue: {
         Args: { p_issue_id: string; p_token_hash: string; p_updates: Json }
+        Returns: undefined
+      }
+      apply_issue_triage_updates: {
+        Args: {
+          p_expected_updated_at: string
+          p_issue_id: string
+          p_updates: Json
+        }
         Returns: undefined
       }
       assign_issue: {
@@ -2239,11 +2415,39 @@ export type Database = {
       }
       can_view_issue: { Args: { p_issue_id: string }; Returns: boolean }
       can_view_profile: { Args: { p_user_id: string }; Returns: boolean }
+      claim_ai_analysis: {
+        Args: {
+          p_context_issue_ids?: string[]
+          p_feature: string
+          p_input_hash: string
+          p_issue_id: string
+          p_model_version: string
+          p_project_id: string
+          p_prompt_version: string
+          p_schema_version: string
+          p_ttl_seconds?: number
+        }
+        Returns: {
+          cache_id: string
+          request_id: string
+          result: Json
+          retry_after: string
+          status: string
+        }[]
+      }
       claim_github_webhook_delivery: {
         Args: { p_delivery_id: string; p_lease_seconds?: number }
         Returns: boolean
       }
+      cleanup_ai_analysis_cache: {
+        Args: { p_before?: string }
+        Returns: number
+      }
       cleanup_github_webhook_payloads: { Args: never; Returns: number }
+      complete_ai_analysis: {
+        Args: { p_request_id: string; p_result: Json; p_ttl_seconds?: number }
+        Returns: undefined
+      }
       create_api_token: {
         Args: {
           p_expires_at?: string
@@ -2428,6 +2632,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      fail_ai_analysis: {
+        Args: { p_error_code: string; p_request_id: string }
+        Returns: undefined
+      }
       find_duplicate_candidates: {
         Args: { p_limit?: number; p_project_id: string; p_title: string }
         Returns: {
@@ -2435,6 +2643,26 @@ export type Database = {
           issue_number: number
           similarity: number
           title: string
+        }[]
+      }
+      get_ai_analysis_cache: {
+        Args: {
+          p_feature: string
+          p_input_hash: string
+          p_issue_id: string
+          p_model_version: string
+          p_project_id: string
+          p_prompt_version: string
+          p_schema_version: string
+        }
+        Returns: {
+          cache_id: string
+          expires_at: string
+          feature: string
+          model_version: string
+          prompt_version: string
+          result: Json
+          schema_version: string
         }[]
       }
       get_dashboard_metrics: {
@@ -2450,6 +2678,17 @@ export type Database = {
         }[]
       }
       get_github_operations: { Args: { p_project_id: string }; Returns: Json }
+      get_issue_blast_radius_context: {
+        Args: { p_issue_id: string; p_limit?: number }
+        Returns: {
+          depth: number
+          direction: string
+          issue_id: string
+          issue_number: number
+          relationship: string
+          title: string
+        }[]
+      }
       get_issue_reports: {
         Args: { p_project_id: string; p_window_days?: number }
         Returns: Json

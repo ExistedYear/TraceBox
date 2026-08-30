@@ -1,0 +1,10 @@
+import { searchParseSchema, type SearchParseResult } from "@/lib/ai/schemas/search";
+export type SearchAllowlist = { statuses: Set<string>; components: Set<string>; members: Set<string>; versions: Set<string>; milestones: Set<string>; labels: Set<string>; customFields: Set<string> };
+const validDate = (value: string | null) => value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : null;
+export function sanitizeSearchFilters(value: unknown, allowed: SearchAllowlist): SearchParseResult {
+  const parsed = searchParseSchema.parse(value);
+  const out = { ...parsed, statuses: parsed.statuses.filter((id) => allowed.statuses.has(id)), assignee: parsed.assignee === "ME" || (parsed.assignee && allowed.members.has(parsed.assignee)) ? parsed.assignee : null, reporter: parsed.reporter === "ME" || (parsed.reporter && allowed.members.has(parsed.reporter)) ? parsed.reporter : null, component_id: parsed.component_id && allowed.components.has(parsed.component_id) ? parsed.component_id : null, affected_version_id: parsed.affected_version_id && allowed.versions.has(parsed.affected_version_id) ? parsed.affected_version_id : null, target_milestone_id: parsed.target_milestone_id && allowed.milestones.has(parsed.target_milestone_id) ? parsed.target_milestone_id : null, labels: parsed.labels.filter((id) => allowed.labels.has(id)), custom_field_id: parsed.custom_field_id && allowed.customFields.has(parsed.custom_field_id) ? parsed.custom_field_id : null, created_from: validDate(parsed.created_from), created_to: validDate(parsed.created_to), updated_from: validDate(parsed.updated_from), updated_to: validDate(parsed.updated_to), custom_value: parsed.custom_value?.slice(0, 200) ?? null, text: parsed.text?.trim().slice(0, 200) || null };
+  if (out.created_from && out.created_to && out.created_from > out.created_to) { out.created_from = null; out.created_to = null; }
+  if (out.updated_from && out.updated_to && out.updated_from > out.updated_to) { out.updated_from = null; out.updated_to = null; }
+  return out;
+}
