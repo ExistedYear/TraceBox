@@ -284,8 +284,6 @@ Never commit environment files, service keys, GitHub private keys, webhook secre
 - [Schema decisions](docs/schema-decisions.md)
 - [Security policy](SECURITY.md)
 
-Historical plans and completed audits are in [`docs/archive`](docs/archive/).
-
 ## License
 
 TraceBox is available under the [MIT License](LICENSE).
