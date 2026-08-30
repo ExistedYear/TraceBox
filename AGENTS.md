@@ -318,7 +318,7 @@ Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (brows
 - Committed Playwright browser harness lives under `playwright/`; run `npm run test:e2e:list` for discovery or `npm run test:e2e` for public/auth smoke. Authenticated journeys are explicitly skipped unless real environment-gated fixtures are supplied; GitHub route/webhook coverage stays credential-free, and browser reports, state, and credentials remain ignored.
 - API/webhook route contracts live in `tests/phase14-api-webhook.test.ts`; rendered realtime hook coverage in `tests/realtime.test.ts` uses Vitest’s jsdom environment with `@testing-library/react`.
 - Issue detail controls keep optimistic custom-field edits rollback-safe, issue-link load failures retryable and announced, mention `aria-controls` scoped to an existing listbox, and narrow notification/attachment rows viewport-safe.
-- Rendered dates use `src/lib/date-format.ts` with an explicit `en-US` locale and UTC time zone; browser-derived theme/accent and relative-time state must remain deterministic until hydration completes. `docs/bugs.md` distinguishes source fixes from post-deployment verification.
+- Rendered dates use `src/lib/date-format.ts` with an explicit `en-US` locale and UTC time zone; browser-derived theme/accent and relative-time state must remain deterministic until hydration completes. `ThemeToggle` must not render `next-themes`' `resolvedTheme` before its mount gate. `docs/bugs.md` distinguishes source fixes from post-deployment verification.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Moon, Palette, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -19,9 +19,15 @@ function getAccentSnapshot() {
   return document.documentElement.dataset.accent ?? "blue";
 }
 
+const subscribeToMount = () => () => undefined;
+
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const dark = resolvedTheme === "dark";
+  const mounted = useSyncExternalStore(subscribeToMount, () => true, () => false);
+  // next-themes reads localStorage in the browser, so resolvedTheme can differ
+  // between the server render and the first client render. Keep the first
+  // render deterministic, then show the persisted theme after hydration.
+  const dark = mounted && resolvedTheme === "dark";
   // Keep the first render deterministic. The root layout applies the saved
   // accent before hydration, so reading it during render would make the
   // client tree differ from the server tree for users with a non-blue accent.
