@@ -68,7 +68,7 @@ export const getWorkspaceContext = cache(async function getWorkspaceContext(): P
 
   const projects = projectRows ?? [];
   const requestedProjectId = cookieStore.get("tb_project")?.value;
-  const activeProject = projects.find((project) => project.id === requestedProjectId) ?? null;
+  const activeProject = projects.find((project) => project.id === requestedProjectId) ?? projects[0] ?? null;
   const { data: activeProjectRole, error: roleError } = activeProject
     ? await supabase.rpc("project_role", { p_project_id: activeProject.id })
     : { data: null, error: null };

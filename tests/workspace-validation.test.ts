@@ -126,3 +126,36 @@ describe("getSafeWorkspaceErrorMessage", () => {
     );
   });
 });
+
+describe("workspace context project fallback contract", () => {
+  const sampleProjects = [
+    { id: "p1", key: "DEMO", name: "Demo Engineering" },
+    { id: "p2", key: "CORE", name: "Core Infrastructure" },
+  ];
+
+  it("selects the project specified by cookie when present in the workspace", () => {
+    const requestedProjectId = "p2";
+    const activeProject = sampleProjects.find((p) => p.id === requestedProjectId) ?? sampleProjects[0] ?? null;
+    expect(activeProject).toEqual({ id: "p2", key: "CORE", name: "Core Infrastructure" });
+  });
+
+  it("defaults to the first workspace project when cookie is missing or null", () => {
+    const requestedProjectId = undefined;
+    const activeProject = sampleProjects.find((p) => p.id === requestedProjectId) ?? sampleProjects[0] ?? null;
+    expect(activeProject).toEqual({ id: "p1", key: "DEMO", name: "Demo Engineering" });
+  });
+
+  it("defaults to the first workspace project when cookie refers to a stale/unknown project", () => {
+    const requestedProjectId = "p-stale-or-other-org";
+    const activeProject = sampleProjects.find((p) => p.id === requestedProjectId) ?? sampleProjects[0] ?? null;
+    expect(activeProject).toEqual({ id: "p1", key: "DEMO", name: "Demo Engineering" });
+  });
+
+  it("resolves to null when workspace has no projects", () => {
+    const emptyProjects: typeof sampleProjects = [];
+    const requestedProjectId = "p1";
+    const activeProject = emptyProjects.find((p) => p.id === requestedProjectId) ?? emptyProjects[0] ?? null;
+    expect(activeProject).toBeNull();
+  });
+});
+

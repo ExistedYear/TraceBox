@@ -39,7 +39,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsSubmitting(true);
     try {
       const supabase = createClient();
-      const requestedNext = getSafeRedirectPath(searchParams.get("next"));
+      const rawNext = searchParams.get("next");
+      const requestedNext = rawNext ? getSafeRedirectPath(rawNext) : (isSignup ? "/onboarding" : "/dashboard");
       if (isSignup) {
         const signupValues = values as SignupValues;
         const { data, error } = await supabase.auth.signUp({ email: signupValues.email, password: signupValues.password, options: { data: { display_name: signupValues.displayName }, emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(requestedNext)}` } });
