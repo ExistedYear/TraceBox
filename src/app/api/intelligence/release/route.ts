@@ -9,7 +9,7 @@ import { claimAiAnalysis, completeAiAnalysis, failAiAnalysis, getCachedAiAnalysi
 import { releaseBriefSchema, RELEASE_JSON_SCHEMA } from "@/lib/ai/schemas/release";
 import { RELEASE_SYSTEM_PROMPT } from "@/lib/ai/prompts/release";
 import { buildReleaseContext } from "@/features/intelligence/release-context";
-import { boundedJson, errorResponse, isUuid, jsonError, sameOrigin } from "@/lib/ai/http";
+import { boundedJson, errorResponse, getRequestLogId, isUuid, jsonError, sameOrigin } from "@/lib/ai/http";
 import { AiError } from "@/lib/ai/errors";
 export async function POST(request: NextRequest) {
   let key: Parameters<typeof claimAiAnalysis>[0] | null = null; let claimId: string | undefined;
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
     const claim = await claimAiAnalysis(key); claimId = claim.claimId; const cached = claim.result === undefined ? null : releaseBriefSchema.safeParse(claim.result).data;
     if (claim.status === "HIT" && cached) return NextResponse.json({ data: cached, cached: true });
     if (claim.status === "IN_PROGRESS") return jsonError("AI_CLAIM_CONFLICT");
-    const raw = await geminiJson<unknown>({ systemPrompt: RELEASE_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_release_brief", jsonSchema: RELEASE_JSON_SCHEMA }); const parsed = releaseBriefSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
+    const raw = await geminiJson<unknown>({ systemPrompt: RELEASE_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_release_brief", jsonSchema: RELEASE_JSON_SCHEMA, requestId: getRequestLogId(request) }); const parsed = releaseBriefSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
     const allowed = new Set(topIssues.map((i) => i.keyLabel)); const result = { ...parsed.data, primary_risks: parsed.data.primary_risks.filter((risk) => allowed.has(risk.issue_key)) };
     await completeAiAnalysis(key, claimId, result); return NextResponse.json({ data: result, cached: false });
-  } catch (error) { if (key && claimId) await failAiAnalysis(key, claimId).catch(() => undefined); return errorResponse(error); }
+  } catch (error) { if (key && claimId) await failAiAnalysis(key, claimId).catch(() => undefined); return errorResponse(error, request); }
 }

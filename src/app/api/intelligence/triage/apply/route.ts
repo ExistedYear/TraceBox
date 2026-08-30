@@ -20,5 +20,5 @@ export async function POST(request: NextRequest) {
     if (Object.keys(updates).length === 0) return jsonError("AI_CONTEXT_UNAVAILABLE", 400);
     const { data, error } = await supabase.rpc("apply_issue_triage_updates", { p_issue_id: issueId, p_updates: updates as Json, p_expected_updated_at: expected }); if (error) { if (error.code === "42501") return jsonError("AI_NOT_AUTHORIZED"); if (error.code === "40001" || error.code === "409") return jsonError("AI_STALE_ISSUE"); throw new AiError("AI_CONTEXT_UNAVAILABLE"); }
     return NextResponse.json({ data });
-  } catch (error) { return errorResponse(error); }
+  } catch (error) { return errorResponse(error, request); }
 }

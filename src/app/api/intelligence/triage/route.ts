@@ -10,7 +10,7 @@ import { claimAiAnalysis, completeAiAnalysis, failAiAnalysis, getCachedAiAnalysi
 import { triageAnalysisSchema, TRIAGE_JSON_SCHEMA } from "@/lib/ai/schemas/triage";
 import { TRIAGE_SYSTEM_PROMPT } from "@/lib/ai/prompts/triage";
 import { buildTriageContext, type TriageIssueInput } from "@/features/intelligence/triage-context";
-import { boundedJson, errorResponse, isUuid, jsonError, sameOrigin } from "@/lib/ai/http";
+import { boundedJson, errorResponse, getRequestLogId, isUuid, jsonError, sameOrigin } from "@/lib/ai/http";
 
 export async function POST(request: NextRequest) {
   let key: Parameters<typeof claimAiAnalysis>[0] | null = null; let claimId: string | undefined;
@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     const cached = claim.result === undefined ? null : triageAnalysisSchema.safeParse(claim.result).data;
     if (claim.status === "HIT" && cached) return NextResponse.json({ data: cached, cached: true, inputHash: key.inputHash });
     if (claim.status === "IN_PROGRESS") return jsonError("AI_CLAIM_CONFLICT");
-    const raw = await geminiJson<unknown>({ systemPrompt: TRIAGE_SYSTEM_PROMPT, userPayload: safeContext, schemaName: "tracebox_triage", jsonSchema: TRIAGE_JSON_SCHEMA });
+    const raw = await geminiJson<unknown>({ systemPrompt: TRIAGE_SYSTEM_PROMPT, userPayload: safeContext, schemaName: "tracebox_triage", jsonSchema: TRIAGE_JSON_SCHEMA, requestId: getRequestLogId(request) });
     const parsed = triageAnalysisSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
     const componentIds = new Set((components ?? []).map((c) => String((c as { id: string }).id))); const assigneeIds = new Set(people.map((person) => person.user_id)); const allowedCandidateIds = new Set(candidateRows.map((c) => String(c.id)));
     const value = { ...parsed.data, component: { ...parsed.data.component, component_id: parsed.data.component.component_id && componentIds.has(parsed.data.component.component_id) ? parsed.data.component.component_id : null }, assignee: { ...parsed.data.assignee, user_id: parsed.data.assignee.user_id && assigneeIds.has(parsed.data.assignee.user_id) ? parsed.data.assignee.user_id : null }, duplicate_analysis: parsed.data.duplicate_analysis.filter((d) => allowedCandidateIds.has(d.issue_id)).slice(0, 3) };
     await completeAiAnalysis(key, claimId, value); return NextResponse.json({ data: value, cached: false, inputHash: key.inputHash });
-  } catch (error) { if (key && claimId) await failAiAnalysis(key, claimId).catch(() => undefined); return errorResponse(error); }
+  } catch (error) { if (key && claimId) await failAiAnalysis(key, claimId).catch(() => undefined); return errorResponse(error, request); }
 }

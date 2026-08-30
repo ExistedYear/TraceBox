@@ -19,5 +19,5 @@ export async function POST(request: NextRequest) {
     const row = issue as Record<string, unknown>;
     const quality = calculateReportQuality(row as IssueForQuality, attachments ?? []);
     return NextResponse.json({ data: quality });
-  } catch (error) { return errorResponse(error); }
+  } catch (error) { return errorResponse(error, request); }
 }

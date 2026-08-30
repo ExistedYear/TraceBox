@@ -25,5 +25,5 @@ export async function GET(request: NextRequest) {
     const meta = new Map<string, { issueNumber?: number; keyLabel?: string; title?: string; componentName?: string | null; milestoneId?: string | null; severity?: string | null; priority?: string | null }>();
     for (const raw of (rows ?? []) as Array<Record<string, unknown>>) { const component = raw.component as { name?: string } | null; meta.set(String(raw.id), { issueNumber: Number(raw.issue_number), keyLabel: `${String((project as { key: string }).key)}-${String(raw.issue_number)}`, title: typeof raw.title === "string" ? raw.title : undefined, componentName: component?.name ?? null, milestoneId: typeof raw.target_milestone_id === "string" ? raw.target_milestone_id : null, severity: typeof raw.severity === "string" ? raw.severity : null, priority: typeof raw.priority === "string" ? raw.priority : null }); }
     return NextResponse.json({ data: getBlastRadius(issueId, linkRows, meta, visible, 5, 200) });
-  } catch (error) { return errorResponse(error); }
+  } catch (error) { return errorResponse(error, request); }
 }

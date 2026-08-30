@@ -75,6 +75,7 @@ src/lib/
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
   ai/                      server-only Google Gemini client for `gemini-3.1-flash-lite`, strict schemas/prompts, redaction,
+                           sanitized provider/route diagnostics,
                            canonical hashing, safe errors, and RPC cache adapter
   features/intelligence/   deterministic quality, context builders, filter sanitation,
                            and bounded graph traversal
@@ -150,6 +151,7 @@ At the end of **every run/session that changes the repository**, update this fil
 - **Server authentication errors**: Supabase's `AuthSessionMissingError` is the normal anonymous state, not an infrastructure failure. Use `isMissingAuthSession` at middleware/page/route boundaries so anonymous users redirect or receive 401 while genuine Auth lookup failures fail closed with safe logging.
 - **DB types are generated**: edit schema via migration, then `npm run db:types` or `npm run db:types:linked`; do not hand-edit `src/types/database.ts`. The committed linked contract and hosted ledger are reconciled through migration 084. Nullable RPC arguments that use database defaults are passed as `undefined` at typed call sites.
 - **Trace Intelligence**: provider calls are explicit, server-only, bounded, recursively redacted, strict-JSON-Schema constrained, and Zod validated. Never send restricted/SECURITY issues, comments, attachment bodies, webhook payloads, emails, credentials, or integration configuration. Returned IDs must be revalidated against request-specific allowlists. Deterministic scoring/readiness/duplicate retrieval remains canonical.
+- **Trace Intelligence diagnostics**: Gemini/provider and intelligence-route failures emit structured server logs with the operation, model, request ID, provider status/message, and stable `AI_*` code; logs redact API-key-like values and never include prompts or raw model output.
 - **AI cache and application**: browser roles have no direct cache/ledger DML. Use migration 080 RPCs for viewer-scoped cache reads, request claims, completion/failure, budgets, leases, and cleanup. Every contributing issue ID must be supplied to the claim so access loss invalidates cached output. Human-approved triage changes use the narrow optimistic `apply_issue_triage_updates`; AI never writes automatically.
 - **Tenant directories and integration catalogs**: profile SELECT is limited to self and users sharing a workspace. GitHub installation/repository SELECT is limited to organization catalog managers or repositories bound to a project the caller belongs to; server routes must preserve the same project-scoped catalog boundary.
 - **Public API reads**: issue list/search authorization, filtering, counting, and bounds execute inside service-role-only SQL wrappers before rows reach Next.js. API routes distinguish database failures from empty/not-found results and never scan a whole project in application memory.
