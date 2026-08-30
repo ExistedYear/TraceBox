@@ -1,8 +1,8 @@
 # Playwright journeys
 
-`npm run test:e2e` runs the public/authentication smoke suite without secrets. CI intentionally runs that mode only.
+`npm run test:e2e` runs the public/authentication smoke suite without secrets. CI runs this credential-free mode.
 
-Protected journeys in `journeys.spec.ts` are skipped unless `PLAYWRIGHT_FULL_JOURNEYS=1` is set. They require a real seeded TraceBox deployment and credentials; no fake accounts or tokens are embedded in the repository.
+The protected journeys in `journeys.spec.ts` run when `PLAYWRIGHT_FULL_JOURNEYS=1` is set. They use a real seeded TraceBox deployment and disposable credentials supplied through the environment; no fake accounts or tokens are embedded in the repository.
 
 Required variables by journey:
 
@@ -15,4 +15,4 @@ Required variables by journey:
 - `PLAYWRIGHT_ASSIGNEE_LABEL`: exact eligible assignee label used by the issue edit journey
 - `PLAYWRIGHT_INITIAL_STATUS`, `PLAYWRIGHT_TRANSITION_TARGET`: exact current/next workflow labels for a non-resolution transition
 
-Run discovery with `npm run test:e2e:list`. The attachment journey uses the committed `fixtures/attachment.txt`; upload/download authorization must be verified against a real issue. GitHub behavior is covered by credential-free route and webhook tests, so this suite does not require GitHub App environment files.
+Run discovery with `npm run test:e2e:list`. The attachment journey uses the committed `fixtures/attachment.txt`. GitHub route and webhook behavior uses credential-free fixtures, so this suite does not require GitHub App environment files.

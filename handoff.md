@@ -1,46 +1,31 @@
 # TraceBox Handoff
 
-## Current implementation
+## Product state
 
-TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through Phase 20:
+TraceBox is a production-oriented issue tracker built with Next.js 16, Supabase, and PostgreSQL. The current application includes:
 
-1. Organizations and projects
-2. Components and default workflow
-3. Atomic issue creation and audit history
-4. Issue table, filtering, sorting, pagination, and inline editing
-5. Comments and unified activity timeline
-6. Assignment, workflow transitions, resolutions, and reopen
-7. Labels, versions, milestones, and planning metadata
-8. Watchers and notifications
-9. Supabase Realtime subscriptions
-10. Search and saved views
-11. Issue links and duplicate detection
-12. Triage Inbox with inline classification and keyboard shortcuts
-13. Private Supabase Storage attachments with signed downloads and image previews
-14. Reports, MTTR, issue aging, and component/priority breakdowns
-15. Explainable release readiness scoring and risk lists
-16. Command palette, issue search, and global keyboard shortcuts
-17. Issue templates and template selection during issue creation
-18. Restricted security issues with explicit access grants and RLS
-19. GitHub App installation verification through the supported user-installation list endpoint, repository bindings, PR/commit artifacts, link validation, signed durable webhooks, and reconciliation
-20. Custom fields, issue custom values, API tokens, and scoped REST API routes
-21. Trace Intelligence: deterministic report quality, advisory triage and duplicate explanations, natural-language filter parsing, release-risk briefs, and a permission-filtered blast-radius graph
+- workspace and project administration with roles, invitations, public discovery, ownership transfer, and safe self-service leave;
+- project components, labels, versions, milestones, templates, custom fields, and configurable workflows;
+- atomic issue creation and editing, queue filters, saved views, bulk updates, triage, duplicate handling, relationships, comments, mentions, watchers, notifications, and Realtime updates;
+- private attachments, restricted security issues, explicit access grants, audit history, reports, readiness scoring, and CSV exports;
+- scoped REST API tokens and project/issue/comment/milestone/search resources;
+- optional Trace Intelligence for report quality, advisory triage, duplicate explanations, natural-language filters, release briefs, and permission-filtered blast radius;
+- optional GitHub App repository bindings, pull-request links, checks, and signed webhooks.
 
-Database state is represented by migrations `202608260001` through `202608260084`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 080 adds the Trace Intelligence boundaries, 081 corrects blast-radius depth, 082 adds public workspaces, 083 makes public joining idempotent without role downgrade, and 084 serializes joins with visibility changes. Supabase records migration versions but does not re-run an applied file after that file is edited.
+The database source of truth is the ordered migration chain `202608260001` through `202608260085`. `supabase/full_schema.sql` is generated from that chain for fresh SQL Editor installs and drift review. Applied migrations are never edited; every schema correction is a new forward-only migration.
 
-Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Disposable database execution is verified in CI; hosted multi-user/realtime/browser validation remains a distinct external release check.
+## Runtime configuration
 
-The submission README contains the product overview, full feature catalog, architecture, live deployment, technology summary, verification boundary, and Trace Intelligence safety model. `docs/archive/last_day_plan.md` remains the retained implementation specification; `docs/archive/last-day-plan-audit.md` records the actual shipped boundary and corrections.
-
-The GitHub integrations settings page uses the command-center layout with connection metrics, Active/Needs attention/History tabs, verified installation health, sanitized project-scoped webhook history, inaccessible/archived repository warnings, repository sync, primary selection, and per-repository automation saves.
-
-## Important runtime configuration
-
-Required local/Vercel variables:
+Required browser variables:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-or-publishable-key>
+```
+
+Server-only variables:
+
+```env
 SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
 GEMINI_API_KEY=<optional-server-only-gemini-key>
 GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
@@ -51,54 +36,41 @@ GITHUB_APP_CLIENT_SECRET=<server-only-github-app-client-secret>
 GITHUB_APP_PRIVATE_KEY=<server-only-github-app-private-key>
 GITHUB_APP_CALLBACK_URL=<exact-github-app-callback-url>
 GITHUB_API_VERSION=2022-11-28
-CRON_SECRET=<server-only-vercel-cron-secret>
+CRON_SECRET=<server-only-maintenance-secret>
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. `GEMINI_API_KEY` is used only by `src/lib/ai/client.ts`; omitting it leaves deterministic product paths available and hides provider actions. Never expose either through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
+Never prefix server-only values with `NEXT_PUBLIC_`, commit them, return them from a route, or log them. The optional AI path is advisory and never sends restricted/security issues or their comments, attachments, or integration data to the provider.
 
-## Verification performed in this checkout
+## Verification record
 
-TypeScript:  npm run typecheck — passed
-Tests:       npm test passed, including safe Supabase Auth error-code regression coverage
-Lint:        0 errors; compatibility warnings only
-Build:       npm run build — passed
-Migration check: 84 files are contiguous and `supabase/full_schema.sql` is synchronized
-Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
-Database tests: GitHub Actions run 33294663307 passed a fresh 001–084 replay, 276 pgTAP assertions, and true concurrent issue allocation
-Database types: `src/types/database.ts` was regenerated from the linked schema after migration 082
+- `npm run lint` passes with three known React-compiler compatibility warnings and no errors.
+- `npm run typecheck` passes.
+- `npm test` passes all 256 Vitest tests.
+- `npm run build` passes with the production Webpack build.
+- `npm run check:migrations` validates the contiguous migration chain and generated schema.
+- Hosted Supabase migration drift was checked before applying migration 085. The self-leave RPC was applied and verified in rollback-only owner/member transactions; linked types were regenerated afterward.
+- Deployment `fb60840` is live at [trace-box.vercel.app](https://trace-box.vercel.app/). Fresh authenticated desktop tabs render the core application routes without React hydration or stream errors.
+- A two-account desktop pass covered onboarding, shared workspace/project access, issue creation and editing, planning, collaboration, restricted issue isolation, Trace Intelligence, queue filters, saved views, account settings, and route-level navigation.
 
-Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079 before this release. Migrations 080–084 were then reviewed and applied in order, linked types were regenerated after schema-changing migration 082, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. This workstation cannot access the Docker socket, but GitHub Actions run 33294663307 independently replayed 001–084 and passed all 276 database assertions, including the intelligence and public-workspace suites. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
+The hosted demo account remains the intentionally public `demo@123.com` / `demo123` ordinary user. It has no service-role access and must never be used for sensitive data or repository access. `scripts/remove-demo-account.sql` is an exact-target cleanup transaction that ends in `ROLLBACK` until deliberately armed.
 
-The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
+## Deployment discipline
 
-The committed `playwright/` suite provides credential-free public/protection smoke plus explicitly gated multi-user journeys. GitHub API/webhook tests use mocked network/auth boundaries and require no GitHub environment files. The older ignored `qa/live/` suite remains optional for deployment-specific probes and must never contribute credentials or artifacts to Git.
+1. Link the intended Supabase project and inspect its migration ledger and live catalog.
+2. Run `npx supabase migration list --linked`, `npx supabase db push --linked --dry-run`, and `npx supabase db lint --linked --level error` before a hosted push.
+3. Apply only new forward migrations with `npx supabase db push --linked`.
+4. Regenerate `src/types/database.ts` with `npm run db:types:linked` after schema changes.
+5. Regenerate `supabase/full_schema.sql` with `npm run sync:migrations` and run the release gates in the README.
+6. Keep Supabase Auth redirect URLs, Storage policies, Realtime publication, Vercel variables, and scheduled maintenance routes aligned with `docs/deployment.md`.
 
-Static source audits found and fixed migration syntax, API issue argument ordering and unbounded reads, granular API scopes, token-owner project authorization, tenant catalog leaks, webhook persistence/retry reporting, optional GitHub merge resolution, storage cleanup, role-gated creation/triage actions, report loading, notification races and mutation handling, issue-link validation, serialized typed custom-field updates, account/avatar failure recovery, anonymous-session classification, password recovery, Markdown rendering, theme handling, sidebar layout, and responsive table layout issues. These conclusions came from tracing authorization, query, mutation, cleanup, and failure paths across the source and live schema; the green automated gates are secondary verification rather than the basis of the audit.
+## Documentation map
 
-The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. Do not commit its `.env`, browser state, reports, or test-results. Earlier pre-deployment probes found an older deployment; the current public probes and the hosted GitHub PR flow now pass, while the full multi-user/API/browser suite remains outstanding.
+- [README](README.md): product overview, setup, architecture, and commands.
+- [Deployment guide](docs/deployment.md): Supabase, Auth, Storage, Realtime, Vercel, API, and optional integrations.
+- [REST API](docs/api.md): bearer-token scopes, routes, request shapes, and safe errors.
+- [Schema decisions](docs/schema-decisions.md): durable data-model choices.
+- [Feature reference](docs/feature-testing-checklist.md): supported product behaviors by area.
+- [Security policy](SECURITY.md): private vulnerability reporting and security boundaries.
+- [Bug register](docs/bugs.md): resolved production defects and their fixes.
 
-Migration 082 was dry-run as the only pending change, applied, and followed by linked type generation. The independent review then fixed repeated-join role downgrade in forward migration 083 and the visibility-change race in forward migration 084. Both are deployed; the final linked dry run is empty and linked SQL lint reports zero errors. The linked project also contains the requested disposable `demo@123.com` account with its own public `tracebox-demo` workspace; these known credentials carry no service-role access. `scripts/remove-demo-account.sql` provides an exact-target, assertion-guarded cleanup transaction and intentionally ends with `ROLLBACK`; it has not been run.
-
-## Deployment checklist
-
-1. Confirm the linked target is TraceBox project `tvjqgzgpgdpzkhhhrfzr` and compare its migration ledger/schema to the local chain before every push.
-2. Confirm the hosted ledger and local chain both end at 084, rerun a linked dry-run and schema lint before future pushes, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
-3. Verify the private `issue-attachments` Storage bucket and policies.
-4. Verify `supabase_realtime` publication tables.
-5. Configure Supabase Auth Site URL and callback URLs. The built-in sender is sufficient only for low-volume evaluation; use custom SMTP for reliable public delivery or higher limits. Existing Auth users accept workspace invitations through the manual TraceBox link.
-6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables. Add server-only `GEMINI_API_KEY` only after reviewing Google Gemini API quotas, data controls, and regional terms.
-7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
-8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
-9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.
-10. Set `CRON_SECRET`, verify the Vercel cron invokes `/api/github/reconcile` (repository reconciliation plus webhook replay/cleanup), and regenerate database types from the live schema if the deployed schema differs. Migrations 042–057 are required for the current GitHub, membership, issue editing, notifications, workflow administration, restricted-security, queue, saved-view, triage, template, custom-field, attachment, and API-token paths.
-11. If attachment orphan reconciliation is scheduled, invoke protected `/api/attachments/reconcile` with `CRON_SECRET` from a separately configured scheduler. It is not part of the existing Vercel cron entry.
-
-Detailed external setup, migration order, reset guidance, Storage, Auth, Realtime, Vercel, GitHub, API token, and end-to-end instructions are in `docs/deployment.md`.
-
-### Vercel Git deployment troubleshooting
-
-The production URL may continue serving an older successful deployment even when GitHub shows a newer commit. Confirm the new commit appears on the connected GitHub repository, then check Vercel project Git settings for the exact repository `ExistedYear/TraceBox`, production branch `main`, Vercel GitHub App access to the repository, an empty ignored-build-step setting, and disabled verified-commit enforcement unless commits are signed. A GitHub Actions `Quality` success is independent of Vercel's deployment check. If no Vercel deployment row is created for a pushed commit, resolve the Git connection before investigating build logs.
-
-## Migration discipline
-
-Never rewrite an applied migration. Add a new timestamped migration for every schema correction. Keep RLS enabled. Keep service-role access server-only. `supabase/full_schema.sql` must be regenerated whenever migration files change.
+Historical plans and release records remain in `docs/archive/` and are not operational instructions.

@@ -212,7 +212,7 @@ Without the key, AI controls show an unavailable state. Report quality, duplicat
 | `npm run lint` | Run ESLint. |
 | `npm run typecheck` | Check TypeScript. |
 | `npm test` | Run credential-free Vitest tests. |
-| `npm run test:e2e` | Run Playwright; fixture-dependent journeys skip without credentials. |
+| `npm run test:e2e` | Run the credential-free Playwright smoke suite. Set `PLAYWRIGHT_FULL_JOURNEYS=1` with disposable fixture variables for the protected journey suite. |
 | `npm run check:migrations` | Check migration order and `full_schema.sql`. |
 | `npm run sync:migrations` | Regenerate `full_schema.sql`. |
 | `npm run db:start` | Start local Supabase. |
@@ -232,7 +232,7 @@ npm run check:migrations
 npm run test:e2e
 ```
 
-Database tests require Docker. Live GitHub, email, multi-user, Storage, Realtime, and Gemini API checks require disposable external credentials and belong in staging.
+Database tests require Docker. GitHub, email, multi-user, Storage, Realtime, and Gemini integrations use the credentials and provider settings described in `docs/deployment.md`.
 
 ## Architecture
 
@@ -279,13 +279,10 @@ Never commit environment files, service keys, GitHub private keys, webhook secre
 ## Documentation
 
 - [Deployment guide](docs/deployment.md)
-- [Feature testing checklist](docs/feature-testing-checklist.md)
+- [Feature reference](docs/feature-testing-checklist.md)
 - [REST API](docs/api.md)
 - [Schema decisions](docs/schema-decisions.md)
 - [Security policy](SECURITY.md)
-- [Current bug and operator status](docs/bugs.md)
-- [Trace Intelligence implementation audit](docs/archive/last-day-plan-audit.md)
-- [Current handoff](handoff.md)
 
 Historical plans and completed audits are in [`docs/archive`](docs/archive/).
 

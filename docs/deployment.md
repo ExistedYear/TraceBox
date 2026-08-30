@@ -23,15 +23,15 @@ This guide walks you through setting up everything outside this workspace: creat
 
 ---
 
-### 1.3 Apply Database Migrations (1 through 84) via SQL Script
+### 1.3 Apply Database Migrations (1 through 85) via SQL Script
 
-You do **not** need the Supabase CLI. You can apply all 84 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
+You do **not** need the Supabase CLI. You can apply all 85 migrations directly in the Supabase web dashboard for a fresh project. For an existing linked project, prefer `npx supabase db push --linked` after comparing its ledger and live schema; never paste the consolidated script over an existing database.
 
 #### Method A: Single Consolidated Script (Recommended)
 
 1. Open the Supabase Dashboard → click **SQL Editor** in the left sidebar.
 2. Click **+ New Query**.
-3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 84 ordered migrations).
+3. Open the file `supabase/full_schema.sql` from this repository (which consolidates all 85 ordered migrations).
 4. Copy the entire content and paste it into the Supabase SQL Editor.
 5. Click **Run** (or press `Ctrl+Enter` / `Cmd+Enter`).
 6. You should see `Success. No rows returned`.
@@ -123,6 +123,7 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 82. `202608260082_public_workspaces.sql`
 83. `202608260083_public_workspace_join_idempotency.sql`
 84. `202608260084_public_workspace_join_lock.sql`
+85. `202608260085_workspace_self_leave.sql`
 
 `supabase/full_schema.sql` is generated and intentionally committed for fresh SQL Editor installs and drift review. Never edit it directly; update migrations and run `npm run sync:migrations`.
 
