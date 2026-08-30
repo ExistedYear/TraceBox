@@ -90,7 +90,7 @@ README.md                  production submission overview, complete feature cata
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/archive/              historical audits, implementation plans, and release records
-public/assets/docs/        landing-page source notes served from the deployed public asset path
+public/assets/docs/        landing-page source notes; source links on the landing page point to the matching GitHub files
 ```
 
 ## Development Commands
