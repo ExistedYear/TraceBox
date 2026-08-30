@@ -9,7 +9,7 @@ type GeminiResponse = {
   promptFeedback?: { blockReason?: unknown };
   candidates?: Array<{
     finishReason?: unknown;
-    content?: { parts?: Array<{ text?: string }> };
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
   }>;
 };
 
@@ -96,6 +96,10 @@ export async function geminiJson<T>(options: GeminiJsonOptions): Promise<T> {
           maxOutputTokens: Math.min(options.maxOutputTokens ?? 2048, 4096),
           responseMimeType: "application/json",
           responseJsonSchema: options.jsonSchema,
+          // These requests are bounded classification/extraction tasks. Keep
+          // Gemini's reasoning at its lowest supported level to reduce latency
+          // and leave more of the output budget for the JSON result.
+          thinkingConfig: { thinkingLevel: "minimal" },
         },
       }),
       signal: controller.signal,
@@ -105,7 +109,9 @@ export async function geminiJson<T>(options: GeminiJsonOptions): Promise<T> {
       throw new GeminiHttpError(response.status, details);
     }
     const result = await response.json() as GeminiResponse;
-    const content = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+    // Gemini 3 can return reasoning as separate `thought` parts. Those parts
+    // are not the structured answer and must never be concatenated into it.
+    const content = result.candidates?.[0]?.content?.parts?.filter((part) => part.thought !== true).map((part) => part.text ?? "").join("") ?? "";
     if (!content || content.length > AI_MAX_OUTPUT_CHARS) {
       logGeminiResponseFailure(options, {
         reason: !content ? "missing_text_candidate" : "output_too_large",

@@ -15,6 +15,7 @@ import { useRealtimeComments } from "@/hooks/use-realtime";
 import { buildTimeline, eventSummary, personLabel, type TimelineComment, type TimelineEventRow } from "@/lib/issues";
 import { getMentionTrigger, mentionToken, normalizeMentionCandidate, reconcileSelectedMentions, selectedMentionIds, selectedMentionsFromRows, type CommentMention, type MentionCandidate, type SelectedMention } from "@/lib/comment-mentions";
 import { commentSchema, type CommentValues } from "@/lib/validation/comment";
+import { formatShortDate, formatTime } from "@/lib/date-format";
 type Props = {
   issueId: string;
   projectId: string;
@@ -27,13 +28,6 @@ type Props = {
   displayNames: Map<string, string>;
   componentNames: Map<string, string>;
 };
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
-}
 
 async function loadCommentMentions(commentId: string): Promise<CommentMention[]> {
   try {
@@ -380,7 +374,7 @@ function EditableComment({
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-xs font-medium">{authorLabel}</span>
         <span className="flex items-center gap-2">
-          <span suppressHydrationWarning className="font-mono text-[10px] text-muted-foreground">{formatDate(comment.created_at)} · {formatTime(comment.created_at)}</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{formatShortDate(comment.created_at)} · {formatTime(comment.created_at)}</span>
           {comment.edited_at && <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">edited</span>}
           {canEdit && !editing && (
             <button type="button" onClick={beginEditing} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] hover:bg-accent" aria-label="Edit comment">
@@ -503,7 +497,7 @@ export function CommentsSection({ issueId, projectId, projectKey: _projectKey, c
                       {summary.detail && !isCommentEvent && <span className="ml-1 font-mono text-xs">{summary.detail}</span>}
                       {isCommentEvent && summary.detail && <span className="ml-1 truncate font-mono text-xs text-muted-foreground">“{summary.detail.slice(0, 80)}”</span>}
                     </span>
-                    <span suppressHydrationWarning className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">{formatTime(entry.at)}</span>
+                    <span className="shrink-0 whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">{formatTime(entry.at)}</span>
                   </li>
                 );
               })}

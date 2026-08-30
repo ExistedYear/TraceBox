@@ -8,6 +8,7 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/date-format";
 
 export type AuditRow = {
   id: string;
@@ -129,7 +130,7 @@ export function AuditExplorer({ projectId, initialRows, initialTotal, actors, ac
       anchor.download = "tracebox-audit.csv";
       anchor.click();
       URL.revokeObjectURL(url);
-      if (filteredTotal > MAX_EXPORT_ROWS) toast.info(`Exported the first ${MAX_EXPORT_ROWS.toLocaleString()} of ${filteredTotal.toLocaleString()} matching events.`);
+      if (filteredTotal > MAX_EXPORT_ROWS) toast.info(`Exported the first ${MAX_EXPORT_ROWS.toLocaleString("en-US")} of ${filteredTotal.toLocaleString("en-US")} matching events.`);
     } catch (rpcError) {
       const errorValue = rpcError as { code?: string; message?: string };
       console.error("Audit CSV export failed", { code: errorValue.code, message: errorValue.message });
@@ -160,10 +161,10 @@ export function AuditExplorer({ projectId, initialRows, initialTotal, actors, ac
             <div><p className="font-mono text-primary">{row.event_type}</p><p className="mt-1 text-muted-foreground">{row.field_name ?? "event"}</p></div>
             <span className="min-w-0 truncate text-muted-foreground">{issueLabels.get(row.issue_id) ?? "Authorized issue"}</span>
             <div className="min-w-0"><p className="truncate text-muted-foreground">Actor {actors.find((option) => option.value === row.actor_id)?.label ?? (row.actor_id ? "Project member" : "System")}</p><p className="mt-1 break-words text-muted-foreground">Before: {displayValue(row.old_value)}</p><p className="break-words text-muted-foreground">After: {displayValue(row.new_value)}</p><p className="mt-1 break-words text-muted-foreground">Metadata: {displayValue(row.metadata)}</p></div>
-            <time className="text-muted-foreground">{new Date(row.created_at).toLocaleString()}</time>
+            <time className="text-muted-foreground" dateTime={row.created_at}>{formatDateTime(row.created_at)}</time>
           </div>)}
         </div>
-        <div className="flex items-center justify-between border-t border-border/70 px-4 py-3 text-xs text-muted-foreground"><span>{total.toLocaleString()} authorized events · showing {page * PAGE_SIZE + 1}–{Math.min(total, (page + 1) * PAGE_SIZE)}</span><div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0 || loading || exporting} onClick={() => void load(page - 1)}>Previous</Button><Button variant="outline" size="sm" disabled={(page + 1) * PAGE_SIZE >= total || loading || exporting} onClick={() => void load(page + 1)}>Next</Button></div></div>
+        <div className="flex items-center justify-between border-t border-border/70 px-4 py-3 text-xs text-muted-foreground"><span>{total.toLocaleString("en-US")} authorized events · showing {page * PAGE_SIZE + 1}–{Math.min(total, (page + 1) * PAGE_SIZE)}</span><div className="flex gap-2"><Button variant="outline" size="sm" disabled={page === 0 || loading || exporting} onClick={() => void load(page - 1)}>Previous</Button><Button variant="outline" size="sm" disabled={(page + 1) * PAGE_SIZE >= total || loading || exporting} onClick={() => void load(page + 1)}>Next</Button></div></div>
       </>}
     </Surface>
   );

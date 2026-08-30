@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { WorkflowEditor } from "@/components/settings/workflow-editor";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { formatShortDate } from "@/lib/date-format";
 import { componentSchema, type ComponentValues } from "@/lib/validation/components";
 import type { WorkflowStateValues } from "@/lib/validation/project-settings";
 import {
@@ -674,7 +675,7 @@ export function ProjectSettings({
                         </Link>
                         <span className={cn("rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide", m.status === "ACTIVE" ? "border-blue-500/30 bg-blue-500/10 text-blue-400" : m.status === "COMPLETED" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-zinc-500/30 bg-zinc-500/10 text-zinc-400")}>{m.status}</span>
                       </div>
-                      {m.due_at && <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"><Calendar className="h-3 w-3" /> Due {new Date(m.due_at).toLocaleDateString()}</p>}
+                      {m.due_at && <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground"><Calendar className="h-3 w-3" /> Due {formatShortDate(m.due_at)}</p>}
                     </div>
                     {canManage && (
                       <div className="flex items-center gap-2">

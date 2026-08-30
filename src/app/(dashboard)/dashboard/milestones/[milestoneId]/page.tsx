@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { displayNameMap } from "@/lib/server-people";
 import { cn } from "@/lib/utils";
 import { getWorkspaceContext } from "@/lib/workspace-context";
+import { formatDate } from "@/lib/date-format";
 
 type Params = Promise<{ milestoneId: string }>;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -131,7 +132,7 @@ export default async function MilestoneDetailPage({ params }: { params: Params }
             </span>
             {milestone.due_at && (
               <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5" /> Due {new Date(milestone.due_at).toLocaleDateString()}
+                <Calendar className="h-3.5 w-3.5" /> Due {formatDate(milestone.due_at)}
               </span>
             )}
           </div>

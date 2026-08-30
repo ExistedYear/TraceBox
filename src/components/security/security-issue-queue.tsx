@@ -3,6 +3,7 @@ import { ChevronRight, Eye, KeyRound, ShieldAlert } from "lucide-react";
 
 import { Surface } from "@/components/tracebox/primitives";
 import { formatIssueKey, humanizeEnum, personLabel } from "@/lib/issues";
+import { formatDateTime } from "@/lib/date-format";
 
 export type SecurityIssue = {
   id: string;
@@ -65,13 +66,13 @@ export function SecurityIssueQueue({ projectKey, issues, accessEvents, names }: 
                   <span className="text-[11px] text-muted-foreground">{issue.status?.name ?? "Unknown status"}</span>
                 </div>
                 <h2 className="mt-2 truncate text-base font-semibold">{issue.title}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">{humanizeEnum(issue.severity)} severity · {issue.priority} priority · updated {new Date(issue.updated_at).toLocaleString()}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{humanizeEnum(issue.severity)} severity · {issue.priority} priority · updated {formatDateTime(issue.updated_at)}</p>
               </div>
               <Link href={`/dashboard/issues/${key}`} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border/80 px-2.5 text-xs font-medium transition-colors hover:bg-accent"><Eye className="h-3.5 w-3.5" /> Open <ChevronRight className="h-3.5 w-3.5" /></Link>
             </div>
             <div className="mt-4 border-t border-border/70 pt-3">
               <div className="flex items-center gap-2"><KeyRound className="h-3.5 w-3.5 text-primary" /><h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Access history</h3></div>
-              {history.length === 0 ? <p className="mt-2 text-xs text-muted-foreground">No access changes recorded yet.</p> : <ol className="mt-2 space-y-2">{history.map((event) => <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">{eventLabel(event, names)}</span><time className="font-mono text-[10px] text-muted-foreground/70" dateTime={event.created_at}>{new Date(event.created_at).toLocaleString()}</time></li>)}</ol>}
+              {history.length === 0 ? <p className="mt-2 text-xs text-muted-foreground">No access changes recorded yet.</p> : <ol className="mt-2 space-y-2">{history.map((event) => <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-muted-foreground">{eventLabel(event, names)}</span><time className="font-mono text-[10px] text-muted-foreground/70" dateTime={event.created_at}>{formatDateTime(event.created_at)}</time></li>)}</ol>}
             </div>
           </Surface>
         );

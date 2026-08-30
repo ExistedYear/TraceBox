@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { Moon, Palette, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -15,11 +15,6 @@ const accents = [
   { value: "emerald", label: "Emerald", color: "bg-emerald-500" },
 ] as const;
 
-function subscribeAccent(callback: () => void) {
-  window.addEventListener("tracebox-accent-change", callback);
-  return () => window.removeEventListener("tracebox-accent-change", callback);
-}
-
 function getAccentSnapshot() {
   return document.documentElement.dataset.accent ?? "blue";
 }
@@ -27,7 +22,17 @@ function getAccentSnapshot() {
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const dark = resolvedTheme === "dark";
-  const accent = useSyncExternalStore(subscribeAccent, getAccentSnapshot, () => "blue");
+  // Keep the first render deterministic. The root layout applies the saved
+  // accent before hydration, so reading it during render would make the
+  // client tree differ from the server tree for users with a non-blue accent.
+  const [accent, setAccent] = useState("blue");
+
+  useEffect(() => {
+    const syncAccent = () => setAccent(getAccentSnapshot());
+    syncAccent();
+    window.addEventListener("tracebox-accent-change", syncAccent);
+    return () => window.removeEventListener("tracebox-accent-change", syncAccent);
+  }, []);
 
   function updateAccent(value: string) {
     document.documentElement.dataset.accent = value;

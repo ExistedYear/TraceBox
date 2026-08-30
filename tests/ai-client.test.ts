@@ -34,7 +34,14 @@ describe("Gemini provider client", () => {
     const body = JSON.parse(String(request.body)) as Record<string, unknown>;
     expect(body.systemInstruction).toEqual({ parts: [{ text: options.systemPrompt }] });
     expect(body.contents).toEqual([{ role: "user", parts: [{ text: JSON.stringify(options.userPayload) }] }]);
-    expect(body.generationConfig).toEqual(expect.objectContaining({ responseMimeType: "application/json", responseJsonSchema: options.jsonSchema }));
+    expect(body.generationConfig).toEqual(expect.objectContaining({ responseMimeType: "application/json", responseJsonSchema: options.jsonSchema, thinkingConfig: { thinkingLevel: "minimal" } }));
+  });
+
+  it("ignores Gemini reasoning parts before parsing the structured answer", async () => {
+    process.env.GEMINI_API_KEY = "test-gemini-key";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: "internal reasoning that is not JSON" }, { text: '{"ok":true}' }] } }] }), { status: 200 })));
+
+    await expect(geminiJson<{ ok: boolean }>(options)).resolves.toEqual({ ok: true });
   });
 
   it("maps Google rate-limit responses to the stable application error", async () => {

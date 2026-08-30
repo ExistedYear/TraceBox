@@ -25,6 +25,7 @@ import type { TimelineComment, TimelineEventRow } from "@/lib/issues";
 import { displayNameMap } from "@/lib/server-people";
 import type { CommentMention } from "@/lib/comment-mentions";
 import { getWorkspaceContext } from "@/lib/workspace-context";
+import { formatDate, formatDateTime } from "@/lib/date-format";
 
 type Params = Promise<{ issueKey: string }>;
 
@@ -157,8 +158,8 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
     ["Assignee", personLabel(mergedNames.get(issue.assignee_id ?? ""), issue.assignee_id)],
     ["Reporter", personLabel(mergedNames.get(issue.reporter_id), issue.reporter_id)],
     ["Visibility", issue.visibility],
-    ["Created", new Date(issue.created_at).toLocaleString()],
-    ["Updated", new Date(issue.updated_at).toLocaleString()],
+    ["Created", formatDateTime(issue.created_at)],
+    ["Updated", formatDateTime(issue.updated_at)],
   ];
   const sections: [string, string | null][] = [
     ["Steps to reproduce", issue.steps_to_reproduce],
@@ -182,7 +183,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs font-semibold tracking-wide text-primary">{issueKeyLabel}</span>
               <span className="rounded-full border border-border/80 bg-muted/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{issue.type}</span>
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 className="h-3 w-3" /> Updated {new Date(issue.updated_at).toLocaleDateString()}</span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Clock3 className="h-3 w-3" /> Updated {formatDate(issue.updated_at)}</span>
             </div>
             <h1 className="mt-2 max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{issue.title}</h1>
             <p className="mt-2 text-sm text-muted-foreground">{issue.severity} severity · {issue.priority} priority · reported by {personLabel(mergedNames.get(issue.reporter_id), issue.reporter_id)}</p>

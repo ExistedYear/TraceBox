@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeReadinessAnalysis, readinessCsv, readinessRiskGroups, type ReadinessAnalysis, type ReadinessIssue } from "@/lib/readiness";
 import { cn } from "@/lib/utils";
+import { formatCompactDateTime, formatShortDate } from "@/lib/date-format";
 export type { ReadinessIssue } from "@/lib/readiness";
 
 export type MilestoneOption = {
@@ -185,7 +186,7 @@ export function ReadinessDashboard({
             <option value="all">All milestones</option>
             {milestones.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} ({m.status}) {m.dueAt ? `· Due ${new Date(m.dueAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
+                {m.name} ({m.status}) {m.dueAt ? `· Due ${formatShortDate(m.dueAt)}` : ""}
               </option>
             ))}
           </select>
@@ -544,7 +545,7 @@ export function ReadinessDashboard({
               <div><h2 className="text-sm font-semibold">Readiness history</h2><p className="text-xs text-muted-foreground">Immutable snapshots of the backend score and factors.</p></div>
               <span className="font-mono text-xs text-muted-foreground">{history.length}</span>
             </div>
-            {history.length === 0 ? <p className="py-4 text-xs text-muted-foreground">No snapshots saved yet.</p> : <div className="space-y-2">{history.slice(0, 8).map((snapshot) => <div key={snapshot.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-xs"><span className="font-mono">{snapshot.status}</span><span className="font-mono font-semibold">{snapshot.status === "NO_DATA" ? "—" : `${snapshot.score}%`}</span><time className="text-muted-foreground">{new Date(snapshot.createdAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</time></div>)}</div>}
+            {history.length === 0 ? <p className="py-4 text-xs text-muted-foreground">No snapshots saved yet.</p> : <div className="space-y-2">{history.slice(0, 8).map((snapshot) => <div key={snapshot.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-xs"><span className="font-mono">{snapshot.status}</span><span className="font-mono font-semibold">{snapshot.status === "NO_DATA" ? "—" : `${snapshot.score}%`}</span><time className="text-muted-foreground">{formatCompactDateTime(snapshot.createdAt)}</time></div>)}</div>}
           </Surface>
         </div>
       </div>

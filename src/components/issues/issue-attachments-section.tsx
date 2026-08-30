@@ -21,6 +21,7 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { formatShortDate } from "@/lib/date-format";
 import { useRealtimeSubscription } from "@/hooks/use-realtime";
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -297,7 +298,7 @@ export function IssueAttachmentsSection({
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{att.filename}</p>
                     <p className="font-mono text-[10px] text-muted-foreground/70">
-                      {formatBytes(att.size_bytes)} · {new Date(att.created_at).toLocaleDateString([], { month: "short", day: "numeric" })}
+                      {formatBytes(att.size_bytes)} · {formatShortDate(att.created_at)}
                     </p>
                   </div>
                 </div>

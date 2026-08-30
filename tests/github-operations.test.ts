@@ -7,6 +7,7 @@ import { scopeGithubRepositoryCatalog } from "../src/lib/github-repository-visib
 const migration = readFileSync(new URL("../supabase/migrations/202608260064_phase13_github_operations.sql", import.meta.url), "utf8");
 const processor = readFileSync(new URL("../src/lib/github-webhook-processor.ts", import.meta.url), "utf8");
 const retryRoute = readFileSync(new URL("../src/app/api/github/retry/route.ts", import.meta.url), "utf8");
+const operationsUi = readFileSync(new URL("../src/components/settings/github-operations-dashboard.tsx", import.meta.url), "utf8");
 
 describe("GitHub operations read-model helpers", () => {
   it("compares the required read permissions without exposing values", () => {
@@ -74,5 +75,10 @@ describe("GitHub operations read-model helpers", () => {
     });
     expect(catalog.repositories).toHaveLength(2);
     expect(catalog.installations).toHaveLength(2);
+  });
+
+  it("uses grammatical retry copy for singular and plural delivery counts", () => {
+    expect(operationsUi).toContain('{counts.retryable === 1 ? "retry" : "retries"}');
+    expect(operationsUi).not.toContain("retry{counts.retryable === 1 ? \"\" : \"ies\"}");
   });
 });

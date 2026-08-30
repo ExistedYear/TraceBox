@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { API_TOKEN_PRESETS } from "@/lib/api-scopes";
 import { createClient } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/date-format";
 
 type Token = { id: string; name: string; scopes: string[]; expires_at: string | null; last_used_at: string | null; created_at: string };
 
@@ -19,7 +20,7 @@ async function makeTokenHash(raw: string) {
 }
 
 function newRawToken() { return `tbx_${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`; }
-function dateLabel(value: string | null) { return value ? new Date(value).toLocaleString([], { dateStyle: "medium" }) : "Never"; }
+function dateLabel(value: string | null) { return value ? formatDateTime(value) : "Never"; }
 function isFutureExpiry(value: string) { return Date.parse(value) > Date.now(); }
 
 export function ApiTokensManager({ organizationId, initialTokens }: { organizationId: string; initialTokens: Token[] }) {

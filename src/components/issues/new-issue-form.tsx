@@ -52,6 +52,7 @@ export function NewIssueForm({
 }) {
   const router = useRouter();
   const [showAdvanced, setShowAdvanced] = useState(requiredCustomFields.length > 0);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [duplicateCandidates, setDuplicateCandidates] = useState<Array<{ issue_number: number; title: string }>>([]);
   const [duplicateSearchError, setDuplicateSearchError] = useState(false);
   const form = useForm<IssueCreateValues>({
@@ -168,9 +169,18 @@ export function NewIssueForm({
       );
       return;
     }
-    toast.success(`Issue ${formatIssueKey(projectKey, Number(issueNumber.data))} created.`);
-    router.push(`/dashboard/issues/${formatIssueKey(projectKey, Number(issueNumber.data))}`);
-    router.refresh();
+    const issueKey = formatIssueKey(projectKey, Number(issueNumber.data));
+    const issueHref = `/dashboard/issues/${issueKey}`;
+
+    // Clear the draft guard before navigating. Otherwise the form's dirty state
+    // can intercept the transition after the successful mutation has completed.
+    form.reset();
+    setIsNavigating(true);
+    toast.success(`Issue ${issueKey} created.`, {
+      action: { label: "Open issue", onClick: () => router.replace(issueHref) },
+      duration: 8000,
+    });
+    router.replace(issueHref);
   }
 
   return (
@@ -297,9 +307,9 @@ export function NewIssueForm({
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={() => { if (!form.formState.isDirty || window.confirm("Discard this unsaved issue?")) router.back(); }}>Cancel</Button>
-        <Button type="submit" disabled={form.formState.isSubmitting} className={cn(form.formState.isSubmitting && "opacity-80")}>
+        <Button type="submit" disabled={form.formState.isSubmitting || isNavigating} className={cn((form.formState.isSubmitting || isNavigating) && "opacity-80")}>
           {form.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          Create issue
+          {isNavigating ? "Opening issue…" : "Create issue"}
         </Button>
       </div>
     </form>

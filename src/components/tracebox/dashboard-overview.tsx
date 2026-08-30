@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +18,7 @@ import { Surface } from "@/components/tracebox/primitives";
 import { Button } from "@/components/ui/button";
 import { categoryClasses } from "@/lib/issues";
 import { cn } from "@/lib/utils";
+import { formatShortDate } from "@/lib/date-format";
 import { NewProjectButton, selectProject, type ProjectSummary } from "@/components/layout/workspace-switcher";
 
 export type OverviewIssue = {
@@ -55,14 +57,23 @@ type DashboardOverviewProps = {
   canCreateProject: boolean;
 };
 
-function relativeTime(iso: string) {
-  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+function relativeTime(iso: string, now: number) {
+  const seconds = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return "just now";
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.round(hours / 24)}d ago`;
+}
+
+function RelativeTime({ value }: { value: string }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(Date.now()), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return <span>{now === null ? formatShortDate(value) : relativeTime(value, now)}</span>;
 }
 
 export function DashboardOverview({
@@ -230,7 +241,7 @@ export function DashboardOverview({
                       {issue.assigneeLabel}
                     </span>
                     <span className="whitespace-nowrap font-mono text-[10px] text-muted-foreground/70">
-                      {relativeTime(issue.updatedAt)}
+                      <RelativeTime value={issue.updatedAt} />
                     </span>
                   </li>
                 ))}
