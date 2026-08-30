@@ -127,19 +127,6 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-The local seed contains a disposable account:
-
-```text
-Email:    demo@123.com
-Password: demo123
-```
-
-### Hosted demo account
-
-The same credentials currently work on the [live TraceBox deployment](https://trace-box.vercel.app/). The account was provisioned as the owner of the public demo workspace and can modify its demo issues and settings; it has no intentional access to private tenants.
-
-These credentials are public: anyone may sign in, change demo content, consume the account's ordinary application quota, or change its login details. Row Level Security limits the account to data it is authorized to access, and it has no service-role key or server credentials. Even so, do not store private information in the demo workspace, reuse this password elsewhere, connect sensitive repositories, or grant the account access to another workspace. Maintainers should treat all demo-account content as untrusted. To permanently remove the exact seeded hosted account and its isolated workspace, review `scripts/remove-demo-account.sql`. It is guarded by exact IDs, refuses unexpected memberships, and ends with `ROLLBACK` by default. Never run it against local seed data you still need.
-
 ### 6. Stop local Supabase
 
 ```bash
