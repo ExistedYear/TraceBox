@@ -148,6 +148,14 @@ export function IssueTable({ projectKey, projectId, canEdit, canManageProject, c
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+  // Natural search and saved-view links update the server-derived props without
+  // necessarily remounting this client component. Keep local controls aligned
+  // with those URL navigations instead of retaining the previous queue state.
+  useEffect(() => {
+    setFilters(initialFilters);
+    setSearchQuery(initialSearchQuery);
+    setDebouncedQuery(initialSearchQuery);
+  }, [initialFilters, initialSearchQuery]);
   // Monotonic request id: stale responses never overwrite newer results.
   const requestSeq = useRef(0);
 

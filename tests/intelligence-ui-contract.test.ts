@@ -6,6 +6,7 @@ const aiPanel = read("src/components/intelligence/trace-ai-panel.tsx");
 const triage = read("src/components/intelligence/triage-suggestion.tsx");
 const duplicate = read("src/components/intelligence/duplicate-analysis.tsx");
 const natural = read("src/components/intelligence/issues-with-natural-search.tsx");
+const issueTable = read("src/components/issues/issue-table.tsx");
 const release = read("src/components/intelligence/release-brief.tsx");
 const blast = read("src/components/intelligence/blast-radius-graph.tsx");
 
@@ -38,6 +39,8 @@ describe("Trace Intelligence UI contracts", () => {
     expect(natural).toContain("IssueTable");
     expect(natural).toContain("params.set(key, value)");
     expect(natural).toContain("params.delete(key)");
+    expect(issueTable).toContain("setFilters(initialFilters)");
+    expect(issueTable).toContain("setSearchQuery(initialSearchQuery)");
   });
 
   it("does not auto-generate release or graph analysis", () => {
@@ -49,4 +52,3 @@ describe("Trace Intelligence UI contracts", () => {
     expect(blast).toContain("/dashboard/issues/${node.keyLabel}");
   });
 });
-
