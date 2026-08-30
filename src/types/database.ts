@@ -2726,6 +2726,10 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: undefined
       }
+      leave_organization: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
       link_github_artifact: {
         Args: {
           p_github_artifact_id: string

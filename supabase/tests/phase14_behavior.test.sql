@@ -5,7 +5,7 @@
 -- JWT claims so a clean migration replay catches cross-tenant regressions.
 begin;
 
-select plan(62);
+select plan(70);
 
 select ok(not has_table_privilege('authenticated', 'public.organizations', 'insert,update,delete'), 'workspace rows are RPC-only');
 select ok(not has_table_privilege('authenticated', 'public.issues', 'insert,update,delete'), 'issue rows are RPC-only');
@@ -31,6 +31,8 @@ select ok(exists (
 select has_function('public', 'create_issue_complete', array['uuid','jsonb'], 'atomic issue creation RPC exists');
 select has_function('public', 'create_api_token', array['uuid','text','text','text[]','timestamp with time zone'], 'scoped API token RPC exists');
 select has_function('public', 'transfer_organization_ownership', array['uuid','uuid'], 'ownership transfer RPC exists');
+select has_function('public', 'leave_organization', array['uuid'], 'self-service workspace leave RPC exists');
+select ok(not has_function_privilege('anon', 'public.leave_organization(uuid)', 'execute'), 'anonymous callers cannot leave a workspace');
 select has_function('public', 'create_organization_invitation', array['uuid','text','text','uuid','text'], 'invitation RPC exists');
 select has_function('public', 'set_project_archived', array['uuid','boolean'], 'archive guard RPC exists');
 select has_function('public', 'replace_project_workflow', array['uuid','jsonb','jsonb'], 'workflow validation RPC exists');
@@ -112,8 +114,17 @@ select throws_ok($$select public.replace_project_workflow('72000000-0000-4000-80
 select ok((select count(*) from public.membership_events where organization_id = '71000000-0000-4000-8000-000000000001' and event_type = 'OWNERSHIP_TRANSFERRED') = 1, 'ownership transfer is audited');
 select ok((select count(*) from public.issue_events where issue_id in (select id from public.issues where project_id = '72000000-0000-4000-8000-000000000001') and event_type = 'ISSUE_CREATED') = 2, 'issue creation writes immutable audit events');
 
+select set_config('request.jwt.claim.sub', '70000000-0000-4000-8000-000000000002', true);
+select throws_ok($$select public.leave_organization('71000000-0000-4000-8000-000000000001')$$, '42501', null, 'workspace owner must transfer ownership before leaving');
+select set_config('request.jwt.claim.sub', '70000000-0000-4000-8000-000000000001', true);
+select lives_ok($$select public.leave_organization('71000000-0000-4000-8000-000000000001')$$, 'non-owner can leave the workspace');
+
 reset role;
 select set_config('request.jwt.claim.sub', '', true);
 select set_config('request.jwt.claim.role', '', true);
+select is((select count(*) from public.organization_members where organization_id = '71000000-0000-4000-8000-000000000001' and user_id = '70000000-0000-4000-8000-000000000001'), 0::bigint, 'leaving removes the workspace membership');
+select is((select count(*) from public.project_members where project_id = '72000000-0000-4000-8000-000000000001' and user_id = '70000000-0000-4000-8000-000000000001'), 0::bigint, 'leaving removes project memberships');
+select is((select count(*) from public.api_tokens where organization_id = '71000000-0000-4000-8000-000000000001' and user_id = '70000000-0000-4000-8000-000000000001'), 0::bigint, 'leaving revokes workspace API tokens');
+select is((select count(*) from public.membership_events where organization_id = '71000000-0000-4000-8000-000000000001' and actor_id = '70000000-0000-4000-8000-000000000001' and event_type = 'ORGANIZATION_MEMBER_REMOVED' and metadata->>'source' = 'self_service'), 1::bigint, 'self-service leave is audited');
 select * from finish();
 rollback;

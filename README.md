@@ -17,7 +17,7 @@ TraceBox is an AI-powered issue tracker and engineering command center. It unifi
 
 | Area | What you can do |
 |---|---|
-| Workspaces | Create private or public workspaces, invite people, discover open workspaces, and manage roles. |
+| Workspaces | Create private or public workspaces, invite people, discover open workspaces, manage roles, transfer ownership, and leave safely. |
 | Projects | Create projects, components, labels, versions, milestones, templates, custom fields, and custom workflows. |
 | Issues | Report, assign, edit, watch, search, filter, sort, link, bulk-update, and resolve issues. |
 | Triage | Review new reports, use keyboard shortcuts, find duplicates, and apply suggested field changes. |

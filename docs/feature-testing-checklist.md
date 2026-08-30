@@ -24,7 +24,7 @@ Space email-delivery checks to respect the configured provider quota. The built-
 - [ ] Admin publishes/unpublishes a workspace; Discover lists only public workspaces and joining grants MEMBER plus REPORTER without exposing restricted issues.
 - [ ] Accepting a project invitation selects the invited workspace/project and lands on its issue queue.
 - [ ] Maintainer adds an existing workspace member, changes project role, and removes access.
-- [ ] Workspace role changes, removal, last-owner protection, and ownership transfer work and create audit history.
+- [ ] Workspace role changes, administrator removal, self-service leave, last-owner protection, and ownership transfer work and create audit history; leaving also revokes project access and workspace API tokens.
 - [ ] Contributors show identity, organization/project roles, access state, pending invitations, and useful mutation failures.
 
 ## Project administration

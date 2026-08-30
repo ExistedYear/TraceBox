@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Loader2, Mail, Shield, UserMinus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Loader2, LogOut, Mail, Shield, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Surface } from "@/components/tracebox/primitives";
@@ -28,6 +29,7 @@ function safeError(message?: string | null) {
 }
 
 export function WorkspaceMembersManager({ organizationId, currentUserId, members: initialMembers, invitations: initialInvitations, canManage }: { organizationId: string; currentUserId: string; members: WorkspaceMemberRow[]; invitations: WorkspaceInvitationRow[]; canManage: boolean }) {
+  const router = useRouter();
   const [members, setMembers] = useState(initialMembers);
   const [invitations, setInvitations] = useState(initialInvitations);
   const [email, setEmail] = useState("");
@@ -35,6 +37,7 @@ export function WorkspaceMembersManager({ organizationId, currentUserId, members
   const [busy, setBusy] = useState<string | null>(null);
   const [lastInviteLink, setLastInviteLink] = useState("");
   const owner = members.find((member) => member.role === "OWNER");
+  const currentMember = members.find((member) => member.userId === currentUserId);
 
   async function copyInvitationLink() {
     try { await navigator.clipboard.writeText(lastInviteLink); toast.success("Invitation link copied."); } catch { toast.error("Could not copy the link. Select and copy it manually."); }
@@ -92,6 +95,22 @@ export function WorkspaceMembersManager({ organizationId, currentUserId, members
     setInvitations((current) => current.map((invitation) => invitation.id === invitationId ? { ...invitation, revoked_at: new Date().toISOString() } : invitation));
   }
 
+  async function leaveWorkspace() {
+    if (!window.confirm("Leave this workspace and lose access to all of its projects?")) return;
+    setBusy("leave");
+    const result = await call("leave_organization", { p_organization_id: organizationId });
+    if (result.error) {
+      setBusy(null);
+      toast.error(safeError(result.error.message));
+      return;
+    }
+    document.cookie = "tb_org=; path=/; max-age=0; samesite=lax";
+    document.cookie = "tb_project=; path=/; max-age=0; samesite=lax";
+    toast.success("You left the workspace.");
+    router.replace("/dashboard");
+    router.refresh();
+  }
+
   return <div className="space-y-6">
     {canManage && <Surface className="p-4">
       <div className="mb-4 flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /><div><h2 className="text-sm font-semibold">Invite to workspace</h2><p className="text-xs text-muted-foreground">TraceBox emails a secure, single-use link and keeps a copy available here.</p></div></div>
@@ -106,5 +125,7 @@ export function WorkspaceMembersManager({ organizationId, currentUserId, members
     <Surface><div className="border-b border-border/70 px-4 py-3"><h2 className="text-sm font-semibold">Workspace members</h2><p className="text-xs text-muted-foreground">{members.length} active member{members.length === 1 ? "" : "s"}</p></div><div className="divide-y divide-border/70">{members.map((member) => <div key={member.userId} className="flex flex-wrap items-center gap-3 px-4 py-3"><div className="flex min-w-0 flex-1 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{(member.displayName ?? "?").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><p className="truncate text-sm font-medium">{member.displayName ?? member.userId.slice(0, 8)}</p><p className="font-mono text-[10px] text-muted-foreground">{member.userId === currentUserId ? "You" : member.userId.slice(0, 8)}</p></div></div><span className="flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground"><Shield className="h-3 w-3" />{member.role}</span>{canManage && member.role !== "OWNER" && <><select aria-label={`Role for ${member.displayName ?? member.userId}`} className="h-8 rounded-md border border-input bg-background px-2 text-xs" value={member.role} onChange={(event) => void changeRole(member.userId, event.target.value)} disabled={busy === member.userId}><option value="ADMIN">Admin</option><option value="MEMBER">Member</option><option value="VIEWER">Viewer</option></select><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => void remove(member.userId)} disabled={busy === member.userId} aria-label="Remove workspace member">{busy === member.userId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />}</Button></>}{canManage && owner?.userId === currentUserId && member.role !== "OWNER" && <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void transfer(member.userId)} disabled={busy === "transfer"}>Make owner</Button>}</div>)}</div></Surface>
 
     {canManage && <Surface><div className="border-b border-border/70 px-4 py-3"><h2 className="text-sm font-semibold">Pending invitations</h2><p className="text-xs text-muted-foreground">Invitation links expire after seven days.</p></div><div className="divide-y divide-border/70">{invitations.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground">No invitations yet.</p>}{invitations.map((invitation) => { const state = invitation.accepted_at ? "Accepted" : invitation.revoked_at ? "Revoked" : new Date(invitation.expires_at) <= new Date() ? "Expired" : "Pending"; return <div key={invitation.id} className="flex flex-wrap items-center gap-3 px-4 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm">{invitation.email}</p><p className="text-xs text-muted-foreground">{invitation.organization_role} · expires {formatDate(invitation.expires_at)}</p></div><span className="text-[10px] uppercase tracking-wide text-muted-foreground">{state}</span>{state === "Pending" && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => void revoke(invitation.id)} disabled={busy === invitation.id}>Revoke</Button>}</div>; })}</div></Surface>}
+
+    <Surface className="border-destructive/30"><div className="flex flex-wrap items-center justify-between gap-4 p-4"><div><h2 className="text-sm font-semibold">Leave workspace</h2><p className="mt-1 text-xs text-muted-foreground">{currentMember?.role === "OWNER" ? "Transfer ownership to another member before leaving." : "This removes your access to every project in this workspace."}</p></div><Button type="button" variant="destructive" size="sm" className="h-8 gap-1.5" disabled={busy === "leave" || currentMember?.role === "OWNER"} onClick={() => void leaveWorkspace()}>{busy === "leave" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}Leave workspace</Button></div></Surface>
   </div>;
 }

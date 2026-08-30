@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(new URL("../supabase/migrations/202608260045_membership_invitations.sql", import.meta.url), "utf8");
 const relationalGuards = readFileSync(new URL("../supabase/migrations/202608260046_phase2_membership_relational_guards.sql", import.meta.url), "utf8");
+const workspaceLeave = readFileSync(new URL("../supabase/migrations/202608260085_workspace_self_leave.sql", import.meta.url), "utf8");
+const workspaceMembersUi = readFileSync(new URL("../src/components/settings/workspace-members-manager.tsx", import.meta.url), "utf8");
 
 describe("membership migration contract", () => {
   it("keeps invitation secrets hashed and time-bound", () => {
@@ -56,5 +58,19 @@ describe("membership migration contract", () => {
     expect(relationalGuards).toContain("membership_events_project_organization_guard");
     expect(relationalGuards).toContain("workspace_invitations_project_organization_guard");
     expect(relationalGuards).toContain("revoke execute on function public.enforce_membership_project_organization()");
+  });
+
+  it("allows only the current non-owner to leave and cleans up workspace access", () => {
+    expect(workspaceLeave).toContain("function public.leave_organization");
+    expect(workspaceLeave).toContain("v_user uuid := auth.uid()");
+    expect(workspaceLeave).toContain("OWNER_TRANSFER_REQUIRED");
+    expect(workspaceLeave).toContain("delete from public.project_members");
+    expect(workspaceLeave).toContain("delete from public.api_tokens");
+    expect(workspaceLeave).toContain("'source', 'self_service'");
+    expect(workspaceLeave).toContain("revoke execute on function public.leave_organization(uuid) from public, anon");
+    expect(workspaceLeave).toContain("grant execute on function public.leave_organization(uuid) to authenticated");
+    expect(workspaceMembersUi).toContain("Leave workspace");
+    expect(workspaceMembersUi).toContain('currentMember?.role === "OWNER"');
+    expect(workspaceMembersUi).toContain('document.cookie = "tb_org=; path=/; max-age=0; samesite=lax"');
   });
 });
