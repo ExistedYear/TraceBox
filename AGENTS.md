@@ -84,8 +84,6 @@ tests/                     vitest unit tests (vitest.config.ts wires @ → src)
 docs/                      active deployment, API, schema, and feature-checklist docs
 README.md                  production submission overview, complete feature catalog, architecture, setup, and verification
   feature-testing-checklist.md submission QA matrix for all implemented product surfaces
-  last_day_plan.md         retained Trace Intelligence implementation specification
-  last-day-plan-audit.md   shipped boundary, security controls, and verification status
   archive/                 completed foundation/roadmap/release records
 handoff.md                 current implementation status, verification, and Supabase/Vercel deployment handoff
 docs/archive/              historical audits, implementation plans, and release records

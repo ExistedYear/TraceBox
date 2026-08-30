@@ -1,6 +1,6 @@
 # TraceBox
 
-TraceBox is an issue tracker for engineering teams. It keeps bug reports, triage decisions, code changes, release planning, and audit history in one place.
+TraceBox is an AI-powered issue tracker and engineering command center. It unifies bug reporting, advisory triage, code changes, release planning, and audit history in one place — with built-in AI for natural-language search, smart triage routing, semantic duplicate detection, and release-risk analysis.
 
 <p align="center">
   <a href="https://trace-box.vercel.app/"><img src="https://img.shields.io/website?url=https%3A%2F%2Ftrace-box.vercel.app%2F&label=live%20app&style=flat-square" alt="Live app status"></a>
@@ -8,6 +8,7 @@ TraceBox is an issue tracker for engineering teams. It keeps bug reports, triage
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js" alt="Next.js 16">
   <img src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
+  <img src="https://img.shields.io/badge/AI%20Features-Trace%20Intelligence-8B5CF6?style=flat-square" alt="AI Features">
 </p>
 
 <p align="center"><strong><a href="https://trace-box.vercel.app/">Open TraceBox</a></strong></p>
@@ -280,7 +281,7 @@ Never commit environment files, service keys, GitHub private keys, webhook secre
 - [Feature testing checklist](docs/feature-testing-checklist.md)
 - [REST API](docs/api.md)
 - [Schema decisions](docs/schema-decisions.md)
-- [Trace Intelligence implementation audit](docs/last-day-plan-audit.md)
+- [Trace Intelligence implementation audit](docs/archive/last-day-plan-audit.md)
 - [Current handoff](handoff.md)
 
 Historical plans and completed audits are in [`docs/archive`](docs/archive/).
