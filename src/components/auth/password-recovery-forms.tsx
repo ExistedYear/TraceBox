@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { getSafeAuthErrorMessage } from "@/lib/errors";
+import { createClient } from "@/lib/supabase/client";
+import { passwordRecoverySchema, passwordResetSchema } from "@/lib/validation/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
-import { passwordRecoverySchema, passwordResetSchema } from "@/lib/validation/auth";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ export function ForgotPasswordForm() {
     setBusy(true);
     try {
       const { error } = await createClient().auth.resetPasswordForEmail(parsed.data.email, { redirectTo: `${window.location.origin}/auth/callback?next=/reset-password` });
-      if (error) { toast.error("Could not send the reset email. Try again shortly."); return; }
+      if (error) { toast.error(getSafeAuthErrorMessage(error)); return; }
       setSent(true);
     } catch { toast.error("Could not reach the server. Try again shortly."); } finally { setBusy(false); }
   }

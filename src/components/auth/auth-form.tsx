@@ -62,7 +62,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         router.refresh();
       }
     } catch (error) {
-      const message = error instanceof Error ? getSafeAuthErrorMessage(error.message) : "Something went wrong. Please try again.";
+      const message = error instanceof Error ? getSafeAuthErrorMessage(error) : "Something went wrong. Please try again.";
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -77,7 +77,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(requestedNext)}` } });
       if (error) throw error;
     } catch (error) {
-      toast.error(error instanceof Error ? getSafeAuthErrorMessage(error.message) : "Could not start GitHub sign-in.");
+      toast.error(error instanceof Error ? getSafeAuthErrorMessage(error) : "Could not start GitHub sign-in.");
       setIsGithubLoading(false);
     }
   }

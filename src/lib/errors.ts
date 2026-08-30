@@ -1,20 +1,35 @@
-export function getSafeAuthErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
+type AuthErrorLike = { code?: string; message?: string };
 
-  if (normalized.includes("invalid login credentials")) {
+export function getSafeAuthErrorMessage(error: string | AuthErrorLike) {
+  const code = typeof error === "string" ? "" : (error.code ?? "").toLowerCase();
+  const normalized = (typeof error === "string" ? error : error.message ?? "").toLowerCase();
+
+  if (code === "invalid_credentials" || normalized.includes("invalid login credentials")) {
     return "The email or password is incorrect.";
   }
 
-  if (normalized.includes("email not confirmed")) {
+  if (code === "email_not_confirmed" || normalized.includes("email not confirmed")) {
     return "Please confirm your email address before signing in.";
   }
 
-  if (normalized.includes("user already registered")) {
+  if (code === "user_already_exists" || code === "email_exists" || normalized.includes("user already registered")) {
     return "An account with this email already exists.";
   }
 
-  if (normalized.includes("password should be at least")) {
+  if (code === "weak_password" || normalized.includes("password should be at least")) {
     return "Choose a password with at least 8 characters.";
+  }
+
+  if (code === "over_email_send_rate_limit" || normalized.includes("email rate limit")) {
+    return "Too many emails were requested. Wait a few minutes and try again.";
+  }
+
+  if (code === "email_address_invalid") {
+    return "Enter a valid email address.";
+  }
+
+  if (code === "email_address_not_authorized" || code === "email_provider_disabled") {
+    return "Email delivery is unavailable. Ask the administrator to configure custom SMTP in Supabase.";
   }
 
   return "Something went wrong. Please try again.";

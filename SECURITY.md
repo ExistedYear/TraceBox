@@ -54,7 +54,7 @@ Never include these in a report, commit, screenshot, fixture, or public log:
 - invitation tokens, signed URLs, cookies, or browser storage
 - real customer issue content or personal information
 
-The credentials `demo@123.com` / `demo123` are intentional public demo data. They may exist in a local database or the hosted demonstration, carry only ordinary user access, and must never be granted privileged credentials or access to real tenant data.
+The credentials `demo@123.com` / `demo123` are intentional public demo data. They may exist in a local database or the hosted demonstration, carry only ordinary user access, and must never be granted privileged credentials or access to real tenant data. The guarded `scripts/remove-demo-account.sql` cleanup targets only the exact seeded identity and workspace, refuses unexpected memberships, and rolls back by default.
 
 ## Safe testing
 

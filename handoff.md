@@ -59,7 +59,7 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       236/236 passed across 43 test files
+Tests:       npm test passed, including safe Supabase Auth error-code regression coverage
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
 Migration check: 84 files are contiguous and `supabase/full_schema.sql` is synchronized
@@ -77,7 +77,7 @@ Static source audits found and fixed migration syntax, API issue argument orderi
 
 The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. Do not commit its `.env`, browser state, reports, or test-results. Earlier pre-deployment probes found an older deployment; the current public probes and the hosted GitHub PR flow now pass, while the full multi-user/API/browser suite remains outstanding.
 
-Migration 082 was dry-run as the only pending change, applied, and followed by linked type generation. The independent review then fixed repeated-join role downgrade in forward migration 083 and the visibility-change race in forward migration 084. Both are deployed; the final linked dry run is empty and linked SQL lint reports zero errors. The linked project also contains the requested disposable `demo@123.com` account with its own public `tracebox-demo` workspace; these known credentials carry no service-role access.
+Migration 082 was dry-run as the only pending change, applied, and followed by linked type generation. The independent review then fixed repeated-join role downgrade in forward migration 083 and the visibility-change race in forward migration 084. Both are deployed; the final linked dry run is empty and linked SQL lint reports zero errors. The linked project also contains the requested disposable `demo@123.com` account with its own public `tracebox-demo` workspace; these known credentials carry no service-role access. `scripts/remove-demo-account.sql` provides an exact-target, assertion-guarded cleanup transaction and intentionally ends with `ROLLBACK`; it has not been run.
 
 ## Deployment checklist
 
@@ -85,7 +85,7 @@ Migration 082 was dry-run as the only pending change, applied, and followed by l
 2. Confirm the hosted ledger and local chain both end at 084, rerun a linked dry-run and schema lint before future pushes, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
-5. Configure Supabase Auth Site URL and callback URLs.
+5. Configure Supabase Auth Site URL and callback URLs. The built-in sender is sufficient only for low-volume evaluation; use custom SMTP for reliable public delivery or higher limits. Existing Auth users accept workspace invitations through the manual TraceBox link.
 6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables. Add server-only `GEMINI_API_KEY` only after reviewing Google Gemini API quotas, data controls, and regional terms.
 7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.

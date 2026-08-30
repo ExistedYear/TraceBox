@@ -126,7 +126,7 @@ If you prefer running file-by-file, open the **SQL Editor** and execute each fil
 
 `supabase/full_schema.sql` is generated and intentionally committed for fresh SQL Editor installs and drift review. Never edit it directly; update migrations and run `npm run sync:migrations`.
 
-Do not run `supabase/seed.sql` in production. It creates the public demo login `demo@123.com` / `demo123` for local and disposable databases.
+Do not run `supabase/seed.sql` in production. It creates the public demo login `demo@123.com` / `demo123` for local and disposable databases. If that exact seed was intentionally loaded into a disposable hosted project, review `scripts/remove-demo-account.sql`. The cleanup verifies fixed IDs, email, slug, ownership, and membership isolation, disables only named immutable-history guards inside one transaction, and ends with `ROLLBACK`. Change the final word to `COMMIT` only after reviewing the target rows and the complete script.
 
 Before every linked push, run `npx supabase migration list --linked`, `npx supabase db push --linked --dry-run`, and linked database lint. The migration ledger is version-based, so editing a file whose version is already applied does not update the hosted function, policy, or constraint. Inspect the live catalog when drift is suspected and ship the correction as the next forward-only migration.
 
@@ -147,14 +147,21 @@ In your Supabase Dashboard:
    - Go to **Authentication** → **Providers** → **Email**.
    - If you want immediate signups without mandatory email verification during testing, toggle **Confirm email** to `OFF`. Click **Save**.
 
-3. **GitHub OAuth (Optional)**:
+3. **Custom SMTP for production email**:
+   - Go to **Project Settings** → **Authentication** → **SMTP Settings**.
+   - Enable custom SMTP and enter a verified sender plus the host, port, username, and password supplied by your mail provider.
+   - The built-in sender can cover low-volume evaluation, but its strict quota can block recovery or secure email change after signup messages. Use custom SMTP for reliable public delivery or higher limits.
+   - Test with a confirmed account. If delivery fails, inspect **Logs** → **Auth Logs** and use the Auth error code, not its raw message, for diagnosis.
+   - Supabase Auth rejects an Auth invitation for an already-registered address. The TraceBox invitation remains valid and returns a one-time manual link.
+
+4. **GitHub OAuth (Optional)**:
    - Go to GitHub → **Settings** → **Developer settings** → **OAuth Apps** → **New OAuth App**.
    - Application name: `TraceBox`
    - Homepage URL: `https://<your-vercel-app-name>.vercel.app`
    - Authorization callback URL: `https://<your-supabase-project-ref>.supabase.co/auth/v1/callback`
    - Copy Client ID and Client Secret into Supabase **Authentication** → **Providers** → **GitHub**.
 
-3. **GitHub App repository access**:
+5. **GitHub App repository access**:
    - Create a GitHub App for TraceBox. This is separate from the Supabase GitHub provider used for login.
    - Enable **Request user authorization (OAuth) during installation** so the callback can verify that the installer owns the installation.
    - Set the callback URL to `https://<your-vercel-domain>/api/github/callback` (and the localhost equivalent when testing locally).

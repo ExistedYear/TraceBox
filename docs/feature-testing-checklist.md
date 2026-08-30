@@ -4,6 +4,8 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 
 ## Public, authentication, and account
 
+Space email-delivery checks to respect the configured provider quota. The built-in sender is acceptable for low-volume evaluation; production-scale delivery requires custom SMTP.
+
 - [ ] Landing, login, signup, forgot-password, and reset-password pages render on desktop and 375px mobile.
 - [ ] Signup validates display name, email, password, and confirmation; duplicate/invalid accounts show safe errors.
 - [ ] Email/password login, GitHub login when configured, logout, session refresh, expired-session redirect, and safe `next` redirects work.

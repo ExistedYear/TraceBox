@@ -290,7 +290,7 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     if (error) {
       console.error("Email update failed", { code: error.code, message: error.message });
       setEmailMessageKind("error");
-      setEmailMessage(getSafeAuthErrorMessage(error.message));
+      setEmailMessage(getSafeAuthErrorMessage(error));
       return;
     }
     setEmailMessageKind("success");
@@ -321,7 +321,7 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
     if (error) {
       console.error("Password update failed", { code: error.code, message: error.message });
       setPasswordMessageKind("error");
-      setPasswordMessage(getSafeAuthErrorMessage(error.message));
+      setPasswordMessage(getSafeAuthErrorMessage(error));
       return;
     }
     setPassword("");

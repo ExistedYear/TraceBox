@@ -138,7 +138,7 @@ Password: demo123
 
 The same credentials currently work on the [live TraceBox deployment](https://trace-box.vercel.app/). The account was provisioned as the owner of the public demo workspace and can modify its demo issues and settings; it has no intentional access to private tenants.
 
-These credentials are public: anyone may sign in, change demo content, consume the account's ordinary application quota, or change its login details. Row Level Security limits the account to data it is authorized to access, and it has no service-role key or server credentials. Even so, do not store private information in the demo workspace, reuse this password elsewhere, connect sensitive repositories, or grant the account access to another workspace. Maintainers should treat all demo-account content as untrusted and reset the account if it is changed or abused.
+These credentials are public: anyone may sign in, change demo content, consume the account's ordinary application quota, or change its login details. Row Level Security limits the account to data it is authorized to access, and it has no service-role key or server credentials. Even so, do not store private information in the demo workspace, reuse this password elsewhere, connect sensitive repositories, or grant the account access to another workspace. Maintainers should treat all demo-account content as untrusted. To permanently remove the exact seeded hosted account and its isolated workspace, review `scripts/remove-demo-account.sql`. It is guarded by exact IDs, refuses unexpected memberships, and ends with `ROLLBACK` by default. Never run it against local seed data you still need.
 
 ### 6. Stop local Supabase
 
@@ -174,6 +174,7 @@ npm run db:stop
 
 5. Set the three Supabase variables in `.env.local` and your deployment host.
 6. Configure the Supabase Auth Site URL and allow callback, reset-password, and `/invite/**` redirects for localhost and the deployed domain.
+7. Supabase's built-in sender can cover low-volume Auth evaluation. Configure custom SMTP when you need reliable public delivery or higher limits; TraceBox keeps manual workspace-invitation links for existing Auth users.
 
 Do not run `supabase/seed.sql` against production. A hosted demo account, when wanted, must be created separately as an ordinary user without privileged credentials or access to real tenant data.
 
@@ -281,6 +282,8 @@ Never commit environment files, service keys, GitHub private keys, webhook secre
 - [Feature testing checklist](docs/feature-testing-checklist.md)
 - [REST API](docs/api.md)
 - [Schema decisions](docs/schema-decisions.md)
+- [Security policy](SECURITY.md)
+- [Current bug and operator status](docs/bugs.md)
 - [Trace Intelligence implementation audit](docs/archive/last-day-plan-audit.md)
 - [Current handoff](handoff.md)
 
