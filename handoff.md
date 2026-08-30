@@ -64,10 +64,10 @@ Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
 Migration check: 84 files are contiguous and `supabase/full_schema.sql` is synchronized
 Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
-Database tests: GitHub Actions run 33264345126 passed a fresh 001–079 replay, 231 pgTAP assertions, and true concurrent issue allocation
+Database tests: GitHub Actions run 33294663307 passed a fresh 001–084 replay, 276 pgTAP assertions, and true concurrent issue allocation
 Database types: `src/types/database.ts` was regenerated from the linked schema after migration 082
 
-Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079 before this release. Migrations 080–084 were then reviewed and applied in order, linked types were regenerated after schema-changing migration 082, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. A local schema diff and pgTAP execution could not run on this machine because the current user lacks Docker socket access; the next Docker-enabled CI run must replay 001–084 and execute the intelligence and public-workspace suites. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
+Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079 before this release. Migrations 080–084 were then reviewed and applied in order, linked types were regenerated after schema-changing migration 082, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. This workstation cannot access the Docker socket, but GitHub Actions run 33294663307 independently replayed 001–084 and passed all 276 database assertions, including the intelligence and public-workspace suites. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 

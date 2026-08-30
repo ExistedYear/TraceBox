@@ -59,7 +59,7 @@ Completed in this checkout:
 - migration chain: 84 contiguous files and synchronized `full_schema.sql`;
 - linked Supabase: ledger now matches 001–084, the final dry run reports no pending migrations, linked SQL lint returns zero errors, and linked types were regenerated after the latest type-changing migration; migration 081 remains the forward correction for the audited three-hop/five-hop blast-radius mismatch.
 
-The new pgTAP file contains 35 assertions covering direct-DML denial, cross-user/project isolation, single-flight, budgets, primary and contributing-issue revocation, bounded graph context, cleanup, and atomic rollback. It could not execute from this workstation because the current user cannot access the Docker socket; the next Docker-enabled CI run is the required replay/pgTAP evidence. A live Groq response and authenticated multi-user browser run remain operator checks because no provider or disposable-account credentials are committed.
+The intelligence pgTAP file contains 35 assertions covering direct-DML denial, cross-user/project isolation, single-flight, budgets, primary and contributing-issue revocation, bounded graph context, cleanup, and atomic rollback. GitHub Actions run 33294663307 replayed all 84 migrations and passed all 276 database assertions across 16 files. A live Groq response and authenticated multi-user browser run remain operator checks because no provider or disposable-account credentials are committed.
 
 ## Deliberate limitations
 
