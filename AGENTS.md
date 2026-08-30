@@ -40,6 +40,7 @@ src/app/
   dashboard/settings/notifications/ personal notification preferences
   onboarding/              two-step create-workspace → create-first-project flow;
                            ?create=1 bypasses the has-orgs redirect for extra workspaces
+  robots.ts                public crawler policy: allow the landing page and exclude app/API/token routes
   auth/callback/route.ts   OAuth/email code exchange handler
 src/components/
   ui/                      stock shadcn/ui (default style, cva, Radix, forwardRef/asChild)
