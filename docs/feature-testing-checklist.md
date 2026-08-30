@@ -7,6 +7,7 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [ ] Landing, login, signup, forgot-password, and reset-password pages render on desktop and 375px mobile.
 - [ ] Signup validates display name, email, password, and confirmation; duplicate/invalid accounts show safe errors.
 - [ ] Email/password login, GitHub login when configured, logout, session refresh, expired-session redirect, and safe `next` redirects work.
+- [ ] Email confirmation and GitHub OAuth callbacks carry refreshed session cookies and reach onboarding without a manual refresh or transient workspace error.
 - [ ] Profile name/avatar changes persist; invalid avatar paths are rejected.
 - [ ] Email/password updates, recovery, current-session logout, and global logout behave honestly.
 - [ ] Light/dark mode and accent choice persist independently.
@@ -17,6 +18,8 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [ ] Workspace/project switchers persist valid `tb_org`/`tb_project` cookies and reject stale or unauthorized selections.
 - [ ] Additional workspace/project creation handles duplicate slug/key/name and archived-project states.
 - [ ] Owner invites by email; wrong-account, expired, revoked, and already-used invitation states are safe.
+- [ ] Invitation email delivery is attempted for workspace and project invitations; the single-use manual link remains available when delivery is unavailable.
+- [ ] Admin publishes/unpublishes a workspace; Discover lists only public workspaces and joining grants MEMBER plus REPORTER without exposing restricted issues.
 - [ ] Accepting a project invitation selects the invited workspace/project and lands on its issue queue.
 - [ ] Maintainer adds an existing workspace member, changes project role, and removes access.
 - [ ] Workspace role changes, removal, last-owner protection, and ownership transfer work and create audit history.

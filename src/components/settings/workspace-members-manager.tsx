@@ -41,16 +41,17 @@ export function WorkspaceMembersManager({ organizationId, currentUserId, members
 
   async function invite() {
     setBusy("invite");
-    const result = await call("create_organization_invitation", { p_organization_id: organizationId, p_email: email, p_organization_role: role });
+    const response = await fetch("/api/invitations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ organizationId, email, organizationRole: role }) });
+    const result = await response.json().catch(() => ({})) as { invitation?: { id: string; email: string; expires_at: string; link: string }; emailSent?: boolean; error?: string };
     setBusy(null);
-    if (result.error) { toast.error(result.error.message.includes("VALIDATION") ? "Enter a valid email address." : safeError(result.error.message)); return; }
-    const invitation = (Array.isArray(result.data) ? result.data[0] : result.data) as { id: string; email: string; token: string; expires_at: string } | undefined;
+    if (!response.ok || result.error) { toast.error(result.error ?? "Invitation could not be created."); return; }
+    const invitation = result.invitation;
     if (!invitation) { toast.error("Invitation could not be created."); return; }
-    const link = `${window.location.origin}/invite/${invitation.token}`;
+    const link = invitation.link;
     setLastInviteLink(link);
     setInvitations((current) => [{ id: invitation.id, email: invitation.email, organization_role: role, expires_at: invitation.expires_at, accepted_at: null, revoked_at: null }, ...current]);
     setEmail("");
-    try { await navigator.clipboard.writeText(link); toast.success("Invitation created and link copied."); } catch { toast.success("Invitation created. The link is shown below for copying."); }
+    try { await navigator.clipboard.writeText(link); toast.success(result.emailSent ? "Invitation email sent and link copied." : "Invitation created. Email delivery was unavailable, so the link was copied."); } catch { toast.success(result.emailSent ? "Invitation email sent." : "Invitation created. Share the link shown below."); }
   }
 
   async function changeRole(userId: string, nextRole: string) {
@@ -92,7 +93,7 @@ export function WorkspaceMembersManager({ organizationId, currentUserId, members
 
   return <div className="space-y-6">
     {canManage && <Surface className="p-4">
-      <div className="mb-4 flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /><div><h2 className="text-sm font-semibold">Invite to workspace</h2><p className="text-xs text-muted-foreground">A secure, single-use link will be copied for sharing.</p></div></div>
+      <div className="mb-4 flex items-center gap-2"><Mail className="h-4 w-4 text-primary" /><div><h2 className="text-sm font-semibold">Invite to workspace</h2><p className="text-xs text-muted-foreground">TraceBox emails a secure, single-use link and keeps a copy available here.</p></div></div>
       <div className="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end">
         <div className="space-y-2"><Label htmlFor="workspace-invite-email">Email</Label><Input id="workspace-invite-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@example.com" /></div>
         <div className="space-y-2"><Label htmlFor="workspace-invite-role">Role</Label><select id="workspace-invite-role" className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={role} onChange={(event) => setRole(event.target.value)}><option value="ADMIN">Admin</option><option value="MEMBER">Member</option><option value="VIEWER">Viewer</option></select></div>

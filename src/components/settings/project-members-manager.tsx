@@ -53,15 +53,14 @@ export function ProjectMembersManager({ organizationId, projectId, members: init
   async function inviteMember() {
     if (!canInvite || !inviteEmail.trim()) return;
     setBusy("invite");
-    const result = await call("create_organization_invitation", { p_organization_id: organizationId, p_email: inviteEmail.trim(), p_organization_role: "MEMBER", p_project_id: projectId, p_project_role: selectedRole });
+    const response = await fetch("/api/invitations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ organizationId, projectId, email: inviteEmail.trim(), organizationRole: "MEMBER", projectRole: selectedRole }) });
+    const result = await response.json().catch(() => ({})) as { invitation?: { link: string }; emailSent?: boolean; error?: string };
     setBusy(null);
-    if (result.error) { toast.error(result.error.message.includes("VALIDATION") ? "Enter a valid email address." : errorText(result.error.message)); return; }
-    const invitation = (Array.isArray(result.data) ? result.data[0] : result.data) as { token?: string } | undefined;
-    if (!invitation?.token) { toast.error("Invitation could not be created."); return; }
-    const link = `${window.location.origin}/invite/${invitation.token}`;
+    if (!response.ok || !result.invitation) { toast.error(result.error ?? "Invitation could not be created."); return; }
+    const link = result.invitation.link;
     setInviteEmail("");
     setLastInviteLink(link);
-    try { await navigator.clipboard.writeText(link); toast.success("Project invitation created and link copied."); } catch { toast.success("Project invitation created. Use the link shown below."); }
+    try { await navigator.clipboard.writeText(link); toast.success(result.emailSent ? "Project invitation emailed and link copied." : "Invitation created. Email delivery was unavailable, so the link was copied."); } catch { toast.success(result.emailSent ? "Project invitation emailed." : "Project invitation created. Use the link shown below."); }
   }
 
   async function changeRole(member: ProjectMemberCandidate, nextRole: string) {

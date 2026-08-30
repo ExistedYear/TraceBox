@@ -54,10 +54,10 @@ Completed in this checkout:
 
 - lint: zero errors; three existing React Compiler compatibility warnings;
 - TypeScript: passed;
-- Vitest: 218 assertions across 41 files passed without GitHub, Groq, or real application environment files;
+- Vitest: 226 assertions across 42 files passed without GitHub, Groq, or real application environment files;
 - production build: passed with all six intelligence routes;
-- migration chain: 81 contiguous files and synchronized `full_schema.sql`;
-- linked Supabase: ledger now matches 001–081, the final dry run reports no pending migrations, linked SQL lint returns zero errors, and linked types were regenerated after the type-changing migration 080; forward migration 081 corrected the audited three-hop/five-hop blast-radius mismatch without changing the type contract.
+- migration chain: 84 contiguous files and synchronized `full_schema.sql`;
+- linked Supabase: ledger now matches 001–084, the final dry run reports no pending migrations, linked SQL lint returns zero errors, and linked types were regenerated after the latest type-changing migration; migration 081 remains the forward correction for the audited three-hop/five-hop blast-radius mismatch.
 
 The new pgTAP file contains 35 assertions covering direct-DML denial, cross-user/project isolation, single-flight, budgets, primary and contributing-issue revocation, bounded graph context, cleanup, and atomic rollback. It could not execute from this workstation because the current user cannot access the Docker socket; the next Docker-enabled CI run is the required replay/pgTAP evidence. A live Groq response and authenticated multi-user browser run remain operator checks because no provider or disposable-account credentials are committed.
 

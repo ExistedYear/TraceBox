@@ -76,7 +76,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(requestedNext)}` } });
       if (error) throw error;
     } catch (error) {
-      toast.error(error instanceof Error ? getSafeAuthErrorMessage(error.message) : "GitHub sign-in is not available yet.");
+      toast.error(error instanceof Error ? getSafeAuthErrorMessage(error.message) : "Could not start GitHub sign-in.");
       setIsGithubLoading(false);
     }
   }
@@ -93,7 +93,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           <Button type="submit" className="w-full" disabled={isSubmitting || isGithubLoading}>{isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}{isSignup ? "Create account" : "Log in"}</Button>
         </form>
         <div className="relative my-6"><Separator /><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">or</span></div>
-        <Button type="button" variant="outline" className="w-full" onClick={continueWithGithub} disabled={isSubmitting || isGithubLoading}><Github className="h-4 w-4" />{isGithubLoading && <Loader2 className="h-4 w-4 animate-spin" />}Continue with GitHub</Button><p className="mt-2 text-center text-[11px] text-muted-foreground">GitHub sign-in requires the workspace deployment to enable the provider.</p>
+        <Button type="button" variant="outline" className="w-full" onClick={continueWithGithub} disabled={isSubmitting || isGithubLoading}><Github className="h-4 w-4" />{isGithubLoading && <Loader2 className="h-4 w-4 animate-spin" />}Continue with GitHub</Button>
         <p className="mt-6 text-center text-sm text-muted-foreground">{isSignup ? "Already have an account?" : "Need an account?"}{" "}<Link href={isSignup ? "/login" : "/signup"} className="font-medium text-primary hover:underline">{isSignup ? "Log in" : "Sign up"}</Link></p>
       </CardContent>
     </Card>

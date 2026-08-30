@@ -1633,6 +1633,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_public: boolean
           name: string
           owner_id: string
           slug: string
@@ -1641,6 +1642,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_public?: boolean
           name: string
           owner_id: string
           slug: string
@@ -1649,6 +1651,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_public?: boolean
           name?: string
           owner_id?: string
           slug?: string
@@ -2719,6 +2722,10 @@ export type Database = {
       is_project_member: { Args: { p_project_id: string }; Returns: boolean }
       is_service_role_request: { Args: never; Returns: boolean }
       issue_id_from_storage_path: { Args: { p_name: string }; Returns: string }
+      join_public_organization: {
+        Args: { p_organization_id: string }
+        Returns: undefined
+      }
       link_github_artifact: {
         Args: {
           p_github_artifact_id: string
@@ -2842,6 +2849,17 @@ export type Database = {
           display_label: string
           mention_token: string
           user_id: string
+        }[]
+      }
+      list_public_organizations: {
+        Args: { p_limit?: number }
+        Returns: {
+          already_joined: boolean
+          id: string
+          member_count: number
+          name: string
+          project_count: number
+          slug: string
         }[]
       }
       list_release_readiness_snapshots: {
@@ -3069,6 +3087,10 @@ export type Database = {
       }
       set_issue_visibility: {
         Args: { p_issue_id: string; p_visibility: string }
+        Returns: undefined
+      }
+      set_organization_public: {
+        Args: { p_is_public: boolean; p_organization_id: string }
         Returns: undefined
       }
       set_project_archived: {

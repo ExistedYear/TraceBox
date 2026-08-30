@@ -6,6 +6,7 @@ import { FolderKanban } from "lucide-react";
 import { ArchivedProjects, ProjectAdministration } from "@/components/settings/project-administration";
 import { ProjectSettings, type StateRow } from "@/components/settings/project-settings";
 import { ProjectMembersManager } from "@/components/settings/project-members-manager";
+import { NewProjectButton, ProjectCardLink } from "@/components/layout/workspace-switcher";
 import { EmptyState, Surface } from "@/components/tracebox/primitives";
 import { LoadError } from "@/components/tracebox/load-error";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ export default async function SettingsPage() {
     const restorableProjects = (archivedResult.data ?? []).filter((project) => canRestoreAll || maintainableIds.has(project.id));
     return (
       <div className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
-        <EmptyState icon={FolderKanban} title="No active project selected" description="Pick an active project from the sidebar, or restore an archived project below." />
+        <Surface className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-primary">Project administration</p><h1 className="mt-1 text-xl font-semibold">Choose a project</h1><p className="mt-1 text-sm text-muted-foreground">Project settings apply to one project at a time.</p></div>{canRestoreAll ? <NewProjectButton organizationId={context.activeOrganization.id} /> : null}</div>{context.projects.length > 0 ? <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{context.projects.map((project) => <ProjectCardLink key={project.id} project={project} />)}</div> : <EmptyState icon={FolderKanban} title="No active projects" description={canRestoreAll ? "Create a project or restore one below." : "Ask a workspace administrator to create or restore a project."} />}</Surface>
         <ArchivedProjects projects={restorableProjects} />
       </div>
     );

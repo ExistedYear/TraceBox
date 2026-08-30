@@ -1,187 +1,221 @@
 # TraceBox
 
-TraceBox is a focused issue-tracking workspace for engineering teams. It turns an incoming defect into structured, permission-aware work with a clear lifecycle from report to triage, implementation, and release. The product combines a dense developer queue with the controls teams need in production: roles, workflows, audit history, restricted issues, planning metadata, notifications, analytics, and GitHub development context.
+TraceBox is an issue tracker for engineering teams. It keeps bug reports, triage decisions, code changes, release planning, and audit history in one place.
 
 <p align="center">
-  <a href="https://trace-box.vercel.app/"><img src="https://img.shields.io/website?url=https%3A%2F%2Ftrace-box.vercel.app%2F&label=live%20deployment&style=flat-square" alt="Live deployment status"></a>
+  <a href="https://trace-box.vercel.app/"><img src="https://img.shields.io/website?url=https%3A%2F%2Ftrace-box.vercel.app%2F&label=live%20app&style=flat-square" alt="Live app status"></a>
   <a href="https://github.com/ExistedYear/TraceBox/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ExistedYear/TraceBox/ci.yml?branch=main&label=CI&style=flat-square" alt="CI status"></a>
-  <a href="https://github.com/ExistedYear/TraceBox"><img src="https://img.shields.io/github/last-commit/ExistedYear/TraceBox?style=flat-square" alt="Last commit"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js" alt="Next.js 16">
+  <img src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase">
 </p>
 
-<p align="center"><strong><a href="https://trace-box.vercel.app/">Open the live application →</a></strong></p>
+<p align="center"><strong><a href="https://trace-box.vercel.app/">Open TraceBox</a></strong></p>
 
-## Product overview
+## What it does
 
-TraceBox is built for teams that need more than a list of tickets. Each issue has an auditable history, explicit ownership, workflow rules, searchable context, and access controls that continue through comments, attachments, notifications, reports, APIs, and realtime updates.
+| Area | What you can do |
+|---|---|
+| Workspaces | Create private or public workspaces, invite people, discover open workspaces, and manage roles. |
+| Projects | Create projects, components, labels, versions, milestones, templates, custom fields, and custom workflows. |
+| Issues | Report, assign, edit, watch, search, filter, sort, link, bulk-update, and resolve issues. |
+| Triage | Review new reports, use keyboard shortcuts, find duplicates, and apply suggested field changes. |
+| Collaboration | Comment with Markdown, mention teammates, attach private files, and follow one activity timeline. |
+| Planning | Track milestones and versions, view reports, export CSV data, and calculate release readiness. |
+| Security | Restrict sensitive issues, grant access explicitly, use private attachments, and review immutable audit history. |
+| GitHub | Connect a GitHub App, bind repositories, link pull requests, read checks, and process signed webhooks. |
+| API | Use scoped bearer tokens with the `/api/v1` project, issue, comment, milestone, search, and GitHub endpoints. |
+| Trace Intelligence | Score report quality, suggest triage, explain duplicates, parse search text, summarize release risk, and show dependency impact. |
 
-## Technology
+Trace Intelligence is advisory. It never changes an issue without a person approving the change. Restricted and security issues are never sent to the external model.
 
-<p>
-  <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white" alt="Next.js 16">
-  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="Strict TypeScript">
-  <img src="https://img.shields.io/badge/Supabase-PostgreSQL%20%7C%20Auth%20%7C%20Storage%20%7C%20Realtime-3ECF8E?logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/Groq-structured%20AI-F55036" alt="Groq structured AI">
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
-  <img src="https://img.shields.io/badge/Vercel-production-black?logo=vercel&logoColor=white" alt="Vercel">
-</p>
+## Main technology
 
-The application uses the Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui-style primitives, Lucide, Zod, React Hook Form, Supabase PostgreSQL/Auth/Storage/Realtime, Groq structured output, and GitHub App APIs. Vitest, Playwright, pgTAP, and GitHub Actions provide the verification layers.
+- Next.js 16, React 19, and strict TypeScript
+- Tailwind CSS and accessible Radix/shadcn-style components
+- Supabase Auth, PostgreSQL, Row Level Security, Storage, and Realtime
+- Groq structured output for optional Trace Intelligence features
+- GitHub App APIs and signed webhooks
+- Vitest, Playwright, pgTAP, ESLint, and GitHub Actions
 
-## Feature matrix
+## Requirements
 
-| Area | What is included | Product guarantee |
-|---|---|---|
-| Workspaces & projects | Workspaces, projects, switchers, invitations, contributors, roles, ownership transfer | Membership and project context are revalidated server-side; invitation tokens are hashed and single-use |
-| Project administration | Metadata, immutable keys, archive/restore, components, default assignees, labels, versions, milestones | Archived projects reject mutations; workflow graphs publish atomically with structural validation |
-| Issue lifecycle | Atomic creation, `KEY-N` numbering, full editing, templates, custom fields, planning, visibility, grants | Concurrent numbering is gap-safe; stale edits are rejected; creation options commit in one transaction |
-| Issue queue | Search, combined filters, sorting, pagination, counts, saved views, inline edits, bulk updates | Queries are database-bounded, URL-stable, permission-checked, and visibility-aware |
-| Workflow & triage | Role-aware transitions, resolutions, reopen, assignment, duplicate suggestions, J/K/A/R/D triage | Invalid transitions and duplicate resolution fail atomically with auditable outcomes |
-| Collaboration | Comments, Markdown, stable mentions, activity timeline, watchers, notifications | Only persisted identity mentions style/notify; notification feeds redact inaccessible issues |
-| Relationships | `BLOCKS`, `DEPENDS_ON`, `RELATES_TO`, `DUPLICATE_OF`, `CAUSED_BY`, `REGRESSION_OF` | Self-links, duplicates, unauthorized targets, and unsafe unlinking are rejected |
-| Security & files | Restricted issues, access grants/history, private attachments, signed previews/downloads, orphan cleanup | `can_view_issue` and active-project checks protect every issue-owned surface and Storage object |
-| Reports & readiness | Dashboard metrics, backlog history, MTTR, age/breakdowns, CSV export, readiness score and snapshots | Aggregates are backend-authoritative, visibility-filtered, explainable, and bounded |
-| Trace Intelligence | Report quality, advisory triage, duplicate explanations, natural search, release briefs, blast radius | Explicit user invocation, strict schemas, live-access cache checks, request budgets, deterministic fallbacks, and no restricted/security inference |
-| GitHub App | Verified installations, repository bindings, PR/check metadata, webhooks, auto-links, retries, reconciliation | Stable IDs, signed/idempotent deliveries, branch-aware resolution, and server-only credentials |
-| REST API | `/api/v1` projects, issues, comments, milestones, search, and GitHub resources | Granular organization-scoped tokens; SQL-enforced scopes, membership, visibility, and safe errors |
-| Account & UI | Profile/avatar, password/recovery, session controls, themes, command palette, responsive/accessibility support | Auth-sensitive writes stay in Auth; keyboard actions have visible equivalents and failure states are explicit |
+- [Node.js 22 or newer](https://nodejs.org/)
+- npm 10 or newer
+- [Docker](https://docs.docker.com/get-docker/) for local Supabase
+- [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), or permission for `npx` to download it
+- Git
 
-## Feature catalog
+GitHub and Groq accounts are optional. The core issue tracker works without them.
 
-### Workspace and project administration
+## Start locally
 
-- Create multiple workspaces and projects with cookie-backed workspace/project switching and server-side membership revalidation.
-- Invite workspace and project contributors with hashed, single-use invitation tokens, explicit organization/project roles, pending-invite visibility, safe expiry/revocation handling, and ownership transfer with last-owner protection.
-- Manage project metadata, immutable project keys, archive/restore lifecycle, components, default assignees, labels, versions, milestones, and contributor access.
-- Publish a complete workflow graph atomically. Validation enforces one initial state, reachability, terminal paths, valid roles/transitions, and safe handling of in-use states.
-
-### Issue lifecycle and queue
-
-- Create issues atomically with human-readable keys such as `BUG-123`; number allocation is gap-safe under concurrent submissions.
-- Capture title, Markdown description, type, priority, severity, environment, reproduction steps, expected/actual behavior, component, assignee, reporter, visibility, labels, versions, milestones, templates, and custom fields.
-- Apply template defaults, required custom-field validation, component-assignee defaults, watchers, restricted grants, and audit events in one transaction.
-- Edit full issue content with optimistic `updated_at` conflict detection, nullable-field clearing, unsaved-draft protection, Markdown preview, and field-level audit entries.
-- Use the issue queue with combined status/category/priority/severity/type/visibility/component/assignee/reporter/resolution/version/milestone/label/custom-field filters, sorting, exact counts, pagination, URL state, and responsive desktop/mobile layouts.
-- Perform bounded, permission-checked, atomic bulk updates with clear selection and failure recovery.
-- Use a dedicated security queue and restricted indicators without exposing unauthorized issue metadata.
-
-### Workflow, triage, and relationships
-
-- Transition issues through the configured workflow with role checks, resolution requirements, reopen support, archived-project guards, and safe assignment/unassignment.
-- Triage from a focused inbox with visible controls and J/K navigation plus A/R/D classification shortcuts that ignore text inputs and remain keyboard-accessible.
-- Find likely duplicates while typing and resolve a duplicate atomically: deterministic locking, canonical issue linking, status/resolution update, and audit history happen together.
-- Link issues as `BLOCKS`, `DEPENDS_ON`, `RELATES_TO`, `DUPLICATE_OF`, `CAUSED_BY`, or `REGRESSION_OF`, with reciprocal rendering, authorization, self-link prevention, duplicate detection, and safe unlink auditing.
-
-### Collaboration and activity
-
-- Add and edit 1–10,000-character comments through RPCs with project-member authorization, archived-project guards, safe GitHub-Flavored Markdown, code blocks, issue references, and XSS-safe rendering.
-- Mention real project/issue identities through scoped autocomplete. Persisted mentions—not arbitrary `@text`—drive styling and notifications, including restricted-issue redaction.
-- View one chronological timeline that merges issue events and comments, including creation, edits, transitions, assignments, links, planning changes, access changes, and comment activity.
-- Watch and unwatch issues idempotently. Preference-aware notifications cover mentions, assignments, comments, status changes, watched updates, links, labels, planning, and milestones.
-- Use the header preview and full cursor-paginated notification inbox with read-one/read-all state, explicit loading/error/empty states, and access-safe redaction.
-
-### Search, saved views, and command workflows
-
-- Search issue text using PostgreSQL `pg_trgm` and `tsvector` indexes, with database-side authorization and bounded results.
-- Save and share stable issue views with `PRIVATE`, `PROJECT`, or `ORGANIZATION` visibility. Owners control lifecycle; RLS controls who can read shared views.
-- Open a command palette for personal issues, notifications, project navigation, issue creation/search, and authorized quick status actions.
-- Preserve filter state in canonical URL codecs so refresh, back/forward navigation, and shared links remain predictable.
-- Subscribe to project-scoped Supabase Realtime channels for issue, comment, notification, and attachment changes; refetch visibility-sensitive updates and protect dirty drafts during reconnects.
-
-### Files, security, and audit
-
-- Upload private issue attachments up to 50 MB with validated names/types/paths, retryable failures, signed previews/downloads, image lightboxes, deletion, and protected orphan reconciliation.
-- Store objects at `<issue-uuid>/<filename>` and require current issue visibility plus an active project for every Storage operation.
-- Create restricted security issues with explicit access grants. RLS applies consistently to issues, comments, events, links, notifications, attachments, searches, saved views, reports, readiness, APIs, and realtime.
-- Browse immutable, paginated project audit history with actor/action/date/issue filters, restricted-safe redaction, and CSV export.
-
-### Reports, dashboard, and release readiness
-
-- View backend-authoritative operational metrics for visible issues, created/resolved history, backlog trends, MTTR, age distribution, and assignee/component/priority/milestone breakdowns.
-- Drill from reports to canonical queue filters and export bounded CSV data without bypassing issue visibility.
-- Calculate an explainable 0–100 release-readiness score with factor-level risk lists, milestone/version validation, historical snapshots, and creator-private snapshot history.
-- Keep dashboard aggregates honest with distinct loading, empty, not-found, failure, and retry states.
-
-### Trace Intelligence
-
-- Score defect-report quality locally from reproduction, expected/actual behavior, environment, version, diagnostic, and regression evidence. Tasks and enhancements are not misleadingly scored.
-- Request advisory triage for component, severity, priority, assignee, regression likelihood, follow-up questions, and the top three deterministic duplicate candidates. Suggested IDs are validated against the exact project allowlists before display or application.
-- Review selected suggestions and apply them through one optimistic, atomic RPC. Existing role checks, archive guards, assignment eligibility, audit events, and stale-issue rejection remain authoritative.
-- Compare duplicate candidates side by side and resolve a confirmed duplicate through the existing transactional duplicate workflow.
-- Translate natural language into the existing validated issue-filter contract, review named editable chips, and apply them through canonical queue URLs. The model cannot generate SQL or invent accepted IDs.
-- Generate a release-risk explanation only for a selected milestone or version. The canonical readiness score remains the existing database calculation; the model receives a bounded summary and the highest-ranked safe risks.
-- Traverse the permission-filtered dependency graph on demand to show direct/transitive blocking impact, affected components/milestones, critical issues, and accessible issue links without external inference.
-- Keep inference server-only and explicit. Results use strict JSON Schema plus Zod validation, an eight-second timeout, bounded context/output, recursive secret redaction, per-user/project budgets, single-flight leases, and viewer-scoped expiring caches whose source-issue access is rechecked on every read.
-- Block external inference when the primary or any contributing issue is restricted or has type `SECURITY`. Comments, attachment bodies, webhook payloads, email addresses, tokens, and integration configuration are never sent to Groq. If Groq is absent or unavailable, the rest of TraceBox continues to work.
-
-### GitHub App integration
-
-- Connect a verified GitHub App installation separately from GitHub sign-in; callback state is signed and bound to the TraceBox user, workspace, and project.
-- Discover repositories through stable GitHub IDs, bind multiple repositories to projects, select a primary repository explicitly, configure target branches, and control automation by repository.
-- Search and link pull requests only from repositories bound to the active project. Fetch authoritative PR metadata and checks server-side.
-- Receive signed, durable, idempotent webhooks with delivery leases, classified failures, replay/retry limits, lifecycle reconciliation, payload cleanup, and safe operational history.
-- Derive `Fixes`/`Closes`/`Resolves` relationships transactionally, preserve manual links, and resolve issues only when the configured branch and visibility rules allow it.
-
-### REST API and accounts
-
-- Use organization-scoped bearer tokens with granular project, issue, comment, milestone, search, integration, and GitHub-link scopes.
-- Access paginated project/issue reads and writes, comments, milestones, search, and verified GitHub resources through `/api/v1`; malformed input, insufficient scope, archived projects, and hidden issues return safe responses.
-- Enforce token-owner live project membership and restricted issue visibility inside service-role-only SQL wrappers before data reaches route handlers.
-- Manage profile/display name, owner-scoped avatar storage, email/password changes, recovery, notification preferences, current-session logout, and global logout from the account area.
-
-### Interface and accessibility
-
-- Use a dense command-center layout with sticky, scrollable navigation, responsive issue cards/tables, compact controls, semantic status labels, and explicit field labels.
-- Support keyboard-only navigation, visible equivalents for shortcuts, focus-safe menus/dialogs, announced validation and failure states, reduced reliance on color, and mobile layouts at narrow viewports.
-- Persist light/dark mode independently from blue, neutral, amber, purple, and emerald accent themes.
-
-## What makes it dependable
-
-- PostgreSQL and RLS are the source of truth. Privileged mutations are narrow SQL RPCs, not unrestricted browser writes.
-- `can_view_issue` is the shared visibility boundary for issue-owned data, including restricted comments, files, notifications, analytics, API responses, and realtime behavior.
-- Issue numbers are allocated atomically; workflow publication and duplicate resolution are transactional; audit history is immutable.
-- Server-only service-role access is confined to API, webhook, and protected maintenance boundaries.
-- Forward-only migrations preserve deployed history. The current chain contains 81 ordered migrations, all deployed to the linked project; migration 081 is the forward correction for the audited five-hop blast-radius contract.
-
-## Architecture
-
-```mermaid
-flowchart TD
-  Browser[Browser] --> Proxy[Next.js proxy]
-  Proxy --> Auth[Supabase Auth]
-  Browser --> App[Next.js app and route handlers]
-  App --> RLS[Supabase PostgREST + RLS]
-  App --> Server[Server-only API/webhook boundary]
-  Server --> RPC[Security-definer RPCs]
-  RLS --> DB[(PostgreSQL)]
-  RPC --> DB
-  Browser --> Storage[Private Storage + signed URLs]
-  DB --> Realtime[Supabase Realtime]
-  Realtime --> Browser
-  GitHub[GitHub App + webhooks] --> Server
-  App --> Intelligence[Trace Intelligence routes]
-  Intelligence --> Cache[RPC-only cache + request budgets]
-  Intelligence --> Groq[Groq structured output]
-  Cache --> DB
-```
-
-Browser components use a typed Supabase client for authorized reads and RPC calls. Server components resolve the authenticated workspace/project context from validated cookies. Service-role credentials never enter client code.
-
-## Run locally
-
-Requirements: Node.js 22+, npm, and the Supabase CLI.
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/ExistedYear/TraceBox.git
+cd TraceBox
 npm install
+```
+
+### 2. Create the environment file
+
+```bash
 cp .env.example .env.local
-# Add Supabase URL and publishable/anon key. GROQ_API_KEY is optional and server-only.
+```
+
+Do not commit `.env.local`. The repository ignores every `.env*` file except `.env.example`.
+
+### 3. Start and reset local Supabase
+
+```bash
 npm run db:start
 npm run db:reset
+```
+
+`db:start` prints the local API URL, anon key, service-role key, database URL, and Studio URL. Copy these values into `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-local-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-local-service-role-key
+```
+
+The reset applies every migration and loads `supabase/seed.sql`.
+
+### 4. Add optional variables
+
+Leave a feature's variables blank if you do not use it.
+
+```dotenv
+GROQ_API_KEY=
+
+GITHUB_WEBHOOK_SECRET=
+GITHUB_APP_ID=
+GITHUB_APP_SLUG=
+GITHUB_APP_CLIENT_ID=
+GITHUB_APP_CLIENT_SECRET=
+GITHUB_APP_PRIVATE_KEY=
+GITHUB_APP_CALLBACK_URL=http://localhost:3000/api/github/callback
+GITHUB_API_VERSION=2022-11-28
+
+CRON_SECRET=
+```
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase API URL. Safe for browser code. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser Supabase key. RLS still controls access. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Hosted server features | Server-only API, webhook, maintenance, and invitation email work. Never expose it to the browser. |
+| `GROQ_API_KEY` | No | Server-only Trace Intelligence requests. |
+| `GITHUB_WEBHOOK_SECRET` | No | Verifies GitHub webhook signatures. |
+| `GITHUB_APP_ID` | No | GitHub App identity. |
+| `GITHUB_APP_SLUG` | No | Builds installation links. |
+| `GITHUB_APP_CLIENT_ID` | No | GitHub App authorization. |
+| `GITHUB_APP_CLIENT_SECRET` | No | GitHub App authorization. Server-only. |
+| `GITHUB_APP_PRIVATE_KEY` | No | Creates installation tokens. Store the full PEM using the format required by your host. |
+| `GITHUB_APP_CALLBACK_URL` | No | Must match the callback configured in GitHub. |
+| `GITHUB_API_VERSION` | No | GitHub REST API version. |
+| `CRON_SECRET` | Hosted maintenance | Protects scheduled cleanup and reconciliation routes. |
+
+### 5. Run the app
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). A clean database reset intentionally has no synthetic tenant data; create a disposable workspace and project through the onboarding flow.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Verification
+The local seed contains a disposable account:
+
+```text
+Email:    demo@123.com
+Password: demo123
+```
+
+These credentials are public test data. The hosted demonstration may expose the same ordinary-user account. Do not store private information in it or grant it administrative access.
+
+### 6. Stop local Supabase
+
+```bash
+npm run db:stop
+```
+
+## Use a hosted Supabase project
+
+1. Create a Supabase project.
+2. Link it:
+
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref YOUR_PROJECT_REF
+   ```
+
+3. Check drift before writing:
+
+   ```bash
+   npx supabase migration list --linked
+   npx supabase db push --linked --dry-run
+   npx supabase db lint --linked --level error
+   ```
+
+4. Apply only pending forward migrations:
+
+   ```bash
+   npx supabase db push --linked
+   npm run db:types:linked
+   npm run sync:migrations
+   ```
+
+5. Set the three Supabase variables in `.env.local` and your deployment host.
+6. Configure the Supabase Auth Site URL and allow callback, reset-password, and `/invite/**` redirects for localhost and the deployed domain.
+
+Do not run `supabase/seed.sql` against production. A hosted demo account, when wanted, must be created separately as an ordinary user without privileged credentials or access to real tenant data.
+
+`supabase/full_schema.sql` is kept on purpose. It is generated from the ordered migrations, supports fresh SQL Editor installs, and makes drift review easier. Never edit it directly; run `npm run sync:migrations` after adding a migration.
+
+## Configure the GitHub App
+
+Skip this section if you do not need GitHub integration.
+
+1. Create a GitHub App with read access to repository metadata, contents, pull requests, and checks.
+2. Set its callback to `https://YOUR_DOMAIN/api/github/callback`.
+3. Set its webhook to `https://YOUR_DOMAIN/api/webhooks/github`.
+4. Subscribe to the installation, repository, pull request, check, and push events used by your workflow.
+5. Add every `GITHUB_*` variable from `.env.example` to the server environment.
+6. Open **Settings → Integrations**, connect the App, bind repositories, choose a primary repository, and set target branches.
+
+GitHub sign-in and GitHub App installation are separate. Sign-in proves identity; the App grants repository access.
+
+## Configure Trace Intelligence
+
+1. Create a Groq API key.
+2. Add `GROQ_API_KEY` to `.env.local` and your deployment host.
+3. Review provider data-retention controls before enabling it for real organization data.
+4. Restart the app.
+
+Without the key, AI controls show an unavailable state. Report quality, duplicate retrieval, release readiness, issue filters, and dependency traversal still work.
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start development with Turbopack. |
+| `npm run build` | Create the production Webpack build. |
+| `npm start` | Serve the production build. |
+| `npm run lint` | Run ESLint. |
+| `npm run typecheck` | Check TypeScript. |
+| `npm test` | Run credential-free Vitest tests. |
+| `npm run test:e2e` | Run Playwright; fixture-dependent journeys skip without credentials. |
+| `npm run check:migrations` | Check migration order and `full_schema.sql`. |
+| `npm run sync:migrations` | Regenerate `full_schema.sql`. |
+| `npm run db:start` | Start local Supabase. |
+| `npm run db:reset` | Rebuild local data from migrations and seed. |
+| `npm run db:test` | Reset, run pgTAP, and test concurrent issue numbering. |
+| `npm run db:types` | Generate database types locally. |
+| `npm run db:types:linked` | Generate types from the linked project. |
+
+## Verify a release
 
 ```bash
 npm run lint
@@ -192,32 +226,61 @@ npm run check:migrations
 npm run test:e2e
 ```
 
-The current checkout passes the JavaScript quality gates, production build, contiguous 001–081 migration/full-schema check, and credential-free tests without GitHub, Groq, or real application environment files. The linked Supabase ledger is aligned through 081, the final dry run reports no pending migrations, linked SQL lint reports zero errors, and linked database types were regenerated after migration 080 (081 does not change the type contract). The existing GitHub Actions evidence covers a fresh 001–079 replay, 231 pgTAP assertions, true concurrent issue allocation, production build, and browser smoke; migration 080 adds a 35-assertion authorization/concurrency suite for the next Docker-enabled CI run. Authenticated multi-user and live provider journeys remain operator-run because they require disposable accounts and external credentials.
+Database tests require Docker. Live GitHub, email, multi-user, Storage, Realtime, and Groq checks require disposable external credentials and belong in staging.
 
-## Deployment
+## Architecture
 
-The live deployment is [trace-box.vercel.app](https://trace-box.vercel.app/). For a new environment:
+```mermaid
+flowchart TD
+  Browser --> Proxy[Next.js session proxy]
+  Proxy --> Auth[Supabase Auth]
+  Browser --> App[Next.js pages and routes]
+  App --> RLS[PostgREST and RLS]
+  App --> RPC[Authorized SQL functions]
+  RLS --> DB[(PostgreSQL)]
+  RPC --> DB
+  Browser --> Storage[Private Storage and signed URLs]
+  DB --> Realtime[Supabase Realtime]
+  Realtime --> Browser
+  GitHub[GitHub App and webhooks] --> App
+  App --> Groq[Optional structured AI]
+```
 
-1. Create a Supabase project and apply the ordered migrations through 081.
-2. Configure Auth site/redirect URLs, private attachment Storage, Realtime publication, and the required Vercel variables.
-3. Configure the GitHub App callback, webhook, permissions, and server-only secrets if GitHub integration is enabled. Configure server-only `GROQ_API_KEY` only after reviewing provider data controls; otherwise Trace Intelligence degrades cleanly.
-4. Connect the repository to Vercel and deploy the `main` branch.
-5. Run the authenticated, two-user, Storage, Realtime, API, and webhook checks against the deployed environment.
+The database is the source of truth. Browser code never receives the service-role key, GitHub private key, webhook secret, cron secret, or Groq key.
 
-See the [deployment guide](docs/deployment.md), [feature checklist](docs/feature-testing-checklist.md), [REST API contract](docs/api.md), and [handoff record](handoff.md). The deployment guide contains the exact variables, migration order, cron routes, Auth settings, Storage checks, and hosted validation steps.
+## Project structure
 
-## Documentation map
+```text
+src/app/                 Pages and route handlers
+src/components/          Product and UI components
+src/lib/                 Auth, Supabase, validation, API, GitHub, and AI helpers
+src/features/            Pure feature logic
+supabase/migrations/     Ordered forward-only database changes
+supabase/tests/          pgTAP authorization and behavior tests
+supabase/seed.sql        Local disposable demo account and data
+tests/                   Vitest tests
+playwright/              Browser tests
+docs/                    Active operator and product documentation
+assets/docs/             Landing-page source notes copied from repository docs
+```
 
-The active documentation set is intentionally small:
+## Security
 
-- [Deployment guide](docs/deployment.md) — setup, configuration, migration discipline, and release checks.
-- [Feature checklist](docs/feature-testing-checklist.md) — the product QA matrix for a real workspace/project.
-- [REST API](docs/api.md) — authentication, scopes, endpoints, pagination, and error contracts.
-- [Schema decisions](docs/schema-decisions.md) — deliberate differences between historical plans and the shipped schema.
-- [Handoff](handoff.md) — current verification evidence and operational context.
+Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not open a public issue for an unpatched security problem.
 
-Historical audits, completed implementation plans, and release logs are retained in [docs/archive](docs/archive/). The retained [Trace Intelligence plan](docs/last_day_plan.md) and [implementation audit](docs/last-day-plan-audit.md) document the shipped feature boundary and its security corrections.
+Never commit environment files, service keys, GitHub private keys, webhook secrets, Groq keys, cron secrets, browser storage, or API bearer tokens.
+
+## Documentation
+
+- [Deployment guide](docs/deployment.md)
+- [Feature testing checklist](docs/feature-testing-checklist.md)
+- [REST API](docs/api.md)
+- [Schema decisions](docs/schema-decisions.md)
+- [Trace Intelligence implementation audit](docs/last-day-plan-audit.md)
+- [Current handoff](handoff.md)
+
+Historical plans and completed audits are in [`docs/archive`](docs/archive/).
 
 ## License
 
-No license has been declared yet. Add the project’s intended license before public redistribution.
+TraceBox is available under the [MIT License](LICENSE).

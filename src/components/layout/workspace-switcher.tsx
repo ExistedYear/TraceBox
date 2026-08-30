@@ -106,9 +106,9 @@ export function WorkspaceSwitcher({ organizations, projects, activeOrganizationI
           <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Projects</DropdownMenuLabel>
           {projects.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No projects yet.</p>}
           {projects.map((project) => (
-            <DropdownMenuItem key={project.id} onSelect={() => { selectProject(project.id); router.push("/dashboard/issues"); router.refresh(); onContextChange?.(); }}>
-              <span className="font-mono text-xs">{project.key}</span>
-              <span className="min-w-0 flex-1 truncate">{project.name}</span>
+            <DropdownMenuItem key={project.id} className="grid grid-cols-[52px_minmax(0,1fr)_16px] gap-2" onSelect={() => { selectProject(project.id); router.push("/dashboard/issues"); router.refresh(); onContextChange?.(); }}>
+              <span className="truncate font-mono text-[10px] font-semibold text-primary">{project.key}</span>
+              <span className="min-w-0 truncate text-xs">{project.name}</span>
               {project.id === activeProjectId && <Check className="h-3.5 w-3.5 text-primary" />}
             </DropdownMenuItem>
           ))}

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Bell, ChevronsLeft, ChevronsRight, CircleDot, FolderKanban, Inbox, LayoutDashboard, Menu, Plus, ScrollText, Settings2, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, Bell, ChevronsLeft, ChevronsRight, CircleDot, FolderKanban, Globe2, Inbox, LayoutDashboard, Menu, Plus, ScrollText, Settings2, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 
 import { TraceLogo } from "@/components/tracebox/trace-mark";
 import { WorkspaceSwitcher, type ProjectSummary, type WorkspaceSummary } from "@/components/layout/workspace-switcher";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 const primaryLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
+  { href: "/dashboard/discover", label: "Discover", icon: Globe2 },
   { href: "/dashboard/issues", label: "Issues", icon: CircleDot },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   { href: "/dashboard/triage", label: "Triage", icon: Inbox },

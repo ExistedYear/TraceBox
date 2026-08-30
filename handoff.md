@@ -26,7 +26,7 @@ TraceBox implements the roadmap in `docs/archive/tracebox-main-plan.md` through 
 20. Custom fields, issue custom values, API tokens, and scoped REST API routes
 21. Trace Intelligence: deterministic report quality, advisory triage and duplicate explanations, natural-language filter parsing, release-risk briefs, and a permission-filtered blast-radius graph
 
-Database state is represented by migrations `202608260001` through `202608260081`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 080 adds the RPC-only viewer-scoped intelligence cache, live source-issue access checks, bounded expiry/results, request budgets, single-flight leases, permission-filtered graph context, and the narrow optimistic atomic triage-apply wrapper. Migration 081 is the forward-only five-hop blast-radius correction. Supabase records migration versions but does not re-run an applied file after that file is edited.
+Database state is represented by migrations `202608260001` through `202608260084`. `supabase/full_schema.sql` is regenerated from all migration files in lexical order. Migration 080 adds the Trace Intelligence boundaries, 081 corrects blast-radius depth, 082 adds public workspaces, 083 makes public joining idempotent without role downgrade, and 084 serializes joins with visibility changes. Supabase records migration versions but does not re-run an applied file after that file is edited.
 
 Completion-plan Phases 2–14 are source-complete: contributor and ownership journeys, honest failure states, full issue creation/editing, realtime queue/detail consistency, notification settings/inbox, project/workflow administration, restricted security controls, advanced queue/saved-view lifecycle, transactional duplicate triage and command workflows, resource/API workflows, analytics/readiness/audit, stable mentions/account management, GitHub operational visibility, and the committed integration/browser verification harness are implemented. Disposable database execution is verified in CI; hosted multi-user/realtime/browser validation remains a distinct external release check.
 
@@ -59,15 +59,15 @@ CRON_SECRET=<server-only-vercel-cron-secret>
 ## Verification performed in this checkout
 
 TypeScript:  npm run typecheck — passed
-Tests:       218/218 passed across 41 test files
+Tests:       226/226 passed across 42 test files
 Lint:        0 errors; compatibility warnings only
 Build:       npm run build — passed
-Migration check: 81 files are contiguous and `supabase/full_schema.sql` is synchronized
+Migration check: 84 files are contiguous and `supabase/full_schema.sql` is synchronized
 Browser smoke: 3 credential-free journeys passed; 10 fixture-dependent journeys skipped explicitly
 Database tests: GitHub Actions run 33264345126 passed a fresh 001–079 replay, 231 pgTAP assertions, and true concurrent issue allocation
-Database types: `src/types/database.ts` was regenerated from the linked schema after migration 080
+Database types: `src/types/database.ts` was regenerated from the linked schema after migration 082
 
-Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079, and `db push --dry-run` reported only migration 080. Migration 080 applied successfully and linked types were regenerated from its live contract. The final audit found that 080 stopped blast-radius recursion at three hops; forward-only migration 081 corrected the specified five-hop contract without changing generated types. Migration 081 then applied successfully, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. A local/linked schema diff and pgTAP execution could not run on this machine because the current user lacks Docker socket access; the next Docker-enabled CI run must replay 001–081 and execute the new 35-assertion intelligence suite. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
+Hosted Supabase drift snapshot on 2026-08-30: the linked ledger matched local migrations 001–079 before this release. Migrations 080–084 were then reviewed and applied in order, linked types were regenerated after schema-changing migration 082, the final linked dry run reported no pending migrations, and linked SQL lint returned zero errors. A local schema diff and pgTAP execution could not run on this machine because the current user lacks Docker socket access; the next Docker-enabled CI run must replay 001–084 and execute the intelligence and public-workspace suites. Historical migration edits are never a deployment mechanism; every future deployed-schema correction must use the next forward-only migration.
 
 The hosted GitHub flow was manually verified on 2026-08-28: a private repository was installed, discovered, bound to a project using key `BUG`, and a PR containing `Fixes BUG-1` was linked by webhook and changed the issue to `RESOLVED / FIXED` after merging into `main`. Public deployment probes also returned `200` for `/` and `/login`, `405` for an unsupported webhook `GET`, and `401` for an unsigned webhook `POST`.
 
@@ -77,10 +77,12 @@ Static source audits found and fixed migration syntax, API issue argument orderi
 
 The local-only `qa/live/` Playwright suite was added for hosted checks. It is ignored by Git and must be configured separately with disposable API, OAuth, and webhook test credentials. Do not commit its `.env`, browser state, reports, or test-results. Earlier pre-deployment probes found an older deployment; the current public probes and the hosted GitHub PR flow now pass, while the full multi-user/API/browser suite remains outstanding.
 
+Migration 082 was dry-run as the only pending change, applied, and followed by linked type generation. The independent review then fixed repeated-join role downgrade in forward migration 083 and the visibility-change race in forward migration 084. Both are deployed; the final linked dry run is empty and linked SQL lint reports zero errors. The linked project also contains the requested disposable `demo@123.com` account with its own public `tracebox-demo` workspace; these known credentials carry no service-role access.
+
 ## Deployment checklist
 
 1. Confirm the linked target is TraceBox project `tvjqgzgpgdpzkhhhrfzr` and compare its migration ledger/schema to the local chain before every push.
-2. Confirm the hosted ledger and local chain both end at 081, rerun a linked dry-run and schema lint before future pushes, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
+2. Confirm the hosted ledger and local chain both end at 084, rerun a linked dry-run and schema lint before future pushes, and regenerate `src/types/database.ts` if the linked contract changes. Never edit an applied migration; use a new forward reconciliation migration for any drift.
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.

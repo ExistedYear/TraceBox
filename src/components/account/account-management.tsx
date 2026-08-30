@@ -376,7 +376,7 @@ export function AccountManagement({ userId, email: initialEmail, displayName: in
           </Surface>
 
           <Surface className="p-5 sm:p-6">
-            <div className="flex items-start gap-3"><Mail className="mt-0.5 h-4 w-4 text-primary" /><div><h2 className="text-sm font-semibold">Email address</h2><p className="mt-1 text-xs text-muted-foreground">Changing your email requires confirmation from both inboxes when enabled by your Auth settings.</p></div></div>
+            <div className="flex items-start gap-3"><Mail className="mt-0.5 h-4 w-4 text-primary" /><div><h2 className="text-sm font-semibold">Email address</h2><p className="mt-1 text-xs text-muted-foreground">Enter a new address. TraceBox will send confirmation messages to your current and new addresses before the change takes effect.</p></div></div>
             <form onSubmit={changeEmail} className="mt-5 space-y-4"><div className="space-y-2"><Label htmlFor="account-email">Email</Label><Input id="account-email" type="email" value={email} onChange={(event) => { setEmail(event.target.value); setEmailMessage(null); setEmailMessageKind(null); }} autoComplete="email" />{emailMessage && <p role="status" className={`text-xs ${emailMessageKind === "success" ? "text-emerald-400" : "text-destructive"}`}>{emailMessage}</p>}</div><Button type="submit" size="sm" className="h-8" disabled={emailBusy}>{emailBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Change email</Button></form>
           </Surface>
         </div>
