@@ -14,8 +14,11 @@ type GeminiResponse = {
 };
 
 class GeminiHttpError extends Error {
-  constructor(readonly status: number, readonly details: string) {
-    super(`Google AI request failed with status ${status}: ${details}`);
+  readonly details: string;
+  constructor(readonly status: number, details: string) {
+    const boundedDetails = details.slice(0, 16_000);
+    super(`Google AI request failed with status ${status}: ${boundedDetails}`);
+    this.details = boundedDetails;
     this.name = "GeminiHttpError";
   }
 }
@@ -91,14 +94,15 @@ export async function geminiJson<T>(options: GeminiJsonOptions): Promise<T> {
         contents: [{ role: "user", parts: [{ text: payload }] }],
         generationConfig: {
           maxOutputTokens: Math.min(options.maxOutputTokens ?? 2048, 4096),
-          responseFormat: { text: { mimeType: "application/json", schema: options.jsonSchema } },
+          responseMimeType: "application/json",
+          responseJsonSchema: options.jsonSchema,
         },
       }),
       signal: controller.signal,
     });
     if (!response.ok) {
       const details = await response.text().catch(() => "");
-      throw new GeminiHttpError(response.status, details.slice(0, 500));
+      throw new GeminiHttpError(response.status, details);
     }
     const result = await response.json() as GeminiResponse;
     const content = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";

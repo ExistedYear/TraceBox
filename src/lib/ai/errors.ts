@@ -46,7 +46,9 @@ export function mapProviderError(error: unknown): AiError {
   const name = error instanceof Error ? error.name : "";
   const message = error instanceof Error ? error.message : String(error);
   const lower = `${name} ${message}`.toLowerCase();
-  if (lower.includes("429") || lower.includes("rate limit")) return new AiError("AI_RATE_LIMITED");
+  const status = error && typeof error === "object" && "status" in error && typeof (error as { status?: unknown }).status === "number" ? (error as { status: number }).status : undefined;
+  if (status === 429 || lower.includes("429") || lower.includes("rate limit")) return new AiError("AI_RATE_LIMITED");
+  if (status !== undefined && status >= 400) return new AiError("AI_PROVIDER_ERROR");
   if (lower.includes("abort") || lower.includes("timeout") || lower.includes("timed out")) return new AiError("AI_TIMEOUT");
   if (lower.includes("json") || lower.includes("schema") || lower.includes("invalid response")) return new AiError("AI_INVALID_RESPONSE");
   return new AiError("AI_PROVIDER_ERROR");

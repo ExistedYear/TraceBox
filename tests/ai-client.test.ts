@@ -34,7 +34,7 @@ describe("Gemini provider client", () => {
     const body = JSON.parse(String(request.body)) as Record<string, unknown>;
     expect(body.systemInstruction).toEqual({ parts: [{ text: options.systemPrompt }] });
     expect(body.contents).toEqual([{ role: "user", parts: [{ text: JSON.stringify(options.userPayload) }] }]);
-    expect(body.generationConfig).toEqual(expect.objectContaining({ responseFormat: { text: { mimeType: "application/json", schema: options.jsonSchema } } }));
+    expect(body.generationConfig).toEqual(expect.objectContaining({ responseMimeType: "application/json", responseJsonSchema: options.jsonSchema }));
   });
 
   it("maps Google rate-limit responses to the stable application error", async () => {
@@ -47,7 +47,7 @@ describe("Gemini provider client", () => {
   it("logs sanitized provider details for non-rate-limit failures", async () => {
     process.env.GEMINI_API_KEY = "test-gemini-key";
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 403, status: "PERMISSION_DENIED", message: "API key AIza-test-secret was rejected" } }), { status: 403 })));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 403, status: "PERMISSION_DENIED", message: "API key AIza-test-secret was rejected", details: [{ description: "provider detail that makes the JSON body exceed the old log limit".repeat(20) }] } }), { status: 403 })));
 
     await expect(geminiJson({ ...options, requestId: "vercel-request-123" })).rejects.toMatchObject({ code: "AI_PROVIDER_ERROR" });
     expect(log).toHaveBeenCalledWith("Trace Intelligence Gemini provider failure", expect.objectContaining({
