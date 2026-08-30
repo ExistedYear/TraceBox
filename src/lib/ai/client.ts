@@ -3,59 +3,54 @@ import "server-only";
 import { AI_MAX_CONTEXT_CHARS, AI_MAX_OUTPUT_CHARS, AI_MODEL, AI_TIMEOUT_MS } from "./config";
 import { AiError, mapProviderError } from "./errors";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-type OpenRouterResponse = {
-  choices?: Array<{
-    message?: { content?: string | null };
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
   }>;
 };
 
-class OpenRouterHttpError extends Error {
+class GeminiHttpError extends Error {
   constructor(readonly status: number, details: string) {
-    super(`OpenRouter request failed with status ${status}: ${details}`);
-    this.name = "OpenRouterHttpError";
+    super(`Google AI request failed with status ${status}: ${details}`);
+    this.name = "GeminiHttpError";
   }
 }
 
-function getOpenRouterApiKey(): string {
-  const key = process.env.OPENROUTER_API_KEY;
+function getGeminiApiKey(): string {
+  const key = process.env.GEMINI_API_KEY;
   if (!key) throw new AiError("AI_NOT_CONFIGURED");
   return key;
 }
 
-export type OpenRouterJsonOptions = { systemPrompt: string; userPayload: unknown; schemaName: string; jsonSchema: object; maxOutputTokens?: number };
+export type GeminiJsonOptions = { systemPrompt: string; userPayload: unknown; schemaName: string; jsonSchema: object; maxOutputTokens?: number };
 
-export async function openRouterJson<T>(options: OpenRouterJsonOptions): Promise<T> {
+export async function geminiJson<T>(options: GeminiJsonOptions): Promise<T> {
   const payload = JSON.stringify(options.userPayload);
   if (payload.length > AI_MAX_CONTEXT_CHARS || options.systemPrompt.length > AI_MAX_CONTEXT_CHARS) throw new AiError("AI_REQUEST_TOO_LARGE");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   try {
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(`${GEMINI_API_URL}/models/${AI_MODEL}:generateContent`, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${getOpenRouterApiKey()}` },
+      headers: { "content-type": "application/json", "x-goog-api-key": getGeminiApiKey() },
       body: JSON.stringify({
-        model: AI_MODEL,
-        messages: [
-          { role: "system", content: options.systemPrompt },
-          { role: "user", content: payload },
-        ],
-        max_tokens: Math.min(options.maxOutputTokens ?? 2048, 4096),
-        temperature: 0.1,
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: options.schemaName, strict: true, schema: options.jsonSchema },
+        systemInstruction: { parts: [{ text: options.systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: payload }] }],
+        generationConfig: {
+          maxOutputTokens: Math.min(options.maxOutputTokens ?? 2048, 4096),
+          responseFormat: { text: { mimeType: "application/json", schema: options.jsonSchema } },
         },
       }),
       signal: controller.signal,
     });
     if (!response.ok) {
       const details = await response.text().catch(() => "");
-      throw new OpenRouterHttpError(response.status, details.slice(0, 500));
+      throw new GeminiHttpError(response.status, details.slice(0, 500));
     }
-    const result = await response.json() as OpenRouterResponse;
-    const content = result.choices?.[0]?.message?.content ?? "";
+    const result = await response.json() as GeminiResponse;
+    const content = result.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
     if (!content || content.length > AI_MAX_OUTPUT_CHARS) throw new AiError("AI_INVALID_RESPONSE");
     try { return JSON.parse(content) as T; } catch { throw new AiError("AI_INVALID_RESPONSE"); }
   } catch (error) {

@@ -117,7 +117,7 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 ## Trace Intelligence
 
 - [ ] Defect report quality scores BUG, REGRESSION, PERFORMANCE, and SECURITY reports locally; TASK and ENHANCEMENT remain unscored.
-- [ ] Restricted/security issues show deterministic quality where applicable but never invoke OpenRouter.
+- [ ] Restricted/security issues show deterministic quality where applicable but never invoke Gemini.
 - [ ] Analyze is explicit and returns validated component, severity, priority, assignee, regression, follow-up, and duplicate advice without changing the issue.
 - [ ] Suggested component/assignee/duplicate IDs outside the supplied project allowlists are discarded.
 - [ ] Applying selected suggestions uses one atomic request, respects current role/assignment rules, and rejects stale `updated_at` without partial changes.
@@ -128,7 +128,7 @@ Use this as the submission QA sheet. Test with a Maintainer, Developer, Reporter
 - [ ] Missing key, timeout, malformed provider output, 429, concurrent Analyze, and provider failure leave deterministic workflows available.
 - [ ] Cache hits are viewer-scoped, expire, include model/schema/prompt versions, and become unreadable after project or any contributing issue access is lost.
 - [ ] Direct cache/ledger DML, cross-user completion, cross-project claims, request-budget bypass, and partial atomic-apply failures are denied.
-- [ ] Browser bundles and responses contain no `OPENROUTER_API_KEY`, prompts, raw provider output, issue comments, attachment bodies, webhook payloads, emails, or integration secrets.
+- [ ] Browser bundles and responses contain no `GEMINI_API_KEY`, prompts, raw provider output, issue comments, attachment bodies, webhook payloads, emails, or integration secrets.
 
 ## Reliability, responsive UX, and release gate
 

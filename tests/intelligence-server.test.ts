@@ -41,10 +41,10 @@ describe("Trace Intelligence server/domain boundaries", () => {
   });
 
   it("sanitizes provider failures without exposing provider text", () => {
-    const error = mapProviderError(new Error("OpenRouter secret=very-private 429 internal response"));
+    const error = mapProviderError(new Error("Google AI secret=very-private 429 internal response"));
     expect(error.code).toBe("AI_RATE_LIMITED");
     expect(error.message).not.toContain("very-private");
-    expect(error.message).not.toContain("OpenRouter");
+    expect(error.message).not.toContain("Google AI");
   });
 
   it("rejects cross-origin and originless scripted writes", () => {

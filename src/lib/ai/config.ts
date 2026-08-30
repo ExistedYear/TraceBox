@@ -1,4 +1,4 @@
-export const AI_MODEL = "z-ai/glm-5.2:free";
+export const AI_MODEL = "gemini-3.1-flash-lite";
 export const AI_TIMEOUT_MS = 8_000;
 export const AI_MAX_QUERY_CHARS = 200;
 export const AI_MAX_BODY_BYTES = 64 * 1024;

@@ -42,7 +42,7 @@ Required local/Vercel variables:
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-or-publishable-key>
 SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
-OPENROUTER_API_KEY=<optional-server-only-openrouter-key>
+GEMINI_API_KEY=<optional-server-only-gemini-key>
 GITHUB_WEBHOOK_SECRET=<server-only-webhook-signing-secret>
 GITHUB_APP_ID=<github-app-id>
 GITHUB_APP_SLUG=<github-app-slug>
@@ -54,7 +54,7 @@ GITHUB_API_VERSION=2022-11-28
 CRON_SECRET=<server-only-vercel-cron-secret>
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. `OPENROUTER_API_KEY` is used only by `src/lib/ai/client.ts`; omitting it leaves deterministic product paths available and hides provider actions. Never expose either through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
+`SUPABASE_SERVICE_ROLE_KEY` is used only in the server-side API/webhook helper. `GEMINI_API_KEY` is used only by `src/lib/ai/client.ts`; omitting it leaves deterministic product paths available and hides provider actions. Never expose either through `NEXT_PUBLIC_*`, client bundles, logs, Git, or API responses.
 
 ## Verification performed in this checkout
 
@@ -86,7 +86,7 @@ Migration 082 was dry-run as the only pending change, applied, and followed by l
 3. Verify the private `issue-attachments` Storage bucket and policies.
 4. Verify `supabase_realtime` publication tables.
 5. Configure Supabase Auth Site URL and callback URLs.
-6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables. Add server-only `OPENROUTER_API_KEY` only after reviewing OpenRouter provider data controls and free-endpoint rate limits.
+6. Configure Vercel public variables plus the server-only service-role, GitHub App, webhook, and cron variables. Add server-only `GEMINI_API_KEY` only after reviewing Google Gemini API quotas, data controls, and regional terms.
 7. Configure the GitHub App callback at `/api/github/callback`, read-only permissions for Metadata, Pull requests, Contents, Checks, and Commit statuses, and App webhook events for `pull_request`, `push`, `installation`, `installation_repositories`, `installation_target`, `repository`, `check_run`, `check_suite`, and `status` at `/api/webhooks/github`. Callback verification uses the user-token `GET /user/installations` list; do not implement or configure a nonexistent `/user/installations/{id}` endpoint.
 8. Run `qa/live/` against the deployed URL for public routes, OAuth redirect, API scopes/pagination, and webhook signatures.
 9. Run the live flow: signup → workspace → project → issue → triage → comments/attachments → planning → GitHub App install → repository binding → verified GitHub link → reports/readiness → logout. The GitHub install/bind/PR-link/merge-resolution segment has been verified; the remaining phases still need broader live coverage.

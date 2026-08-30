@@ -269,7 +269,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
             issueId={issue.id}
             projectKey={parsed.projectKey}
             expectedUpdatedAt={issue.updated_at}
-            aiConfigured={Boolean(process.env.OPENROUTER_API_KEY)}
+            aiConfigured={Boolean(process.env.GEMINI_API_KEY)}
             canApply={canEditIssue}
             reportQualityIssue={{ type: issue.type, visibility: issue.visibility, title: issue.title, description: issue.description, steps_to_reproduce: issue.steps_to_reproduce, expected_behavior: issue.expected_behavior, actual_behavior: issue.actual_behavior, environment: issue.environment, affected_version_id: issue.affected_version_id }}
             attachments={(attachmentRows ?? []).map((row) => ({ filename: (row as { filename?: string | null }).filename ?? null, mime_type: (row as { mime_type?: string | null }).mime_type ?? null }))}

@@ -117,7 +117,7 @@ export default async function IssuesPage({ searchParams }: { searchParams: Searc
           stateCategoryIds={stateCategoryIds}
           initialFilters={filters}
           initialSearchQuery={typeof filterParams.q === "string" ? filterParams.q : ""}
-          aiConfigured={Boolean(process.env.OPENROUTER_API_KEY)}
+          aiConfigured={Boolean(process.env.GEMINI_API_KEY)}
         />
       )}
     </main>

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { normalizeReadinessAnalysis } from "@/lib/readiness";
 import { AI_MODEL, AI_PROMPT_VERSION, AI_SCHEMA_VERSION } from "@/lib/ai/config";
-import { openRouterJson } from "@/lib/ai/client";
+import { geminiJson } from "@/lib/ai/client";
 import { canonicalHash } from "@/lib/ai/hash";
 import { claimAiAnalysis, completeAiAnalysis, failAiAnalysis, getCachedAiAnalysis } from "@/lib/ai/cache";
 import { releaseBriefSchema, RELEASE_JSON_SCHEMA } from "@/lib/ai/schemas/release";
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const claim = await claimAiAnalysis(key); claimId = claim.claimId; const cached = claim.result === undefined ? null : releaseBriefSchema.safeParse(claim.result).data;
     if (claim.status === "HIT" && cached) return NextResponse.json({ data: cached, cached: true });
     if (claim.status === "IN_PROGRESS") return jsonError("AI_CLAIM_CONFLICT");
-    const raw = await openRouterJson<unknown>({ systemPrompt: RELEASE_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_release_brief", jsonSchema: RELEASE_JSON_SCHEMA }); const parsed = releaseBriefSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
+    const raw = await geminiJson<unknown>({ systemPrompt: RELEASE_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_release_brief", jsonSchema: RELEASE_JSON_SCHEMA }); const parsed = releaseBriefSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
     const allowed = new Set(topIssues.map((i) => i.keyLabel)); const result = { ...parsed.data, primary_risks: parsed.data.primary_risks.filter((risk) => allowed.has(risk.issue_key)) };
     await completeAiAnalysis(key, claimId, result); return NextResponse.json({ data: result, cached: false });
   } catch (error) { if (key && claimId) await failAiAnalysis(key, claimId).catch(() => undefined); return errorResponse(error); }
