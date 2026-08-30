@@ -267,7 +267,7 @@ supabase/seed.sql        Local disposable demo account and data
 tests/                   Vitest tests
 playwright/              Browser tests
 docs/                    Active operator and product documentation
-assets/docs/             Landing-page source notes copied from repository docs
+public/assets/docs/      Landing-page source notes served at the public source links
 ```
 
 ## Security
