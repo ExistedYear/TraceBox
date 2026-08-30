@@ -34,7 +34,7 @@ Trace Intelligence is advisory. It never changes an issue without a person appro
 - Next.js 16, React 19, and strict TypeScript
 - Tailwind CSS and accessible Radix/shadcn-style components
 - Supabase Auth, PostgreSQL, Row Level Security, Storage, and Realtime
-- Groq structured output for optional Trace Intelligence features
+- OpenRouter structured output for optional Trace Intelligence features
 - GitHub App APIs and signed webhooks
 - Vitest, Playwright, pgTAP, ESLint, and GitHub Actions
 
@@ -46,7 +46,7 @@ Trace Intelligence is advisory. It never changes an issue without a person appro
 - [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), or permission for `npx` to download it
 - Git
 
-GitHub and Groq accounts are optional. The core issue tracker works without them.
+GitHub and OpenRouter accounts are optional. The core issue tracker works without them.
 
 ## Start locally
 
@@ -88,7 +88,7 @@ The reset applies every migration and loads `supabase/seed.sql`.
 Leave a feature's variables blank if you do not use it.
 
 ```dotenv
-GROQ_API_KEY=
+OPENROUTER_API_KEY=
 
 GITHUB_WEBHOOK_SECRET=
 GITHUB_APP_ID=
@@ -107,7 +107,7 @@ CRON_SECRET=
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase API URL. Safe for browser code. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser Supabase key. RLS still controls access. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Hosted server features | Server-only API, webhook, maintenance, and invitation email work. Never expose it to the browser. |
-| `GROQ_API_KEY` | No | Server-only Trace Intelligence requests. |
+| `OPENROUTER_API_KEY` | No | Server-only OpenRouter Trace Intelligence requests. |
 | `GITHUB_WEBHOOK_SECRET` | No | Verifies GitHub webhook signatures. |
 | `GITHUB_APP_ID` | No | GitHub App identity. |
 | `GITHUB_APP_SLUG` | No | Builds installation links. |
@@ -193,9 +193,9 @@ GitHub sign-in and GitHub App installation are separate. Sign-in proves identity
 
 ## Configure Trace Intelligence
 
-1. Create a Groq API key.
-2. Add `GROQ_API_KEY` to `.env.local` and your deployment host.
-3. Review provider data-retention controls before enabling it for real organization data.
+1. Create an API key in [OpenRouter](https://openrouter.ai/settings/keys).
+2. Add `OPENROUTER_API_KEY` to `.env.local` and your deployment host.
+3. Review OpenRouter provider data-retention controls and free-endpoint rate limits before enabling it for real organization data.
 4. Restart the app.
 
 Without the key, AI controls show an unavailable state. Report quality, duplicate retrieval, release readiness, issue filters, and dependency traversal still work.
@@ -230,7 +230,7 @@ npm run check:migrations
 npm run test:e2e
 ```
 
-Database tests require Docker. Live GitHub, email, multi-user, Storage, Realtime, and Groq checks require disposable external credentials and belong in staging.
+Database tests require Docker. Live GitHub, email, multi-user, Storage, Realtime, and OpenRouter checks require disposable external credentials and belong in staging.
 
 ## Architecture
 
@@ -247,10 +247,10 @@ flowchart TD
   DB --> Realtime[Supabase Realtime]
   Realtime --> Browser
   GitHub[GitHub App and webhooks] --> App
-  App --> Groq[Optional structured AI]
+  App --> OpenRouter[Optional structured AI]
 ```
 
-The database is the source of truth. Browser code never receives the service-role key, GitHub private key, webhook secret, cron secret, or Groq key.
+The database is the source of truth. Browser code never receives the service-role key, GitHub private key, webhook secret, cron secret, or OpenRouter key.
 
 ## Project structure
 
@@ -272,7 +272,7 @@ assets/docs/             Landing-page source notes copied from repository docs
 
 Read [SECURITY.md](SECURITY.md) before reporting a vulnerability. Do not open a public issue for an unpatched security problem.
 
-Never commit environment files, service keys, GitHub private keys, webhook secrets, Groq keys, cron secrets, browser storage, or API bearer tokens.
+Never commit environment files, service keys, GitHub private keys, webhook secrets, OpenRouter keys, cron secrets, browser storage, or API bearer tokens.
 
 ## Documentation
 

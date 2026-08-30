@@ -186,7 +186,7 @@ In your Supabase Dashboard:
    NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-public-key>
    SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-   GROQ_API_KEY=<server-only-groq-api-key>
+   OPENROUTER_API_KEY=<server-only-openrouter-api-key>
    GITHUB_WEBHOOK_SECRET=<random-webhook-secret>
    GITHUB_APP_ID=<github-app-id>
    GITHUB_APP_SLUG=<github-app-slug>
@@ -197,7 +197,7 @@ In your Supabase Dashboard:
    GITHUB_API_VERSION=2022-11-28
    CRON_SECRET=<random-vercel-cron-secret>
    ```
-2. Keep `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
+2. Keep `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, and `GITHUB_WEBHOOK_SECRET` server-only. Never prefix them with `NEXT_PUBLIC_`, commit them, or expose them in browser code.
 3. Start the local server:
    ```bash
    npm run dev
@@ -233,7 +233,7 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Browser + server |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key | Browser + server |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret | Server-only API routes |
-| `GROQ_API_KEY` | Groq API key for explicit Trace Intelligence requests | Server-only intelligence routes |
+| `OPENROUTER_API_KEY` | OpenRouter API key for explicit Trace Intelligence requests | Server-only intelligence routes |
 | `GITHUB_WEBHOOK_SECRET` | Random webhook signing secret | Server-only webhook route |
 | `GITHUB_APP_ID` | GitHub App numeric ID | Server-only JWT signing |
 | `GITHUB_APP_SLUG` | GitHub App URL slug | Installation redirect |
@@ -246,7 +246,7 @@ In Vercel **Settings → Environment Variables**, add these to the environments 
 
 The service-role key is required by `/api/v1/*` and `/api/webhooks/github`. Vercel server functions may use it, but it must never be named `NEXT_PUBLIC_*`, exposed in client code, returned by an endpoint, logged, or committed.
 
-Trace Intelligence uses `openai/gpt-oss-120b` through Groq only after a user chooses Analyze, Parse, or Generate. Before enabling `GROQ_API_KEY` in production, review the provider's current data controls and regional terms and enable Zero Data Retention where available. Restricted and security issues are blocked from external inference; comments, attachment bodies, webhook payloads, credentials, and email addresses are never provider context. Without `GROQ_API_KEY`, deterministic report quality, advanced filters, readiness scoring, duplicate candidates, and the local blast-radius graph remain available.
+Trace Intelligence uses `z-ai/glm-5.2:free` through OpenRouter only after a user chooses Analyze, Parse, or Generate. Before enabling `OPENROUTER_API_KEY` in production, review OpenRouter's current provider data controls, regional terms, and free-endpoint rate limits. Restricted and security issues are blocked from external inference; comments, attachment bodies, webhook payloads, credentials, and email addresses are never provider context. Without `OPENROUTER_API_KEY`, deterministic report quality, advanced filters, readiness scoring, duplicate candidates, and the local blast-radius graph remain available.
 
 ### 3.5 API and webhook contract
 

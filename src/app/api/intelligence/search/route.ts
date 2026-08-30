@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { AI_MAX_QUERY_CHARS, AI_MODEL, AI_PROMPT_VERSION, AI_SCHEMA_VERSION } from "@/lib/ai/config";
-import { groqJson } from "@/lib/ai/client";
+import { openRouterJson } from "@/lib/ai/client";
 import { canonicalHash } from "@/lib/ai/hash";
 import { claimAiAnalysis, completeAiAnalysis, failAiAnalysis, getCachedAiAnalysis } from "@/lib/ai/cache";
 import { SEARCH_SYSTEM_PROMPT } from "@/lib/ai/prompts/search";
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     const claim = await claimAiAnalysis(key); claimId = claim.claimId; const cached = claim.result === undefined ? null : searchParseSchema.safeParse(claim.result).data;
     if (claim.status === "HIT" && cached) return NextResponse.json({ data: cached, cached: true });
     if (claim.status === "IN_PROGRESS") return jsonError("AI_CLAIM_CONFLICT");
-    const raw = await groqJson<unknown>({ systemPrompt: SEARCH_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_search_filters", jsonSchema: SEARCH_JSON_SCHEMA });
+    const raw = await openRouterJson<unknown>({ systemPrompt: SEARCH_SYSTEM_PROMPT, userPayload: context, schemaName: "tracebox_search_filters", jsonSchema: SEARCH_JSON_SCHEMA });
     const parsed = searchParseSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
     const result = sanitizeSearchFilters(parsed.data, { statuses: new Set((states ?? []).map((x) => String((x as { id: string }).id))), components: new Set((components ?? []).map((x) => String((x as { id: string }).id))), members: new Set(people.map((x) => String(x.user_id))), versions: new Set((versions ?? []).map((x) => String((x as { id: string }).id))), milestones: new Set((milestones ?? []).map((x) => String((x as { id: string }).id))), labels: new Set((labels ?? []).map((x) => String((x as { id: string }).id))), customFields: new Set((fields ?? []).map((x) => String((x as { id: string }).id))) });
     await completeAiAnalysis(key, claimId, result); return NextResponse.json({ data: result, cached: false });

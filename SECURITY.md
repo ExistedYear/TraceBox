@@ -35,7 +35,7 @@ TraceBox uses:
 - `can_view_issue` for restricted issue-owned data.
 - Narrow SQL functions for privileged and atomic writes.
 - Private Storage with signed attachment URLs.
-- Server-only service-role, GitHub App, webhook, cron, and Groq credentials.
+- Server-only service-role, GitHub App, webhook, cron, and OpenRouter credentials.
 - Signed and idempotent GitHub webhook processing.
 - Bounded, redacted AI input with no restricted or security issue inference.
 - Immutable browser-facing audit history.
@@ -48,7 +48,7 @@ Never include these in a report, commit, screenshot, fixture, or public log:
 - Supabase service-role or secret keys
 - GitHub App private keys or client secrets
 - GitHub webhook secrets
-- Groq API keys
+- OpenRouter API keys
 - cron secrets
 - TraceBox API bearer tokens
 - invitation tokens, signed URLs, cookies, or browser storage

@@ -74,7 +74,7 @@ src/lib/
   utils.ts                 cn(), getSafeRedirectPath (open-redirect guard), slugify()
   errors.ts                getSafeAuthErrorMessage + getSafeWorkspaceErrorMessage
                            (maps 23505 duplicate-key and NOT_ORG_ADMIN RPC errors)
-  ai/                      server-only Groq client, strict schemas/prompts, redaction,
+  ai/                      server-only OpenRouter client for `z-ai/glm-5.2:free`, strict schemas/prompts, redaction,
                            canonical hashing, safe errors, and RPC cache adapter
   features/intelligence/   deterministic quality, context builders, filter sanitation,
                            and bounded graph traversal
@@ -291,7 +291,7 @@ At the end of **every run/session that changes the repository**, update this fil
 | `.env.example` | Required vars (see below) |
 | `README.md` | Setup/deploy runbook |
 
-Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, required by `/api/v1/*` and server GitHub routes), `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CALLBACK_URL`, `GITHUB_API_VERSION`, and `CRON_SECRET` (all GitHub/cron secrets server-only). `.env*` is gitignored except `.env.example`.
+Env contract: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (browser-safe), `SUPABASE_SERVICE_ROLE_KEY` (server-only, required by `/api/v1/*` and server GitHub routes), `OPENROUTER_API_KEY` (server-only OpenRouter key for the `z-ai/glm-5.2:free` Trace Intelligence model), `GITHUB_WEBHOOK_SECRET`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CALLBACK_URL`, `GITHUB_API_VERSION`, and `CRON_SECRET` (all GitHub/cron secrets server-only). `.env*` is gitignored except `.env.example`.
 
 ## Runtime/Tooling Preferences
 

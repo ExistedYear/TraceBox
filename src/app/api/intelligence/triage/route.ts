@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingAuthSession } from "@/lib/supabase/auth-errors";
 import { AI_MODEL, AI_PROMPT_VERSION, AI_SCHEMA_VERSION } from "@/lib/ai/config";
-import { groqJson } from "@/lib/ai/client";
+import { openRouterJson } from "@/lib/ai/client";
 import { AiError } from "@/lib/ai/errors";
 import { canonicalHash } from "@/lib/ai/hash";
 import { redactObject } from "@/lib/ai/redact";
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const cached = claim.result === undefined ? null : triageAnalysisSchema.safeParse(claim.result).data;
     if (claim.status === "HIT" && cached) return NextResponse.json({ data: cached, cached: true, inputHash: key.inputHash });
     if (claim.status === "IN_PROGRESS") return jsonError("AI_CLAIM_CONFLICT");
-    const raw = await groqJson<unknown>({ systemPrompt: TRIAGE_SYSTEM_PROMPT, userPayload: safeContext, schemaName: "tracebox_triage", jsonSchema: TRIAGE_JSON_SCHEMA });
+    const raw = await openRouterJson<unknown>({ systemPrompt: TRIAGE_SYSTEM_PROMPT, userPayload: safeContext, schemaName: "tracebox_triage", jsonSchema: TRIAGE_JSON_SCHEMA });
     const parsed = triageAnalysisSchema.safeParse(raw); if (!parsed.success) throw new AiError("AI_INVALID_RESPONSE");
     const componentIds = new Set((components ?? []).map((c) => String((c as { id: string }).id))); const assigneeIds = new Set(people.map((person) => person.user_id)); const allowedCandidateIds = new Set(candidateRows.map((c) => String(c.id)));
     const value = { ...parsed.data, component: { ...parsed.data.component, component_id: parsed.data.component.component_id && componentIds.has(parsed.data.component.component_id) ? parsed.data.component.component_id : null }, assignee: { ...parsed.data.assignee, user_id: parsed.data.assignee.user_id && assigneeIds.has(parsed.data.assignee.user_id) ? parsed.data.assignee.user_id : null }, duplicate_analysis: parsed.data.duplicate_analysis.filter((d) => allowedCandidateIds.has(d.issue_id)).slice(0, 3) };

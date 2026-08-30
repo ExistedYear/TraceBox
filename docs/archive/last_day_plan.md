@@ -1,5 +1,7 @@
 # TraceBox — Last Day Execution Plan
 
+> Historical provider note: this plan was originally written for Groq. The shipped provider is now OpenRouter using the server-only `OPENROUTER_API_KEY` with model `z-ai/glm-5.2:free`; current setup instructions live in `README.md`, `docs/deployment.md`, and `handoff.md`.
+
 > Status: implemented on 2026-08-30 with the security and lifecycle corrections recorded in [`last-day-plan-audit.md`](last-day-plan-audit.md). Operator-only production/provider checks remain evidence gates, not source-completion claims.
 
 ## Purpose

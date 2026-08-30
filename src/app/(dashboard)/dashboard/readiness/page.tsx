@@ -94,7 +94,7 @@ export default async function ReadinessPage() {
       } satisfies ReadinessSnapshot))}
       milestones={milestones}
       versions={versions}
-      aiConfigured={Boolean(process.env.GROQ_API_KEY)}
+      aiConfigured={Boolean(process.env.OPENROUTER_API_KEY)}
     />
   );
 }
